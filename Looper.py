@@ -9,11 +9,54 @@ import threading
 import OSC
 import time
 import thread
+import random
 
 def bo(*args):
     print "oibayabu"
 
 class Looper:
+    
+    
+    def __init__(self, loopO, loopV):
+        #self.recvAddr = 
+        self.loopObj = loopO
+        self.loopVect = loopV
+        self.loopInd = 0
+        self.progInd = len(loopO)
+        self.grid = [[0 for i in range(16)] for j in range (16)]
+        self.prog = phrase.Progression()
+        self.prog.c = [phrase.Chord([-1]) for i in range(16)]
+        self.prog.t = [.25 for i in range(16)]
+        self.root = 48
+        self.scale = phrase.modes["maj5"]
+        
+        
+        self.audioThread = 0
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174))
+        self.oscServSelf.addDefaultHandlers()
+        self.oscServSelf.addMsgHandler("/played", self.realPlay)
+        self.oscServSelf.addMsgHandler("/tester", self.tester)
+        self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
+        self.oscServUI = OSC.OSCServer(("192.168.1.3", 8000))
+        self.oscClientUI = OSC.OSCClient()
+        self.oscClientUI.connect(("192.168.1.2", 9000))
+        
+        
+        self.lock = threading.Lock()
+        
+        self.callbacks = [[0 for i in range(16)] for j in range (16)]
+        self.uiThread = 0
+        self.oscServUI.addDefaultHandlers()
+        print "buildcheck\n\n\n"
+        for i in range(16):
+            for j in range(16):
+                #don't need lambda functions
+                self.callbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
+                #self.callbacks[i][j](self.grid, 1, 2, 3)
+                print "wat"
+                self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.callbacks[i][j])
+        print "\n\n\nbuildcheck\n\n"
+
     
     def realPlay(self, *args):
         print "aoibay"
@@ -23,16 +66,17 @@ class Looper:
 #        if self.progInd == len(16):     #for playing chord progs (matrix)
 #            self.progInd %= len(self.loopObj)
 #            self.loopInd += 1 
-        lock = threading.Lock()
-        lock.acquire()
-        self.progInd %= 16
-        print self.progInd, "progInd"
-        phrase.play(self.prog.c[self.progInd])
-        self.loopInd += 1
-        self.progInd += 1
-        if len(args) > 0:
-            print args[0]
-        lock.release()
+        with self.lock:
+            self.progInd %= 16
+            print self.progInd, "progInd"
+            phrase.play(self.prog.c[self.progInd])
+            self.loopInd += 1
+            self.progInd += 1
+            if len(args) > 0:
+                print args[0]
+        if self.progInd == 15:
+            self.gridNoise(1)
+            
     
     def stopCallback(self):
         self.oscServSelf.close()
@@ -91,6 +135,7 @@ class Looper:
                 if grid[i][j] != 0:
                     c.append(notes[j])
             prog.append((c, .25))
+        return prog
     
      
     def scaleNotes(self, root, scale):
@@ -111,51 +156,49 @@ class Looper:
                 if col[j] != 0:
                     c.append(notes[j])
         return c
-        
+    
+    #a is actually self.grid - change this later    
     def assign2(self, a, b, c):
-        lock = threading.Lock()
-        lock.acquire()
-        print c
-        s = b.split("/")
-        i = int(s[2])-1
-        j = 16-int(s[3])
-        a[i][j] = c[0]
-        print "assigned " + str(c[0]) + " to " + str(i+1) +" " + str(j+1)
-        self.prog.c[i] = self.colToChord(a[i], 48, phrase.modes["maj5"])
-        print self.prog, "\n\n\n"
-        lock.release()
+        with self.lock:
+            print c
+            s = b.split("/")
+            i = int(s[2])-1
+            j = 16-int(s[3])
+            a[i][j] = c[0]
+            print "assigned " + str(c[0]) + " to " + str(i+1) +" " + str(j+1)
+            self.prog.c[i] = self.colToChord(a[i], self.root, self.scale)
+            print self.prog, "\n\n\n"
+            
         
-    def __init__(self, loopO, loopV):
-        #self.recvAddr = 
-        self.loopObj = loopO
-        self.loopVect = loopV
-        self.loopInd = 0
-        self.progInd = len(loopO)
-        self.grid = [[0 for i in range(16)] for j in range (16)]
-        self.prog = phrase.Progression()
-        self.prog.c = [phrase.Chord([-1]) for i in range(16)]
-        self.prog.t = [.25 for i in range(16)]
+    def gridNoise(self, k):
+        print "in noise"
+        with self.lock:
+            print "in lock"
+            l = len(self.grid)
+            p = 1.0 * k / (l*l)
+            msg = OSC.OSCMessage()
+            #make everything 1 instead of 14 in touchOSC
+            for i in range(l):
+                for j in range(l):
+                    if random.uniform(0, 1) < p:
+                        msg.setAddress("/grid/"+str(i+1) +"/" + str(16-j))
+                        if self.grid[i][j] != 0:
+                            self.grid[i][j] = 0
+                            msg.append(0)
+                            self.oscClientUI.send(msg)
+                            msg.clearData()
+                        else: 
+                            self.grid[i][j] = 18
+                            msg.append(18)
+                            self.oscClientUI.send(msg)
+                            msg.clearData()
+                self.prog.c[i] = self.colToChord(self.grid[i], self.root, self.scale)
+            print "randomized"
+            #self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            
+                
         
-        self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174))
-        self.oscServSelf.addDefaultHandlers()
-        self.oscServSelf.addMsgHandler("/played", self.realPlay)
-        self.oscServSelf.addMsgHandler("/tester", self.tester)
-        self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("10.76.205.109", 8000))
-        
-        self.callbacks = [[0 for i in range(16)] for j in range (16)]
-        self.uiThread = 0
-        self.oscServUI.addDefaultHandlers()
-        print "buildcheck\n\n\n"
-        for i in range(16):
-            for j in range(16):
-                self.callbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
-                #self.callbacks[i][j](self.grid, 1, 2, 3)
-                print "wat"
-                self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.callbacks[i][j])
-        print "\n\n\nbuildcheck\n\n"
-
+    
 n = [60, 62, 64, 65]
 t = [1, 1, 1, 1]
 p = phrase.Phrase(n, t)
