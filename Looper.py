@@ -194,7 +194,7 @@ class Looper:
                             msg.clearData()
                 self.prog.c[i] = self.colToChord(self.grid[i], self.root, self.scale)
             print "randomized"
-            #self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            #self.prog = self.gridToProg(self.grid, self.scale, self.root) 
             
                 
         

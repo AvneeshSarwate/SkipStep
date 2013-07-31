@@ -10,8 +10,14 @@ test morph function
 
 
 
-BUG - after certain amount of loop iterations, 
+BUG (FIXED WITH MINIAUDICLE UPDATE) - 
+after certain amount of loop iterations, 
 playing a phrase no longer plays audio on ableton
 even though ableton registers midi coming in, no audio.
 restarting chuck VM temporarily fixes this. 
 not sure if ableton or chuck problem. 
+
+----------------------------------------------------
+
+basic grid "noise" function working
+on every loop iteration, grid flips on average k squares.
