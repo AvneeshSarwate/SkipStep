@@ -46,4 +46,7 @@ BUGS
 MORE FEATURES to implement
 - back button
 - reverse looping
+----------------------------------------------
+FIXED
+- transition between normal and collumn subset looping
 	
