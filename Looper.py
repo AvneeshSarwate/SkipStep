@@ -127,7 +127,7 @@ class Looper:
             print "                             inside lock ", self.progInd
             self.subsets = (stuff[0] == 1)
             print "                             past bool", self.subsets 
-            self.progInd = 0 if stuff[1] == 0 else self.columnsub[self.progInd]
+            self.progInd = 0 if stuff[0] == 1 else self.columnsub[self.progInd]
             print "                      colsub ", str(self.subsets), "progind" + str(self.progind)
         
            
