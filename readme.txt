@@ -21,3 +21,29 @@ not sure if ableton or chuck problem.
 
 basic grid "noise" function working
 on every loop iteration, grid flips on average k squares.
+
+----------------------------------------------------
+step indicator and "step jumping" working
+
+noise on/off button, clear grid button working
+
+added grid copy function
+
+column subset looping working (with small bug)
+
+modularity improvements (wrapper for cleanliness):
+	create play(i) function - plays ith chord/column
+	method to translate touchOSC indicies into grid indicies
+	
+for "column subset looping" - maintin list of selected column indicies
+	iterate over that list (no need for new progression)
+
+BUGS 
+- still some issues with UI being thrown out of sync w/ internal grid
+	double check threading
+- when switching from subset to full looping, not going to correct column on transition
+
+MORE FEATURES to implement
+- back button
+- reverse looping
+	

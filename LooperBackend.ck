@@ -99,7 +99,7 @@ for(0 => int i; i < nInst; i++) {
     m[i] => g;
 }
 
-1.2::second => dur whole;
+1::second => dur whole;
 .01::second => dur split;
 
 fun void playPhrase(StkInstrument c, int notes[], float times[], dur whole) {

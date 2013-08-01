@@ -29,6 +29,9 @@ class Looper:
         self.prog.t = [.25 for i in range(16)]
         self.root = 48
         self.scale = phrase.modes["maj5"]
+        self.noisy = False
+        self.columnsub = []
+        self.subsets = False
         
         
         self.audioThread = 0
@@ -40,6 +43,7 @@ class Looper:
         self.oscServUI = OSC.OSCServer(("192.168.1.3", 8000))
         self.oscClientUI = OSC.OSCClient()
         self.oscClientUI.connect(("192.168.1.2", 9000))
+        self.stepTrack = OSC.OSCMessage()
         
         
         self.lock = threading.Lock()
@@ -48,12 +52,20 @@ class Looper:
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         print "buildcheck\n\n\n"
+        self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
+        self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
+        for i in range(16):
+            self.oscServUI.addMsgHandler("/step/" + str(i+1) + "/1", self.stepjump)
+            print "step jumper " + str(i + 1)
+        for i in range(16):
+            self.oscServUI.addMsgHandler("/col/" + str(i+1) + "/1", self.colsub)
+            print "step jumper " + str(i + 1)
         for i in range(16):
             for j in range(16):
                 #don't need lambda functions
                 self.callbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
                 #self.callbacks[i][j](self.grid, 1, 2, 3)
-                print "wat"
+                print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.callbacks[i][j])
         print "\n\n\nbuildcheck\n\n"
 
@@ -66,17 +78,62 @@ class Looper:
 #        if self.progInd == len(16):     #for playing chord progs (matrix)
 #            self.progInd %= len(self.loopObj)
 #            self.loopInd += 1 
-        with self.lock:
-            self.progInd %= 16
-            print self.progInd, "progInd"
-            phrase.play(self.prog.c[self.progInd])
+        with self.lock: 
+            if(self.subsets):
+                l = len(self.columnsub)
+                self.progInd %= len(self.columnsub)
+                playind = self.columnsub[self.progInd]
+                
+            else:
+                l = 16
+                self.progInd %= 16
+                playind = self.progInd
+            print playind, "playind"
+            #turn light on for progind+1
+            self.stepTrack.setAddress("/step/" + str(playind+1) + "/1")
+            self.stepTrack.append(1)
+            self.oscClientUI.send(self.stepTrack)
+            self.stepTrack.clearData()
+            phrase.play(self.prog.c[playind]) #make this more efficient turn it into a PLAYER object?
             self.loopInd += 1
             self.progInd += 1
             if len(args) > 0:
                 print args[0]
-        if self.progInd == 15:
-            self.gridNoise(1)
-            
+        if self.noisy and self.progInd == (l-1):
+            self.gridNoise(5)
+   
+    def stepjump(self, addr, tags, stuff, source):
+        if stuff[0] != 0:
+            self.progInd = int(addr.split("/")[2]) - 1
+            print "                                jumped to " + str(self.progInd)
+    
+    def noiseFlip(self, addr, tags, stuff, source):
+        print "                               noise flip " + str(stuff[0] == 1)
+        self.noisy = (stuff[0] == 1)
+    
+    def colsub(self, addr, tags, stuff, source):
+        ind = int(addr.split("/")[2]) - 1
+        if stuff[0] == 1 and ind not in self.columnsub: #do we need 2nd conditional?
+            self.columnsub.append(ind)
+            print "                            added " + str(ind)
+        if stuff[0] == 0 and ind in self.columnsub:
+            self.columnsub.remove(ind)
+            print "                            removed " + str(ind)
+        self.columnsub.sort()
+    
+    def colsubflip(self, addr, tags, stuff, source):
+        print "                             gottem yo", self.progInd
+        with self.lock:
+            print "                             inside lock ", self.progInd
+            self.subsets = (stuff[0] == 1)
+            print "                             past bool", self.subsets 
+            self.progInd = 0 if stuff[1] == 0 else self.columnsub[self.progInd]
+            print "                      colsub ", str(self.subsets), "progind" + str(self.progind)
+        
+           
+    def gridcopy(self, *args):
+        k = self.grid if len(args) == 0 else args[0]
+        return [[k[j][i] for i in range(len(k))] for j in range(len(k))]
     
     def stopCallback(self):
         self.oscServSelf.close()
