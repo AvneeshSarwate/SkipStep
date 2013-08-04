@@ -40,9 +40,9 @@ class Looper:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("192.168.1.3", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.181.114", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("192.168.1.2", 9000))
+        self.oscClientUI.connect(("169.254.6.165", 9000))
         self.stepTrack = OSC.OSCMessage()
         
         

@@ -49,4 +49,6 @@ MORE FEATURES to implement
 ----------------------------------------------
 FIXED
 - transition between normal and collumn subset looping
-	
+
+BUG
+- when jumping between columns on collumn subset mode, doesn't exactly work right
