@@ -32,6 +32,8 @@ class Looper:
         self.noisy = False
         self.columnsub = []
         self.subsets = False
+        self.gridzz = [0 for i in range(6)]
+        self.noiselev = 2
         
         
         self.audioThread = 0
@@ -40,9 +42,9 @@ class Looper:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.181.114", 8000))
+        self.oscServUI = OSC.OSCServer(("192.168.1.3", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.6.165", 9000))
+        self.oscClientUI.connect(("192.168.1.2", 9000))
         self.stepTrack = OSC.OSCMessage()
         
         
@@ -52,14 +54,27 @@ class Looper:
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         print "buildcheck\n\n\n"
+        
         self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
+        
         for i in range(16):
             self.oscServUI.addMsgHandler("/step/" + str(i+1) + "/1", self.stepjump)
             print "step jumper " + str(i + 1)
+            
         for i in range(16):
             self.oscServUI.addMsgHandler("/col/" + str(i+1) + "/1", self.colsub)
             print "step jumper " + str(i + 1)
+        
+        for i in range(5):
+            self.oscServUI.addMsgHandler("/noiselev/" + str(i+1) + "/1", self.noiseLevHandler)
+        
+        for i in range(6):
+            self.oscServUI.addMsgHandler("/gridload/" + str(i+1) + "/1", self.gridload)
+        
+        for i in range(6):
+            self.oscServUI.addMsgHandler("/gridsave/" + str(i+1) + "/1", self.saveGrid)
+            
         for i in range(16):
             for j in range(16):
                 #don't need lambda functions
@@ -100,7 +115,7 @@ class Looper:
             if len(args) > 0:
                 print args[0]
         if self.noisy and self.progInd == (l-1):
-            self.gridNoise(5)
+            self.gridNoise(self.noiselev)
    
     def stepjump(self, addr, tags, stuff, source):
         if stuff[0] != 0:
@@ -110,6 +125,9 @@ class Looper:
     def noiseFlip(self, addr, tags, stuff, source):
         print "                               noise flip " + str(stuff[0] == 1)
         self.noisy = (stuff[0] == 1)
+    #new
+    def noiseLevHandler(self, addr, tags, stuff, source):
+        self.noiselev = 2 * int(addr.split("/")[2])
     
     def colsub(self, addr, tags, stuff, source):
         ind = int(addr.split("/")[2]) - 1
@@ -130,10 +148,48 @@ class Looper:
             self.progInd = 0 if stuff[0] == 1 else self.columnsub[self.progInd]
             print "                      colsub ", str(self.subsets), "progind" + str(self.progind)
         
-           
+    #new       
     def gridcopy(self, *args):
-        k = self.grid if len(args) == 0 else args[0]
+        #k = self.grid if len(args) == 0 else args[0]
+        print "                                len ", len(args)
+        if len(args) == 0:
+            k = self.grid
+            print "                                uno "
+        else: 
+            k = args[0]
+            print "                                dos "
         return [[k[j][i] for i in range(len(k))] for j in range(len(k))]
+   #new 
+    def gridload(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        ind = int(addr.split("/")[2]) - 1
+        self.pullUpGrid(self.gridzz[ind])
+    #new
+    def pullUpGrid(self, grid):
+        msg = OSC.OSCMessage()
+        with self.lock:
+            for i in range(len(grid)):
+                for j in range(len(grid)):
+                    msg.setAddress("/grid/"+str(i+1) +"/" + str(16-j))
+                    msg.append(grid[i][j])
+                    self.oscClientUI.send(msg)
+                    msg.clearData()
+            print "                          pre", type(grid), type(self.scale), type(self.root)
+            self.prog = self.gridToProg(grid, self.scale, self.root)
+            print "                          progged"
+            self.grid = self.gridcopy(grid)
+            
+    #new
+    def saveGrid(self, addr, tags, stuff, source):
+        ind = int(addr.split("/")[2]) - 1
+        if stuff[0] != 0:
+            self.gridzz[ind] = self.gridcopy()
+        else: 
+            self.gridzz[ind] = 0 
+    #new        
+    def gridClear(self):
+        self.prog = self.prog.c = [phrase.Chord([-1]) for i in range(16)]
+        self.pullUpGrid([[0 for i in range(16)] for j in range (16)])
     
     def stopCallback(self):
         self.oscServSelf.close()
@@ -183,12 +239,12 @@ class Looper:
     def gridToProg(self, grid, scale, root):
         notes = self.scaleNotes(root, scale)
         prog = phrase.Progression()
-        for i in len(grid):
+        for i in range(len(grid)):
             if sum(grid[i]) == 0:
                 prog.append((phrase.Chord([-1]), .25))
                 continue
             else: c = phrase.Chord()
-            for j in len(grid[i]):
+            for j in range(len(grid[i])):
                 if grid[i][j] != 0:
                     c.append(notes[j])
             prog.append((c, .25))
@@ -224,8 +280,7 @@ class Looper:
             a[i][j] = c[0]
             print "assigned " + str(c[0]) + " to " + str(i+1) +" " + str(j+1)
             self.prog.c[i] = self.colToChord(a[i], self.root, self.scale)
-            print self.prog, "\n\n\n"
-            
+            print self.prog, "\n\n\n"        
         
     def gridNoise(self, k):
         print "in noise"

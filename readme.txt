@@ -38,17 +38,21 @@ modularity improvements (wrapper for cleanliness):
 for "column subset looping" - maintin list of selected column indicies
 	iterate over that list (no need for new progression)
 
-BUGS 
-- still some issues with UI being thrown out of sync w/ internal grid
-	double check threading
-- when switching from subset to full looping, not going to correct column on transition
-
 MORE FEATURES to implement
 - back button
 - reverse looping
 ----------------------------------------------
 FIXED
 - transition between normal and collumn subset looping
+_________________________________________________
 
-BUG
+variable noise implemented
+
+save/load grids implemented
+
+BUGS
+- still some issues with UI being thrown out of sync w/ internal grid
+	double check threading
 - when jumping between columns on collumn subset mode, doesn't exactly work right
+- noise being applied on 14th column, not first
+- optimize as much as possible 
