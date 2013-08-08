@@ -56,3 +56,16 @@ BUGS
 - when jumping between columns on collumn subset mode, doesn't exactly work right
 - noise being applied on 14th column, not first
 - optimize as much as possible 
+-------
+TODO:
+- "refresh" mode-given a "backup" grid, you can change a column, and it plays 
+	the changed version, but after the column is played it reverts to the backup version
+	(levels of diff/backup? i.e. - refresh after 2 rounds, or 2 rounds variation, saving
+	 each "round" of variation, then 2 rounds stepping back down 1 round at a time)
+- piano mode:
+	replace step position selectors with buttons
+	create playOn and playOff code modeling phrase.play and LooperBackend
+- comparison view - have one grid under another, bottom grid is same as current playing
+	grid and uneditable, editable grid goes on top 
+- optimize UI updating so OSC messages only sent for grid elements that are diff
+	(precalculate diff grid: each element is -1 if same, or value of new grid if not)
