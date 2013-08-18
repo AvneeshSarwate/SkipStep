@@ -24,9 +24,11 @@ class Looper:
         self.loopInd = 0
         self.progInd = len(loopO)
         self.grid = [[0 for i in range(16)] for j in range (16)]
+        self.refgrid = [[0 for i in range(16)] for j in range (16)]
         self.prog = phrase.Progression()
         self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.prog.t = [.25 for i in range(16)]
+        self.refprog = 0
         self.root = 48
         self.scale = phrase.modes["maj5"]
         self.noisy = False
@@ -34,6 +36,7 @@ class Looper:
         self.subsets = False
         self.gridzz = [0 for i in range(6)]
         self.noiselev = 2
+        self.refreshing = False
         
         
         self.audioThread = 0
@@ -110,13 +113,34 @@ class Looper:
             self.oscClientUI.send(self.stepTrack)
             self.stepTrack.clearData()
             phrase.play(self.prog.c[playind]) #make this more efficient turn it into a PLAYER object?
+            if self.refreshing:
+                self.refreshColumn(playind)
             self.loopInd += 1
             self.progInd += 1
             if len(args) > 0:
                 print args[0]
         if self.noisy and self.progInd == (l-1):
             self.gridNoise(self.noiselev)
-   
+    
+    def refreshColumn(self, k):
+        msg = OSC.OSCMessage()
+        msg.setAddress("/refresh")
+        for i in len(self.grid):
+            if(self.refgrid[k][i] != self.grid[k][i]):
+                msg.append(self.refgrid[k][i])
+                self.oscClientUI.send(msg)
+                msg.clearData()
+                self.grid[k][i] = self.refgrid[k][i]
+        self.prog.c[k] = self.refprog.c[k]
+    
+    def refreshHanlder(self, addr, tags, stuff, source):
+        if stuff[0] != 0:
+            self.refreshing = True
+            self.refprog = phrase.Progression(self.prog)
+            self.refgrid = self.gridcopy(self.grid)
+        else:
+            self.refreshing = False   
+    
     def stepjump(self, addr, tags, stuff, source):
         if stuff[0] != 0:
             self.progInd = int(addr.split("/")[2]) - 1
