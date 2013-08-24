@@ -25,6 +25,7 @@ class Looper:
         self.progInd = len(loopO)
         self.grid = [[0 for i in range(16)] for j in range (16)]
         self.refgrid = [[0 for i in range(16)] for j in range (16)]
+        self.pianogrid = [[0 for i in range(16)] for j in range (16)]
         self.prog = phrase.Progression()
         self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.prog.t = [.25 for i in range(16)]
@@ -45,15 +46,16 @@ class Looper:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("192.168.1.3", 8000))
+        self.oscServUI = OSC.OSCServer(("192.168.10.86", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("192.168.1.2", 9000))
+        self.oscClientUI.connect(("192.168.10.124", 9000))
         self.stepTrack = OSC.OSCMessage()
         
         
         self.lock = threading.Lock()
         
-        self.callbacks = [[0 for i in range(16)] for j in range (16)]
+        self.gridcallbacks = [[0 for i in range(16)] for j in range (16)]
+        self.pianocallbacks = [[0 for i in range(16)] for j in range (16)]
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         print "buildcheck\n\n\n"
@@ -80,11 +82,17 @@ class Looper:
             
         for i in range(16):
             for j in range(16):
-                #don't need lambda functions
-                self.callbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
-                #self.callbacks[i][j](self.grid, 1, 2, 3)
-                print "grid ui listener " + str(i+1) + " " + str(j+1)
-                self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.callbacks[i][j])
+                self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
+                #print "grid ui listener " + str(i+1) + " " + str(j+1)
+                self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
+        
+        for i in range(16):
+            for j in range(16):
+                
+                self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.pianogrid, addr, stuff)
+                #print "grid ui listener " + str(i+1) + " " + str(j+1)
+                self.oscServUI.addMsgHandler("pianoGrid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
+        
         print "\n\n\nbuildcheck\n\n"
 
     
@@ -187,14 +195,14 @@ class Looper:
     def gridload(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         ind = int(addr.split("/")[2]) - 1
-        self.pullUpGrid(self.gridzz[ind])
+        self.pullUpGrid(self.gridzz[ind], "/grid")
     #new
-    def pullUpGrid(self, grid):
+    def pullUpGrid(self, grid, gridAddr):
         msg = OSC.OSCMessage()
         with self.lock:
             for i in range(len(grid)):
                 for j in range(len(grid)):
-                    msg.setAddress("/grid/"+str(i+1) +"/" + str(16-j))
+                    msg.setAddress(gridAddr + "/"+str(i+1) +"/" + str(16-j))
                     msg.append(grid[i][j])
                     self.oscClientUI.send(msg)
                     msg.clearData()
@@ -202,6 +210,23 @@ class Looper:
             self.prog = self.gridToProg(grid, self.scale, self.root)
             print "                          progged"
             self.grid = self.gridcopy(grid)
+            
+    def pianoModeOn(self, addr, tags, stuff, source):
+        #switch tab to piano mode tab
+        self.stopCallback()
+        self.pianogrid = self.gridcopy()
+        self.pullUpGrid(self.grid, "/pianoGrid")
+        #hanlders for "piano keys" should already be set up
+        return
+    #SHOULD PIANO GRID BE EDITABLE AND SHOULD EDITS UPDATE TO MAIN GRID
+    
+    #set up handler using lambda functions like with normal grid 
+    def pianoKey(self, addr, tags, stuff, source):
+        i, j = self.gridAddrInd(addr)
+        if(stuff[0] == 1):
+            phrase.play(toggle="on", self.prog.c[i])
+        else:
+            phrase.play(toggle="off", self.prog.c[i])
             
     #new
     def saveGrid(self, addr, tags, stuff, source):
@@ -213,10 +238,10 @@ class Looper:
     #new        
     def gridClear(self):
         self.prog = self.prog.c = [phrase.Chord([-1]) for i in range(16)]
-        self.pullUpGrid([[0 for i in range(16)] for j in range (16)])
+        self.pullUpGrid([[0 for i in range(16)] for j in range (16)], "/grid")
     
     def stopCallback(self):
-        self.oscServSelf.close()
+        self.oscServSelf.close() #do we need to close server? probs not
         self.audioThread.join()
         
     def playStart(self):
@@ -294,13 +319,21 @@ class Looper:
                     c.append(notes[j])
         return c
     
+    def gridAddrInd(self, addr):
+        s = addr.split("/")
+        i = int(s[2])-1
+        j = 16-int(s[3])
+        return i, j
+        
+    
     #a is actually self.grid - change this later    
     def assign2(self, a, b, c):
         with self.lock:
             print c
-            s = b.split("/")
-            i = int(s[2])-1
-            j = 16-int(s[3])
+#            s = b.split("/")
+#            i = int(s[2])-1
+#            j = 16-int(s[3])
+            i, j = self.gridAddrInd(b)
             a[i][j] = c[0]
             print "assigned " + str(c[0]) + " to " + str(i+1) +" " + str(j+1)
             self.prog.c[i] = self.colToChord(a[i], self.root, self.scale)

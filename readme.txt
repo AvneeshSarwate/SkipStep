@@ -69,3 +69,12 @@ TODO:
 	grid and uneditable, editable grid goes on top 
 - optimize UI updating so OSC messages only sent for grid elements that are diff
 	(precalculate diff grid: each element is -1 if same, or value of new grid if not)
+--------
+SHOULD PIANO GRID BE EDITABLE AND SHOULD CHANGES PUSH TO MAIN GRID
+	option to toggle updating on/off?
+	For now - "going to piano mode" sends main grid to piano screen
+		but piano screen not pushed to main grid (can have button to do that)
+
+writen, but with no UI and not tested:
+	refresh mode
+	piano mode

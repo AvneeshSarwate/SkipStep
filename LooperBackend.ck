@@ -102,65 +102,6 @@ for(0 => int i; i < nInst; i++) {
 1::second => dur whole;
 .01::second => dur split;
 
-fun void playPhrase(StkInstrument c, int notes[], float times[], dur whole) {
-    
-    Flute s => dac;
-    
-    <<<"oi">>>;
-    notes.size() => int len;
-    
-    for(0 => int i; i < len; i++) {
-        //problem comes when OSC messaged doesn't get sent 
-        <<<notes[i], times[i]>>>;  //displas 0, 0 on error
-        if(notes[i] == 0 || times[i] == 0) {
-            <<<"OSC message failure (play)">>>;
-            return;
-        } 
-        if(notes[i] == -1) {
-            whole*times[i] => now;
-        }
-        else{
-            midOn(notes[i]);
-            whole*times[i] - split => now;
-        }
-        midOff(notes[i]);
-        split=>now;
-    }   
-    1 => s.noteOff;
-    
-    s =< dac;
-    conf.startMsg("/played", "s");
-    "played0" => conf.addString;
-    <<<"phrase played">>>;
-}
-
-fun void readOSCPhrase(OscEvent start, OscEvent nums, OscEvent nums2, int n, StkInstrument f, dur whole) {
-    <<<n, "numnotes">>>;
-    int notes[n];
-    float times[n];
-    
-    0 => int broken;
-    for(0 => int i; i < n; i++) {
-        nums => now;
-        nums.nextMsg();
-        nums.getInt() => notes[i];
-        <<<notes[i], "notes[i]">>>;
-        nums2 => now;
-        nums2.nextMsg();
-        nums2.getFloat() => times[i];
-        <<<times[i], "times[i]">>>;
-        if(notes[i] == 0 || times[i] == 0) {
-            <<<"OSC message failure (read)">>>;
-            1 => broken;
-            //return;
-        }
-    }
-    if(broken == 1) return;
-    <<<"yo">>>;
-    playPhrase(f, notes, times, whole);
-}
-
-
 0 => int chordNum;
 fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur whole) {
     <<<n>>>;
@@ -185,6 +126,69 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     //<<<"yo chord">>>;
     playChord(m, c, whole);
 }
+
+fun Chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
+    <<<n>>>;
+    int notes[n];
+    0 => int broken;
+    for(0 => int i; i < n; i++) {
+        nums => now;
+        nums.nextMsg();
+        nums.getInt() => notes[i];
+        if(notes[i] == 0) {
+            <<<"OSC message failure (read)">>>;
+            1 => broken;
+            //return; //better than break?
+            //break;
+        }
+    }
+    if(broken == 1) return;
+    chord c;
+    c.setNotes(notes);
+    //<<<"yo chord">>>;
+    return c;
+}
+
+fun void readAndToggle(OscEvent start, OscEvent nums, int n, int on){
+    readOSCChord2(start, nums, n) @=> chord c;
+    chordToggle(c, on);
+}
+
+fun void chordToggle(chord c, int on) {
+    //<<<"oi chord">>>;
+    c.size() => int len;
+    if(c.notes[0] == -1) {
+        /*.25 * whole => now;
+        <<<"chord rest">>>;
+        conf.startMsg("/played", "s");
+        "played0" => conf.addString;*/
+        return;
+    }
+    
+    for(0 => int i; i < len; i++) {
+        if(c.notes[i] == 0) {
+            <<<"OSC message failure (play)">>>;
+            return; //better than break?
+            break;
+        } 
+        //spork ~ miniPlay(Std.mtof(c.notes[i]), whole, m[i]);
+        if(on == 1)
+            midOn(c.notes[i]);
+        else
+            midOff(c.notes[i]);
+        <<<c.notes[i]>>>;
+    }   
+    /*.25*whole => now;
+    for(0 => int i; i < len; i++) {
+        midOff(c.notes[i]);
+    }
+    conf.startMsg("/played", "s");
+    "played0" => conf.addString;
+    <<<"function played chord">>>;*/
+}
+
+
+
 
 fun void playChord(Mandolin m[], chord c, dur whole) {
     //<<<"oi chord">>>;
@@ -217,46 +221,6 @@ fun void playChord(Mandolin m[], chord c, dur whole) {
 }
 
 
-fun void readOSCProg(OscEvent start, OscEvent nums, OscEvent nums2, int n, Mandolin m[], dur whole) {
-    chord c[n];
-    float t[n];
-    <<<"stared read prog with " + n + " chords">>>; 
-    for(0 => int i; i < n; i++){
-        nums => now;
-        nums.nextMsg();
-        nums.getInt() => int cn;
-        <<<"cn " + cn>>>;
-        int cnotes[cn];
-        nums2 => now;
-        nums2.nextMsg();
-        nums2.getFloat() => t[i];
-        if(cn * t[i] == 0) {
-            <<<"OSC reading error (prog)">>>;
-            while(nums.nextMsg() != 0) ;
-            return;
-        }
-        <<<"t[i] " + t[i]>>>;
-        for(0 => int k; k < cn; k++) {
-            nums => now;
-            nums.nextMsg();
-            nums.getInt() => cnotes[k];
-            <<<cnotes[k]>>>;
-            if(cnotes[k] == 0) {
-                <<<"OSC reading error (prog)">>>;
-                while(nums.nextMsg() != 0) ;
-                return;
-            }
-        }
-        c[i].setNotes(cnotes);
-        <<<"chord " + i + " done">>>;
-    }
-    for(0 => int i; i < n; i++){
-        playChord(m, c[i], t[i]*whole);
-    }
-    
-}
-
-
 
 // infinite event loop
 while ( true )
@@ -280,34 +244,18 @@ while ( true )
             nums[i] => now;
             nums[i].nextMsg();
             nums[i].getInt() => int n;
-            if(mtype == "phrase") {
-                spork~ readOSCPhrase(start, nums[i], nums2[i], n, f, whole); 
-            }
             if(mtype == "chord") {
                 spork~ readOSCChord(start, nums[i], n, m, whole);
             }
-            if(mtype == "progression") {
-                spork~ readOSCProg(start, nums[i], nums2[i], n, m, whole);
+            if(mtype == "on") {
+                spork~ readAndToggle(start, nums[i], n, 1);
+            }
+            if(mtype == "off") {
+                spork~ readAndToggle(start, nums[i], n, 0);
             }
         }
     }
     //now that you have phrase length n, make and play arrays
 }
 
-
-
-// grab the next message from the queue. 
-// while ( oe.nextMsg() != 0 )
-//{ 
-// getFloat fetches the expected float (as indicated by "f")
-//   oe.getFloat() => float got;
-// print
-//   <<< "got (via OSC):", got >>>;
-// set play pointer to beginning
-//0 => buf.pos;
-
-//   oe.nextMsg();
-//   oe.getFloat() => got;
-//   <<<"got again", got >>>;
-//}
 
