@@ -9,7 +9,7 @@ public class chord{
     }
     public int size() {
         return notes.size();
-    }   
+    }    
 }
 
 
