@@ -62,6 +62,8 @@ class Looper:
         
         self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
+        self.oscServUI.addMsgHandler("/piano", self.pianoModeOn)
+        #need to add everything for moving piano mode grid back to main 
         
         for i in range(16):
             self.oscServUI.addMsgHandler("/step/" + str(i+1) + "/1", self.stepjump)

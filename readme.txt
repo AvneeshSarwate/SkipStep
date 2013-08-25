@@ -75,6 +75,6 @@ SHOULD PIANO GRID BE EDITABLE AND SHOULD CHANGES PUSH TO MAIN GRID
 	For now - "going to piano mode" sends main grid to piano screen
 		but piano screen not pushed to main grid (can have button to do that)
 
-writen, but with no UI and not tested:
+writen, but with no UI and not tested: 
 	refresh mode
 	piano mode

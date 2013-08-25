@@ -637,7 +637,7 @@ def play(toggle = "", *args):    #send object type to reciever
             
             mtype = OSC.OSCMessage()
             mtype.setAddress("type")
-            mtype.append(obj.type)
+            mtype.append(obj.type) 
             nums = OSC.OSCMessage()
             nums.setAddress("nums" + str(i))
             nums.append(n);
