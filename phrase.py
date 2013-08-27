@@ -70,9 +70,9 @@ class Progression:
         self.names = list()
         self.type = "progression" 
         if(len(args) > 0 and args[0].type == "progression"):
-            for i in range(len(args)):
-                self.c.append(Chord(args.c[i]))
-                self.t.append(args.t[i])
+            for i in range(len(args[0])):
+                self.c.append(Chord(args[0].c[i]))
+                self.t.append(args[0].t[i])
         
     def append(self, arg):
         #print arg[0]

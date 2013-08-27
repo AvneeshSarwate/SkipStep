@@ -1,4 +1,4 @@
-/*public class chord{
+public class chord{
     int notes[];
     public void setNotes(int a[]) {
         int temp[a.size()];
@@ -10,7 +10,7 @@
     public int size() {
         return notes.size();
     }    
-}*/
+}
 
 
 MidiOut mout;

@@ -48,7 +48,7 @@ class Looper:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("10.76.205.109", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("192.168.10.124", 9000))
+        self.oscClientUI.connect(("10.76.205.110", 9000))
         self.stepTrack = OSC.OSCMessage()
         
         
@@ -126,6 +126,7 @@ class Looper:
             print "in play"
             phrase.play(self.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if self.refreshing:
+                print "                                   refresh", playind
                 self.refreshColumn(playind)
             self.loopInd += 1
             self.progInd += 1
@@ -137,19 +138,28 @@ class Looper:
     def refreshColumn(self, k):
         msg = OSC.OSCMessage()
         msg.setAddress("/refresh")
-        for i in len(self.grid):
+        for i in range(len(self.grid)):
             if(self.refgrid[k][i] != self.grid[k][i]):
                 msg.append(self.refgrid[k][i])
                 self.oscClientUI.send(msg)
                 msg.clearData()
                 self.grid[k][i] = self.refgrid[k][i]
+        print "error here?"
+        print type(self.refprog), "refprog", "after"
+        print type(self.prog), "prog"
+        
         self.prog.c[k] = self.refprog.c[k]
     
     def refreshHandler(self, addr, tags, stuff, source):
+        print "                     hit ref handler", stuff, stuff[0] != 0
         if stuff[0] != 0:
+            print "                    in conditional"
             self.refreshing = True
             self.refprog = phrase.Progression(self.prog)
+            print type(self.refprog), "refprog", "before"
             self.refgrid = self.gridcopy(self.grid)
+            print len(self.prog), ":prog", len(self.refprog), ":refprog"
+            print "refresh on"
         else:
             self.refreshing = False   
     
