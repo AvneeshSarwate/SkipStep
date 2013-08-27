@@ -582,7 +582,7 @@ def fillPhrase(phr, txt, root):
             phr.append((cmap[txt[x%l]], dic2[txt[x%l-k]]))
     return cmap
 
-def play(toggle = "", *args):    #send object type to reciever 
+def play(*args, **kwargs):    #send object type to reciever 
     client = OSC.OSCClient()
     client.connect( ('127.0.0.1', 6449) )  
     start = OSC.OSCMessage()
@@ -590,6 +590,7 @@ def play(toggle = "", *args):    #send object type to reciever
     start.append("started")
     objs = OSC.OSCMessage()
     objs.setAddress("objs")
+    print "args", len(args)
     objs.append(len(args))
     client.send(start)
     client.send(objs)
@@ -605,10 +606,10 @@ def play(toggle = "", *args):    #send object type to reciever
             
             mtype = OSC.OSCMessage()
             mtype.setAddress("type")
-            if toggle == "" : 
+            if kwargs["toggle"] == "" : 
                 mtype.append(obj.type)
             else:
-                mtype.append(toggle)
+                mtype.append(kwargs["toggle"])
             nums = OSC.OSCMessage()
             nums.setAddress("nums" + str(i))
             nums.append(n);

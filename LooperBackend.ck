@@ -1,4 +1,4 @@
-public class chord{
+/*public class chord{
     int notes[];
     public void setNotes(int a[]) {
         int temp[a.size()];
@@ -10,7 +10,7 @@ public class chord{
     public int size() {
         return notes.size();
     }    
-}
+}*/
 
 
 MidiOut mout;
@@ -127,7 +127,7 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     playChord(m, c, whole);
 }
 
-fun Chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
+fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
     <<<n>>>;
     int notes[n];
     0 => int broken;
@@ -142,7 +142,7 @@ fun Chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
             //break;
         }
     }
-    if(broken == 1) return;
+    if(broken == 1) return null;
     chord c;
     c.setNotes(notes);
     //<<<"yo chord">>>;
@@ -254,6 +254,7 @@ while ( true )
                 spork~ readAndToggle(start, nums[i], n, 0);
             }
         }
+        
     }
     //now that you have phrase length n, make and play arrays
 }

@@ -46,7 +46,7 @@ class Looper:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("192.168.10.86", 8000))
+        self.oscServUI = OSC.OSCServer(("10.76.205.109", 8000))
         self.oscClientUI = OSC.OSCClient()
         self.oscClientUI.connect(("192.168.10.124", 9000))
         self.stepTrack = OSC.OSCMessage()
@@ -63,6 +63,7 @@ class Looper:
         self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
         self.oscServUI.addMsgHandler("/piano", self.pianoModeOn)
+        self.oscServUI.addMsgHandler("/refresh", self.refreshHandler)
         #need to add everything for moving piano mode grid back to main 
         
         for i in range(16):
@@ -122,7 +123,8 @@ class Looper:
             self.stepTrack.append(1)
             self.oscClientUI.send(self.stepTrack)
             self.stepTrack.clearData()
-            phrase.play(self.prog.c[playind]) #make this more efficient turn it into a PLAYER object?
+            print "in play"
+            phrase.play(self.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if self.refreshing:
                 self.refreshColumn(playind)
             self.loopInd += 1
@@ -143,7 +145,7 @@ class Looper:
                 self.grid[k][i] = self.refgrid[k][i]
         self.prog.c[k] = self.refprog.c[k]
     
-    def refreshHanlder(self, addr, tags, stuff, source):
+    def refreshHandler(self, addr, tags, stuff, source):
         if stuff[0] != 0:
             self.refreshing = True
             self.refprog = phrase.Progression(self.prog)
@@ -226,9 +228,11 @@ class Looper:
     def pianoKey(self, addr, tags, stuff, source):
         i, j = self.gridAddrInd(addr)
         if(stuff[0] == 1):
-            phrase.play(toggle="on", self.prog.c[i])
+            print "piano on"
+            phrase.play(self.prog.c[i], toggle="on")
         else:
-            phrase.play(toggle="off", self.prog.c[i])
+            print "piano off"
+            phrase.play(self.prog.c[i], toggle="off")
             
     #new
     def saveGrid(self, addr, tags, stuff, source):
