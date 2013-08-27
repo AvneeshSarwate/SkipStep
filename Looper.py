@@ -137,9 +137,10 @@ class Looper:
     
     def refreshColumn(self, k):
         msg = OSC.OSCMessage()
-        msg.setAddress("/refresh")
+        
         for i in range(len(self.grid)):
             if(self.refgrid[k][i] != self.grid[k][i]):
+                msg.setAddress("/grid/" + str(k) + "/" + str(i))
                 msg.append(self.refgrid[k][i])
                 self.oscClientUI.send(msg)
                 msg.clearData()
@@ -165,7 +166,19 @@ class Looper:
     
     def stepjump(self, addr, tags, stuff, source):
         if stuff[0] != 0:
-            self.progInd = int(addr.split("/")[2]) - 1
+            self.progInd = int(addr.split("/")[2]) - 1 #replace with gridAddrInd
+            if self.subsets:
+                if self.progInd in self.columnsub:
+                    self.progInd = self.columnsub.index(self.progInd)
+                else:
+                    if self.progInd > self.columnsub[-1]:
+                        self.progInd = len(self.columnsub) - 1
+                        return
+                    i = len(self.columnsub) - 1
+                    while self.columnsub[i] >= self.progInd:
+                        self.progInd = self.columnsub[i]
+                        i -= 1
+                    
             print "                                jumped to " + str(self.progInd)
     
     def noiseFlip(self, addr, tags, stuff, source):
@@ -176,7 +189,7 @@ class Looper:
         self.noiselev = 2 * int(addr.split("/")[2])
     
     def colsub(self, addr, tags, stuff, source):
-        ind = int(addr.split("/")[2]) - 1
+        ind = int(addr.split("/")[2]) - 1 #replace with gridAddrInd
         if stuff[0] == 1 and ind not in self.columnsub: #do we need 2nd conditional?
             self.columnsub.append(ind)
             print "                            added " + str(ind)
