@@ -126,13 +126,14 @@ class Looper:
             print "in play"
             phrase.play(self.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if self.refreshing:
-                print "                                   refresh", playind
+                #print "                                   refresh", playind
                 self.refreshColumn(playind)
             self.loopInd += 1
             self.progInd += 1
             if len(args) > 0:
                 print args[0]
-        if self.noisy and self.progInd == (l-1):
+        if self.noisy and self.progInd == (l):
+            print "                             noise at", l
             self.gridNoise(self.noiselev)
     
     def refreshColumn(self, k):
@@ -140,15 +141,12 @@ class Looper:
         
         for i in range(len(self.grid)):
             if(self.refgrid[k][i] != self.grid[k][i]):
-                msg.setAddress("/grid/" + str(k) + "/" + str(i))
+                print "                            single element refresh", k+1, i+1, self.refgrid[k][i]
+                msg.setAddress("/grid/" + str(k+1) + "/" + str(16-i))
                 msg.append(self.refgrid[k][i])
                 self.oscClientUI.send(msg)
                 msg.clearData()
                 self.grid[k][i] = self.refgrid[k][i]
-        print "error here?"
-        print type(self.refprog), "refprog", "after"
-        print type(self.prog), "prog"
-        
         self.prog.c[k] = self.refprog.c[k]
     
     def refreshHandler(self, addr, tags, stuff, source):
@@ -354,6 +352,8 @@ class Looper:
         j = 16-int(s[3])
         return i, j
         
+    def indToUIInd(self, i, j):
+        return i+1, 16-j
     
     #a is actually self.grid - change this later    
     def assign2(self, a, b, c):

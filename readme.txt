@@ -78,3 +78,23 @@ SHOULD PIANO GRID BE EDITABLE AND SHOULD CHANGES PUSH TO MAIN GRID
 writen, but with no UI and not tested: 
 	refresh mode
 	piano mode
+------------------------------------------------------
+refresh implemented
+
+seemingly fixed bug with jumping, but broke subsets
+
+BUGS
+- SUBSET BROKEN
+- still some issues with UI being thrown out of sync w/ internal grid
+	double check threading
+- noise being applied on 14th column, not first
+- optimize as much as possible 
+-------
+TODO:
+- piano mode:
+	replace step position selectors with buttons
+	create playOn and playOff code modeling phrase.play and LooperBackend
+- comparison view - have one grid under another, bottom grid is same as current playing
+	grid and uneditable, editable grid goes on top 
+- optimize UI updating so OSC messages only sent for grid elements that are diff
+	(precalculate diff grid: each element is -1 if same, or value of new grid if no
