@@ -10,9 +10,9 @@ import OSC
 import time
 import thread
 import random
+import cPickle
 
-def bo(*args):
-    print "oibayabu"
+
 
 class Looper:
     
@@ -58,7 +58,7 @@ class Looper:
         self.pianocallbacks = [[0 for i in range(16)] for j in range (16)]
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
-        print "buildcheck\n\n\n"
+        #print "buildcheck\n\n\n"
         
         self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
@@ -68,11 +68,11 @@ class Looper:
         
         for i in range(16):
             self.oscServUI.addMsgHandler("/step/" + str(i+1) + "/1", self.stepjump)
-            print "step jumper " + str(i + 1)
+            #print "step jumper " + str(i + 1)
             
         for i in range(16):
             self.oscServUI.addMsgHandler("/col/" + str(i+1) + "/1", self.colsub)
-            print "step jumper " + str(i + 1)
+            #print "step jumper " + str(i + 1)
         
         for i in range(5):
             self.oscServUI.addMsgHandler("/noiselev/" + str(i+1) + "/1", self.noiseLevHandler)
@@ -86,21 +86,21 @@ class Looper:
         for i in range(16):
             for j in range(16):
                 self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
-                #print "grid ui listener " + str(i+1) + " " + str(j+1)
+                ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
         
         for i in range(16):
             for j in range(16):
                 
                 self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.pianogrid, addr, stuff)
-                #print "grid ui listener " + str(i+1) + " " + str(j+1)
+                ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("pianoGrid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
         
-        print "\n\n\nbuildcheck\n\n"
+        #print "\n\n\nbuildcheck\n\n"
 
     
     def realPlay(self, *args):
-        print "aoibay"
+        ##print "aoibay"
         #phrase.play(lv.stableMorph(self.loopObj, self.loopVect[self.loopInd]))
 #        phrase.play(phrase.transpose(self.loopObj, self.loopVect[self.loopInd]))
 #        self.loopInd %= len(self.loopVect)
@@ -123,25 +123,24 @@ class Looper:
             self.stepTrack.append(1)
             self.oscClientUI.send(self.stepTrack)
             self.stepTrack.clearData()
-            print "in play"
+            ##print "in play"
             phrase.play(self.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if self.refreshing:
-                #print "                                   refresh", playind
+                ##print "                                   refresh", playind
                 self.refreshColumn(playind)
             self.loopInd += 1
             self.progInd += 1
-            if len(args) > 0:
-                print args[0]
         if self.noisy and self.progInd == (l):
-            print "                             noise at", l
             self.gridNoise(self.noiselev)
+            #print "                             noise at", l
+            
     
     def refreshColumn(self, k):
         msg = OSC.OSCMessage()
         
         for i in range(len(self.grid)):
             if(self.refgrid[k][i] != self.grid[k][i]):
-                print "                            single element refresh", k+1, i+1, self.refgrid[k][i]
+                #print "                            single element refresh", k+1, i+1, self.refgrid[k][i]
                 msg.setAddress("/grid/" + str(k+1) + "/" + str(16-i))
                 msg.append(self.refgrid[k][i])
                 self.oscClientUI.send(msg)
@@ -150,17 +149,18 @@ class Looper:
         self.prog.c[k] = self.refprog.c[k]
     
     def refreshHandler(self, addr, tags, stuff, source):
-        print "                     hit ref handler", stuff, stuff[0] != 0
+        #print "                     hit ref handler", stuff, stuff[0] != 0
         if stuff[0] != 0:
-            print "                    in conditional"
+            #print "                    in conditional"
             self.refreshing = True
             self.refprog = phrase.Progression(self.prog)
-            print type(self.refprog), "refprog", "before"
+            #print type(self.refprog), "refprog", "before"
             self.refgrid = self.gridcopy(self.grid)
-            print len(self.prog), ":prog", len(self.refprog), ":refprog"
-            print "refresh on"
+            #print len(self.prog), ":prog", len(self.refprog), ":refprog"
+            print "                           refresh on"
         else:
-            self.refreshing = False   
+            self.refreshing = False
+            print "                           refresh off"   
     
     def stepjump(self, addr, tags, stuff, source):
         if stuff[0] != 0:
@@ -197,24 +197,24 @@ class Looper:
         self.columnsub.sort()
     
     def colsubflip(self, addr, tags, stuff, source):
-        print "                             gottem yo", self.progInd
+        #print "                             gottem yo", self.progInd
         with self.lock:
-            print "                             inside lock ", self.progInd
+            #print "                             inside lock ", self.progInd
             self.subsets = (stuff[0] == 1)
-            print "                             past bool", self.subsets 
+            #print "                             past bool", self.subsets 
             self.progInd = 0 if stuff[0] == 1 else self.columnsub[self.progInd]
             print "                      colsub ", str(self.subsets), "progind" + str(self.progind)
         
     #new       
     def gridcopy(self, *args):
         #k = self.grid if len(args) == 0 else args[0]
-        print "                                len ", len(args)
+        #print "                                len ", len(args)
         if len(args) == 0:
             k = self.grid
-            print "                                uno "
+            #print "                                uno "
         else: 
             k = args[0]
-            print "                                dos "
+            #print "                                dos "
         return [[k[j][i] for i in range(len(k))] for j in range(len(k))]
    #new 
     def gridload(self, addr, tags, stuff, source):
@@ -231,9 +231,9 @@ class Looper:
                     msg.append(grid[i][j])
                     self.oscClientUI.send(msg)
                     msg.clearData()
-            print "                          pre", type(grid), type(self.scale), type(self.root)
+            #print "                          pre", type(grid), type(self.scale), type(self.root)
             self.prog = self.gridToProg(grid, self.scale, self.root)
-            print "                          progged"
+            #print "                          progged"
             self.grid = self.gridcopy(grid)
             
     def pianoModeOn(self, addr, tags, stuff, source):
@@ -249,10 +249,10 @@ class Looper:
     def pianoKey(self, addr, tags, stuff, source):
         i, j = self.gridAddrInd(addr)
         if(stuff[0] == 1):
-            print "piano on"
+            #print "piano on"
             phrase.play(self.prog.c[i], toggle="on")
         else:
-            print "piano off"
+            #print "piano off"
             phrase.play(self.prog.c[i], toggle="off")
             
     #new
@@ -285,20 +285,20 @@ class Looper:
     
     def loopStart(self):
         try :
-            print "starting loop"
+            #print "starting loop"
             while 1 :
                 continue
 
         except KeyboardInterrupt :
-            print "\nClosing oscServSelf."
+            #print "\nClosing oscServSelf."
             self.oscServSelf.close()
             self.oscServUI.close()
-            print "Waiting for Server-thread to finish"
+            #print "Waiting for Server-thread to finish"
             if self.audioThread != 0:
                 self.audioThread.join() ##!!!
             if self.uiThread != 0:
                 self.uiThread.join() ##!!!
-            print "Done"
+            #print "Done"
     
     def tester(self, *args):
         print "hurr"
@@ -331,13 +331,13 @@ class Looper:
         notes = [0]*16
         for i in range(16):
             notes[i] = root + (i/len(scale))*12 + scale[i%len(scale)] 
-#            print i, (i/len(scale))*12, i%len(scale)
+#            #print i, (i/len(scale))*12, i%len(scale)
         return notes 
         
     def colToChord(self, col, root, scale):
         notes = self.scaleNotes(root, scale)
         if sum(col) == 0:
-#            print "zero"
+#            #print "zero"
             return phrase.Chord([-1])
         else: 
             c = phrase.Chord()
@@ -358,20 +358,32 @@ class Looper:
     #a is actually self.grid - change this later    
     def assign2(self, a, b, c):
         with self.lock:
-            print c
+            #print c
 #            s = b.split("/")
 #            i = int(s[2])-1
 #            j = 16-int(s[3])
             i, j = self.gridAddrInd(b)
             a[i][j] = c[0]
-            print "assigned " + str(c[0]) + " to " + str(i+1) +" " + str(j+1)
+            print "          assigned " + str(c[0]) + " to " + str(i+1) +" " + str(16-j) #correct?
             self.prog.c[i] = self.colToChord(a[i], self.root, self.scale)
-            print self.prog, "\n\n\n"        
-        
+            #print self.prog, "\n\n\n"        
+    
+    def saveGridtoFile(self):
+        filename = raw_input("Grid Name: ")
+        savefile = open(filename +".ss", "rw")
+        cPickle.dump(self.grid, savefile)
+    
+    def loadGridFromFile(self):
+        filename = raw_input("File Name: ")
+        obj = cPickle.load(open(filename))
+        self.grid = obj
+        self.prog = self.gridToProg(obj, self.scale, self.root)
+        self.pullUpGrid(obj, "/grid")
+    
     def gridNoise(self, k):
-        print "in noise"
+        #print "in noise"
         with self.lock:
-            print "in lock"
+            #print "in lock"
             l = len(self.grid)
             p = 1.0 * k / (l*l)
             msg = OSC.OSCMessage()
@@ -391,7 +403,7 @@ class Looper:
                             self.oscClientUI.send(msg)
                             msg.clearData()
                 self.prog.c[i] = self.colToChord(self.grid[i], self.root, self.scale)
-            print "randomized"
+            print "                                randomized"
             #self.prog = self.gridToProg(self.grid, self.scale, self.root) 
             
                 

@@ -590,7 +590,7 @@ def play(*args, **kwargs):    #send object type to reciever
     start.append("started")
     objs = OSC.OSCMessage()
     objs.setAddress("objs")
-    print "args", len(args)
+    #print "args", len(args)
     objs.append(len(args))
     client.send(start)
     client.send(objs)
@@ -632,8 +632,8 @@ def play(*args, **kwargs):    #send object type to reciever
             noteA = obj.n
             
             n = len(noteA);
-            print "chord play: " + str(n)
-            print noteA
+            #print "chord play: " + str(n)
+            #print noteA
              
             
             mtype = OSC.OSCMessage()
@@ -650,7 +650,7 @@ def play(*args, **kwargs):    #send object type to reciever
                 nums.append(noteA[i])
                 client.send(nums)
                 
-            print "chord data sent"
+            #print "chord data sent"
         if(obj.type == "progression"):
             n = len(obj)
             
@@ -681,7 +681,7 @@ def play(*args, **kwargs):    #send object type to reciever
                     nums.clearData()
                     nums.append(obj.c[i].n[k])
                     client.send(nums)
-                    print obj.c[i].n[k]
+                    #print obj.c[i].n[k]
         
     
      
