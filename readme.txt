@@ -88,9 +88,9 @@ BUGS
 -------
 TODO:
 - save/Load of main grid (coded but no ui or teting)
-- piano mode (coded not tested):
-	replace step position selectors with buttons
-	create playOn and playOff code modeling phrase.play and LooperBackend
+- create separate chuck thread/file for controlling timing
+- custom scale definer
+- slider for tempo control
 - comparison view - have one grid under another, bottom grid is same as current playing
 	grid and uneditable, editable grid goes on top 
 - optimize UI updating so OSC messages only sent for grid elements that are diff
