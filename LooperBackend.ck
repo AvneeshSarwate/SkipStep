@@ -256,7 +256,7 @@ while ( true )
                 <<<"             OFF">>>;
             }
         }
-        
+          
     }
     //now that you have phrase length n, make and play arrays
 }

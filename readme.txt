@@ -70,7 +70,7 @@ got piano mode mostly working (some problems when swiping across keys)
 
 can generally fix problems by removing extra threads hanging around in chuck
 ------------------------------------------------------
-fixed major threading problems for piano mode
+fixed major threading problems for piano mode   
 
 
 BUGS
