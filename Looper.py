@@ -69,6 +69,7 @@ class Looper:
         for i in range(16):
             self.oscServUI.addMsgHandler("/step/" + str(i+1) + "/1", self.stepjump)
             #print "step jumper " + str(i + 1)
+            self.oscServUI.addMsgHandler("/pianoKey/" + str(i+1) + "/1", self.pianoKey)
             
         for i in range(16):
             self.oscServUI.addMsgHandler("/col/" + str(i+1) + "/1", self.colsub)
@@ -238,7 +239,17 @@ class Looper:
             
     def pianoModeOn(self, addr, tags, stuff, source):
         #switch tab to piano mode tab
+        if(stuff[0] == 0):
+            self.oscServSelf.addMsgHandler("/played", self.realPlay)
+            self.realPlay()
+            return
+        print "                      going to piano mode"
         self.stopCallback()
+        print "                      stop callback returned"
+        msg = OSC.OSCMessage()
+        msg.setAddress("/3")
+        #msg.append(1)
+        self.oscClientUI.send(msg)
         self.pianogrid = self.gridcopy()
         self.pullUpGrid(self.grid, "/pianoGrid")
         #hanlders for "piano keys" should already be set up
@@ -268,8 +279,10 @@ class Looper:
         self.pullUpGrid([[0 for i in range(16)] for j in range (16)], "/grid")
     
     def stopCallback(self):
-        self.oscServSelf.close() #do we need to close server? probs not
-        self.audioThread.join()
+        #self.oscServSelf.close() #do we need to close server? probs not
+        self.oscServSelf.delMsgHandler("/played")
+        print "                    thread closed"
+        #self.audioThread.join()
         
     def playStart(self):
         self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)

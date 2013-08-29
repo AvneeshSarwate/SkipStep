@@ -65,11 +65,20 @@ refresh implemented
 seemingly fixed bug with jumping, but broke subsets
 ------------------------------------------------------
 implemented save/load of main grid (no UI, no testing)
+------------------------------------------------------
+got piano mode mostly working (some problems when swiping across keys)
+
+can generally fix problems by removing extra threads hanging around in chuck
+
 
 BUGS
-- SUBSET BROKEN
+- when swiping across keys in piano mode, chuck threading/midi handled badly
+- piano mode on/off acts weird (ex starting in on position and going to off)
+- ?????? - SUBSET BROKEN - hasn't been well replicated
 - still some issues with UI being thrown out of sync w/ internal grid
 	double check threading
+- sometimes UI actions not reaching python 
+	problem in python or just UDP messages failing sometimes?
 - noise being applied on 14th column, not first (sort of fixed)
 - optimize as much as possible 
 -------

@@ -249,9 +249,11 @@ while ( true )
             }
             if(mtype == "on") {
                 spork~ readAndToggle(start, nums[i], n, 1);
+                <<<"             ON">>>;
             }
             if(mtype == "off") {
                 spork~ readAndToggle(start, nums[i], n, 0);
+                <<<"             OFF">>>;
             }
         }
         
