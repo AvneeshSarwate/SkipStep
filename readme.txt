@@ -69,10 +69,14 @@ implemented save/load of main grid (no UI, no testing)
 got piano mode mostly working (some problems when swiping across keys)
 
 can generally fix problems by removing extra threads hanging around in chuck
+------------------------------------------------------
+fixed major threading problems for piano mode
 
 
 BUGS
 - when swiping across keys in piano mode, chuck threading/midi handled badly
+	partially fixed by calling instead of sporking on/off readers in chuck
+		still latency issues - not sure if code or hardware/network
 - piano mode on/off acts weird (ex starting in on position and going to off)
 - ?????? - SUBSET BROKEN - hasn't been well replicated
 - still some issues with UI being thrown out of sync w/ internal grid
