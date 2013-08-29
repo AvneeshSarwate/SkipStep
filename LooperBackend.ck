@@ -248,11 +248,11 @@ while ( true )
                 spork~ readOSCChord(start, nums[i], n, m, whole);
             }
             if(mtype == "on") {
-                spork~ readAndToggle(start, nums[i], n, 1);
+                readAndToggle(start, nums[i], n, 1);
                 <<<"             ON">>>;
             }
             if(mtype == "off") {
-                spork~ readAndToggle(start, nums[i], n, 0);
+                readAndToggle(start, nums[i], n, 0);
                 <<<"             OFF">>>;
             }
         }
