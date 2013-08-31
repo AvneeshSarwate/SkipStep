@@ -102,6 +102,14 @@ for(0 => int i; i < nInst; i++) {
 1::second => dur whole;
 .01::second => dur split;
 
+fun void timer(){
+    while(true) {
+        .25 * whole => now;
+        conf.startMsg("/played", "s");
+        "played0" => conf.addString;
+    }
+}
+
 0 => int chordNum;
 fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur whole) {
     <<<n>>>;
@@ -215,12 +223,12 @@ fun void playChord(Mandolin m[], chord c, dur whole) {
     for(0 => int i; i < len; i++) {
         midOff(c.notes[i]);
     }
-    conf.startMsg("/played", "s");
-    "played0" => conf.addString;
+    //conf.startMsg("/played", "s");
+    //"played0" => conf.addString;
     <<<"function played chord">>>;
 }
 
-
+spork~ timer();
 
 // infinite event loop
 while ( true )

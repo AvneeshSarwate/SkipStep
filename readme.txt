@@ -71,6 +71,15 @@ got piano mode mostly working (some problems when swiping across keys)
 can generally fix problems by removing extra threads hanging around in chuck
 ------------------------------------------------------
 fixed major threading problems for piano mode   
+------------------------------------------------------
+added (none tested): 
+scale definer code, no UI
+
+compare view code, no UI
+
+timer thread added in backend 
+
+
 
 
 BUGS

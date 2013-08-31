@@ -26,9 +26,12 @@ class Looper:
         self.grid = [[0 for i in range(16)] for j in range (16)]
         self.refgrid = [[0 for i in range(16)] for j in range (16)]
         self.pianogrid = [[0 for i in range(16)] for j in range (16)]
+        self.compareBackGrid = [[0 for i in range(16)] for j in range (16)]
+        self.compareFrontGrid = [[0 for i in range(16)] for j in range (16)]
         self.prog = phrase.Progression()
         self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.prog.t = [.25 for i in range(16)]
+        self.customScale = []
         self.refprog = 0
         self.root = 48
         self.scale = phrase.modes["maj5"]
@@ -56,6 +59,7 @@ class Looper:
         
         self.gridcallbacks = [[0 for i in range(16)] for j in range (16)]
         self.pianocallbacks = [[0 for i in range(16)] for j in range (16)]
+        self.comparecallbacks = [[0 for i in range(16)] for j in range (16)]
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         #print "buildcheck\n\n\n"
@@ -95,7 +99,14 @@ class Looper:
                 
                 self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.pianogrid, addr, stuff)
                 ##print "grid ui listener " + str(i+1) + " " + str(j+1)
-                self.oscServUI.addMsgHandler("pianoGrid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
+                self.oscServUI.addMsgHandler("pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[i][j])
+        
+        for i in range(16):
+            for j in range(16):
+                
+                self.comparecallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.compareFrontGrid, addr, stuff)
+                ##print "grid ui listener " + str(i+1) + " " + str(j+1)
+                self.oscServUI.addMsgHandler("compareFront/"+str(i+1)+"/"+str(j+1), self.comparecallbacks[i][j])
         
         #print "\n\n\nbuildcheck\n\n"
 
@@ -265,6 +276,31 @@ class Looper:
         else:
             #print "piano off"
             phrase.play(self.prog.c[i], toggle="off")
+    
+    def applyCustomScale(self, addr, tags, stuff, source):
+        with self.lock():
+            custScale = [i - min(self.customScale) for i in self.customScale]
+            custScale.sort()
+            self.prog = self.gridToProg(self.grid, custScale, self.root)
+    
+    def custScale(self, addr, tags, stuff, source):
+        i, j = self.gridAddrInd(addr)
+        if(stuff[0] != 0):
+            self.customScale.append(i)
+        else:
+            if i in self.customScale:
+                self.customScale.remove(i)
+    
+    def toCompareView(self, addr, tags, stuff, source):
+        #change page
+        self.pullUpGrid(self.grid, "/compareBack")
+    
+    def compareToMain(self, addr, tags, stuff, source):
+        with self.lock:
+            #change page
+            self.pullUpGrid(self.compareFrontGrid, "/grid")
+            self.grid = self.gridcopy(self.compareFrontGrid)
+            self.prog = self.gridToProg(self.grid, self.scale, self.root)
             
     #new
     def saveGrid(self, addr, tags, stuff, source):
@@ -339,7 +375,7 @@ class Looper:
             prog.append((c, .25))
         return prog
     
-     
+    
     def scaleNotes(self, root, scale):
         notes = [0]*16
         for i in range(16):
