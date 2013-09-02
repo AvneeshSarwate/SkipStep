@@ -79,10 +79,12 @@ compare view code, no UI
 
 timer thread added in backend 
 
+----------------------------
+added UI for arranger view (including noise and refresh mode)
+--no code written
 
 
-
-BUGS
+BUGS  
 - when swiping across keys in piano mode, chuck threading/midi handled badly
 	partially fixed by calling instead of sporking on/off readers in chuck
 		still latency issues - not sure if code or hardware/network
