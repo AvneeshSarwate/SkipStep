@@ -38,9 +38,10 @@ class Looper:
         self.noisy = False
         self.columnsub = []
         self.subsets = False
-        self.gridzz = [0 for i in range(6)]
+        self.gridzz = [0 for i in range(8)]
         self.noiselev = 2
         self.refreshing = False
+        self.arrowToggle = False
         
         
         self.audioThread = 0
@@ -68,6 +69,9 @@ class Looper:
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
         self.oscServUI.addMsgHandler("/piano", self.pianoModeOn)
         self.oscServUI.addMsgHandler("/refresh", self.refreshHandler)
+        self.oscServUI.addMsgHandler("/compare", self.toCompareView)
+        self.oscServUI.addMsgHandler("/compareReturn", self.compareToMain)
+        self.oscServUI.addMsgHandler("/scaleApply", self.applyCustomScale)
         #need to add everything for moving piano mode grid back to main 
         
         for i in range(16):
@@ -87,6 +91,10 @@ class Looper:
         
         for i in range(6):
             self.oscServUI.addMsgHandler("/gridsave/" + str(i+1) + "/1", self.saveGrid)
+            
+        for i in range(16):
+            self.oscServUI.addMsgHandler("/custScale/" + str(i+1) + "/1", self.custScale)
+            
             
         for i in range(16):
             for j in range(16):
@@ -251,6 +259,7 @@ class Looper:
     def pianoModeOn(self, addr, tags, stuff, source):
         #switch tab to piano mode tab
         if(stuff[0] == 0):
+            self.prog = self.gridToProg(self.grid, self.scale, self.root)
             self.oscServSelf.addMsgHandler("/played", self.realPlay)
             self.realPlay()
             return
@@ -278,18 +287,24 @@ class Looper:
             phrase.play(self.prog.c[i], toggle="off")
     
     def applyCustomScale(self, addr, tags, stuff, source):
-        with self.lock():
+        if stuff[0] == 0:
+            return
+        with self.lock:
             custScale = [i - min(self.customScale) for i in self.customScale]
             custScale.sort()
+            print custScale
+            self.scale = custScale
             self.prog = self.gridToProg(self.grid, custScale, self.root)
     
     def custScale(self, addr, tags, stuff, source):
         i, j = self.gridAddrInd(addr)
         if(stuff[0] != 0):
             self.customScale.append(i)
+            print "                added note to scale", i 
         else:
             if i in self.customScale:
                 self.customScale.remove(i)
+                print "                removed note from scale", i
     
     def toCompareView(self, addr, tags, stuff, source):
         #change page
@@ -375,6 +390,40 @@ class Looper:
             prog.append((c, .25))
         return prog
     
+    def upArrow(self, addr, tags, stuff, source):
+        return
+    
+    def downArrow(self, addr, tags, stuff, source):
+        return
+    
+    def leftArrow(self, addr, tags, stuff, source):
+        return
+    
+    def rightArrow(self, addr, tags, stuff, source):
+        return
+    
+    def arrowTogHandler(self, addr, tags, stuff, source):
+        self.arrowToggle = (stuff[0] == 1)
+    
+    def gridShift(self, g, direction):
+        grid = self.gridcopy(g)
+        
+        if direction == "up":
+            print "up"
+            for i in range(len(grid)):
+                grid[i].insert(0, grid[i].pop())            
+                    
+        if direction == "down":
+            for i in range(len(grid)):
+                grid[i] = grid[i][1:len(grid[i])] + [grid[i][0]]
+                    
+        if direction == "right":
+            grid.insert(0, grid.pop())
+        
+        if direction == "left": 
+            grid = grid[1:len(grid)] + [grid[0]]
+        
+        return grid
     
     def scaleNotes(self, root, scale):
         notes = [0]*16
