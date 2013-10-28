@@ -107,6 +107,7 @@ fun void timer(){
         .25 * whole => now;
         conf.startMsg("/played", "s");
         "played0" => conf.addString;
+        <<<"                  step">>>;
     }
 }
 
@@ -204,8 +205,8 @@ fun void playChord(Mandolin m[], chord c, dur whole) {
     if(c.notes[0] == -1) {
         .25 * whole => now;
         <<<"chord rest">>>;
-        conf.startMsg("/played", "s");
-        "played0" => conf.addString;
+        //conf.startMsg("/played", "s");
+        //"played0" => conf.addString;
         return;
     }
     
@@ -219,7 +220,7 @@ fun void playChord(Mandolin m[], chord c, dur whole) {
         midOn(c.notes[i]);
         <<<c.notes[i]>>>;
     }   
-    .25*whole => now;
+    .25*whole - split=> now;
     for(0 => int i; i < len; i++) {
         midOff(c.notes[i]);
     }
