@@ -72,6 +72,10 @@ class Looper:
         self.oscServUI.addMsgHandler("/compare", self.toCompareView)
         self.oscServUI.addMsgHandler("/compareReturn", self.compareToMain)
         self.oscServUI.addMsgHandler("/scaleApply", self.applyCustomScale)
+        self.oscServUI.addMsgHandler("/up", self.gridShiftHandler)
+        self.oscServUI.addMsgHandler("/down", self.gridShiftHandler)
+        self.oscServUI.addMsgHandler("/left", self.gridShiftHandler)
+        self.oscServUI.addMsgHandler("/right", self.gridShiftHandler)
         #need to add everything for moving piano mode grid back to main 
         
         for i in range(16):
@@ -390,18 +394,6 @@ class Looper:
             prog.append((c, .25))
         return prog
     
-    def upArrow(self, addr, tags, stuff, source):
-        return
-    
-    def downArrow(self, addr, tags, stuff, source):
-        return
-    
-    def leftArrow(self, addr, tags, stuff, source):
-        return
-    
-    def rightArrow(self, addr, tags, stuff, source):
-        return
-    
     def arrowTogHandler(self, addr, tags, stuff, source):
         self.arrowToggle = (stuff[0] == 1)
     
@@ -424,6 +416,21 @@ class Looper:
             grid = grid[1:len(grid)] + [grid[0]]
         
         return grid
+    
+    def gridShiftHandler(self, addr, tags, stuff, source):
+        if stuff[0] == 0:
+            return
+        direction = addr.split("/")[1]
+        print "                   direction:", direction
+        if(self.arrowToggle):
+            return
+        else:
+            g = self.gridShift(self.grid, direction)
+            with self.lock:
+                self.grid = g
+                self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            self.pullUpGrid(self.grid, "/grid")
+            
     
     def scaleNotes(self, root, scale):
         notes = [0]*16
