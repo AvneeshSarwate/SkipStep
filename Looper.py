@@ -42,10 +42,11 @@ class Looper:
         self.noiselev = 2
         self.refreshing = False
         self.arrowToggle = False
+        self.stepIncrement = 1
         
         
         self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174))
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
@@ -76,6 +77,7 @@ class Looper:
         self.oscServUI.addMsgHandler("/down", self.gridShiftHandler)
         self.oscServUI.addMsgHandler("/left", self.gridShiftHandler)
         self.oscServUI.addMsgHandler("/right", self.gridShiftHandler)
+        self.oscServUI.addMsgHandler("/arrowToggle", self.arrowTogHandler)
         #need to add everything for moving piano mode grid back to main 
         
         for i in range(16):
@@ -153,8 +155,8 @@ class Looper:
                 ##print "                                   refresh", playind
                 self.refreshColumn(playind)
             self.loopInd += 1
-            self.progInd += 1
-        if self.noisy and self.progInd == (l):
+            self.progInd += self.stepIncrement
+        if self.noisy and (self.progInd == (l) or(self.progInd == -1)):
             self.gridNoise(self.noiselev)
             #print "                             noise at", l
             
@@ -423,7 +425,10 @@ class Looper:
         direction = addr.split("/")[1]
         print "                   direction:", direction
         if(self.arrowToggle):
-            return
+            if direction == "left":
+                self.stepIncrement = -1
+            if direction == "right":
+                self.stepIncrement = 1
         else:
             g = self.gridShift(self.grid, direction)
             with self.lock:
@@ -520,8 +525,7 @@ p = phrase.Phrase(n, t)
 trans = [1, 2, 5, 1]
 
 loop = Looper(p, trans)
-loop.check()
-time.sleep(2)
+#loop.check()
 loop.uiStart()
 loop.playStart()
 loop.loopStart()

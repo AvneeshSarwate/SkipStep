@@ -82,9 +82,18 @@ timer thread added in backend
 ----------------------------
 added UI for arranger view (including noise and refresh mode)
 --no code written
+_________________________
 
+fixed timer thread
 
-BUGS  
+----------------
+
+added grid shifting and reverse direction looping
+LANdini code added to backend but not tested 
+grid send/recieve ui roughly put together
+
+BUGS   
+- very jumpy stepping, reverse mode not activiting as fast as desired 
 - when swiping across keys in piano mode, chuck threading/midi handled badly
 	partially fixed by calling instead of sporking on/off readers in chuck
 		still latency issues - not sure if code or hardware/network
@@ -98,9 +107,9 @@ BUGS
 - optimize as much as possible 
 -------
 TODO:
+- LANdini for coordinated stepping 
 - save/Load of main grid (coded but no ui or teting)
-- create separate chuck thread/file for controlling timing
-- custom scale definer
+- custom scale definer (partially done) 
 - slider for tempo control
 - comparison view - have one grid under another, bottom grid is same as current playing
 	grid and uneditable, editable grid goes on top 

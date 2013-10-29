@@ -40,29 +40,11 @@ fun void midOff(int note){
 }
 
 
-// host name and port
-"127.0.0.1" => string hostname;
-5174 => int port;
 
-// get command line
-if( me.args() ) me.arg(0) => hostname;
-if( me.args() > 1 ) me.arg(1) => Std.atoi => port;
-<<<hostname, port>>>;
-// send object
-OscSend conf;
 
-// aim the transmitter
-conf.setHost( hostname, port );
 
 60 => int note;
 
-conf.startMsg("/played", "s");
-        "0" => conf.addString;
-<<<"played 0">>>;
-conf.startMsg("/played", "s");
-        "02" => conf.addString;
-conf.startMsg("/tester", "i");
-5=>conf.addInt;
 
 
 // create our OSC receiver
@@ -102,10 +84,37 @@ for(0 => int i; i < nInst; i++) {
 1::second => dur whole;
 .01::second => dur split;
 
+
+
+// host name and port
+"127.0.0.1" => string hostname;
+5174 => int port;
+//50506 => int port; LANDINI
+// send object
+OscSend conf;
+// aim the transmitter
+conf.setHost( hostname, port );
+conf.startMsg("/played, s");
+//conf.startMsg("/send/GD, s, s, s"); LANDINI
+//"all" => conf.addString; LANDINI
+//"/played" => conf.addString; LANDINI
+"played0" => conf.addString;
+
+fun void timerLANdini(){
+    while(true) {
+        .25 * whole => now;
+        conf.startMsg("/send/GD, s, s, s");
+        "all" => conf.addString;
+        "/played" => conf.addString;
+        "played0" => conf.addString;
+        <<<"                  step">>>;
+    }
+}
+
 fun void timer(){
     while(true) {
         .25 * whole => now;
-        conf.startMsg("/played", "s");
+        conf.startMsg("/played, s");
         "played0" => conf.addString;
         <<<"                  step">>>;
     }
