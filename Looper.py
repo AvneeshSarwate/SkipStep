@@ -46,7 +46,7 @@ class Looper:
         
         
         self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 50505)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)

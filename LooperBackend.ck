@@ -87,29 +87,43 @@ for(0 => int i; i < nInst; i++) {
 
 
 // host name and port
-"127.0.0.1" => string hostname;
-5174 => int port;
-//50506 => int port; LANDINI
+
+//50506 => int port; //LANDINI
 // send object
-OscSend conf;
+
 // aim the transmitter
-conf.setHost( hostname, port );
-conf.startMsg("/played, s");
+
+
 //conf.startMsg("/send/GD, s, s, s"); LANDINI
 //"all" => conf.addString; LANDINI
 //"/played" => conf.addString; LANDINI
-"played0" => conf.addString;
+
+
+OscSend confLANdini;
+confLANdini.setHost( "127.0.0.1", 50506 );
+"all" => confLANdini.addString;
+"/played" => confLANdini.addString;
+"played0" => confLANdini.addString;
 
 fun void timerLANdini(){
     while(true) {
         .25 * whole => now;
-        conf.startMsg("/send/GD, s, s, s");
-        "all" => conf.addString;
-        "/played" => conf.addString;
-        "played0" => conf.addString;
+        confLANdini.startMsg("/send/GD, s, s, s");
+        "all" => confLANdini.addString;
+        "/played" => confLANdini.addString;
+        "played0" => confLANdini.addString;
         <<<"                  step">>>;
     }
 }
+
+
+
+OscSend conf;
+"127.0.0.1" => string hostname;
+5174 => int port;
+conf.setHost( hostname, port );
+conf.startMsg("/played, s");
+"played0" => conf.addString;
 
 fun void timer(){
     while(true) {
