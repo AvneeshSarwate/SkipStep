@@ -97,6 +97,16 @@ LANdini working for stepping with 1 instance/computer
 - for sending grids: simple solution:
 	create custom toString/from string methods for grid/context and send it
 	alternatively, figure out how to serialize objects, or use OSC bundles
+	
+Working feature list: 
+	- changing root note via up/down buttons with toggle on
+	- GRID SHARING
+	- multi scale interface
+	- grid blending
+	- undo button, undoes single touches, grid changes, scale changes
+	- game of life step changing
+	- smart randomization
+	- MULTI INSTRUMENT LOOPING
 
 BUGS   
 - very jumpy stepping, reverse mode not activiting as fast as desired 
@@ -113,11 +123,22 @@ BUGS
 - optimize as much as possible 
 -------
 TODO:
-- LANdini for coordinated stepping 
 - save/Load of main grid (coded but no ui or teting)
-- custom scale definer (partially done) 
 - slider for tempo control
 - comparison view - have one grid under another, bottom grid is same as current playing
 	grid and uneditable, editable grid goes on top 
 - optimize UI updating so OSC messages only sent for grid elements that are diff
 	(precalculate diff grid: each element is -1 if same, or value of new grid if no
+	
+	
+BIG IDEA FOR NATIVE: let users scale up complexity of interface themselves.
+Max Flexibility: let users chose what features they want and lay out their
+	controls in a maner similar to touchOSC
+for simple learning and introduction:	
+start them with a simple step sequencers, and keep +/- buttons in the bottom corner
++ adds a random control widget to the screen, - removes the last one added
+the app smartly packs them
+let users flip between random "pages" of set up controls (could be a handmade set)
+users could share their setups 
+--this flexibility allows you to create many "non core" widgets/features
+	that aren't forced onto the user 
