@@ -91,6 +91,12 @@ fixed timer thread
 added grid shifting and reverse direction looping
 LANdini code added to backend but not tested 
 grid send/recieve ui roughly put together
+______________________________________
+
+LANdini working for stepping with 1 instance/computer
+- for sending grids: simple solution:
+	create custom toString/from string methods for grid/context and send it
+	alternatively, figure out how to serialize objects, or use OSC bundles
 
 BUGS   
 - very jumpy stepping, reverse mode not activiting as fast as desired 
