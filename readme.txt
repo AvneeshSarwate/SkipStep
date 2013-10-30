@@ -142,3 +142,4 @@ let users flip between random "pages" of set up controls (could be a handmade se
 users could share their setups 
 --this flexibility allows you to create many "non core" widgets/features
 	that aren't forced onto the user 
+"Non heirarchial structure"
