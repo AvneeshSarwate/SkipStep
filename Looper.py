@@ -11,6 +11,7 @@ import time
 import thread
 import random
 import cPickle
+import copy
 
 
 
@@ -571,10 +572,9 @@ class Looper:
             for k in [-1, 0, 1]:
                 if abs(m) + abs(k) == 0:
                     continue
-                if grid[i+m][j+k] != 0:
+                if grid[(i+m)%len(grid)][(j+k)%len(grid)] != 0:
                     count += 1
-        return count
-                    
+        return count       
         
     def gameOfLife(self, oldG):
         newG = [[0 for i in range(len(oldG))] for j in range(len(oldG))]
@@ -589,7 +589,29 @@ class Looper:
                     newG[i][j] = 1
         return 
         
-        
+    def blend(self, grid1, grid2, direction, amount):
+        blend = [[0 for i in range(len(grid1))] for j in range (len(grid1))]
+        allslots = range(len(grid1))
+        set1 = []
+        for i in range(amount):
+            k = random.choice(allslots)
+            allslots.remove(k)
+            set.append(k)
+        if direction == "hor":  #blending columns  
+            for i in range(len(grid1)):
+                if i in set1:
+                    blend[i] = copy.copy(grid1[i])
+                else:
+                    blend[i] = copy.copy(grid2[i])
+        if direction == "vert":
+            for i in range(len(grid1)):
+                if i in set1:
+                    for j in range(len(grid1)):
+                        blend[j][i] = grid1[j][i]
+                else:
+                    for j in range(len(grid1)):
+                        blend[j][i] = grid2[j][i]
+              
     
     def gridNoise(self, k):
         #print "in noise"
