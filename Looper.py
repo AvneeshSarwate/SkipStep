@@ -28,6 +28,7 @@ class Looper:
         self.pianogrid = [[0 for i in range(16)] for j in range (16)]
         self.compareBackGrid = [[0 for i in range(16)] for j in range (16)]
         self.compareFrontGrid = [[0 for i in range(16)] for j in range (16)]
+        self.recievedGrid = [[0 for i in range(16)] for j in range (16)]
         self.prog = phrase.Progression()
         self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.prog.t = [.25 for i in range(16)]
@@ -54,6 +55,8 @@ class Looper:
         self.oscServUI = OSC.OSCServer(("10.76.205.109", 8000))
         self.oscClientUI = OSC.OSCClient()
         self.oscClientUI.connect(("10.76.205.110", 9000))
+        self.oscLANdiniClient = OSC.OSCClient()
+        self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.stepTrack = OSC.OSCMessage()
         
         
@@ -66,6 +69,7 @@ class Looper:
         self.oscServUI.addDefaultHandlers()
         #print "buildcheck\n\n\n"
         
+        self.oscServSelf.addMsgHandler("/gridrecv", self.recieveGrid)
         self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
         self.oscServUI.addMsgHandler("/piano", self.pianoModeOn)
@@ -78,6 +82,7 @@ class Looper:
         self.oscServUI.addMsgHandler("/left", self.gridShiftHandler)
         self.oscServUI.addMsgHandler("/right", self.gridShiftHandler)
         self.oscServUI.addMsgHandler("/arrowToggle", self.arrowTogHandler)
+        self.oscServUI.addMsgHandler("/setgrid", self.sendButtonTest)
         #need to add everything for moving piano mode grid back to main 
         
         for i in range(16):
@@ -261,6 +266,20 @@ class Looper:
             self.prog = self.gridToProg(grid, self.scale, self.root)
             #print "                          progged"
             self.grid = self.gridcopy(grid)
+    
+    def pullUpScale(self, scale, scaleAddr):
+        print "           ", scale 
+        msg = OSC.OSCMessage()
+        for i in range(12):
+            msg.clearData()
+            msg.setAddress("/custScale/"+ str(i+1) +"/1" )
+            if i in scale:
+                msg.append(1)
+            else:
+                msg.append(0)
+            self.oscClientUI.send(msg)
+                
+                 
             
     def pianoModeOn(self, addr, tags, stuff, source):
         #switch tab to piano mode tab
@@ -429,6 +448,15 @@ class Looper:
                 self.stepIncrement = -1
             if direction == "right":
                 self.stepIncrement = 1
+            if direction == "up":
+                self.root += 1
+                with self.lock:
+                    self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            if direction == "down":
+                self.root -= 1
+                with self.lock:
+                    self.prog = self.gridToProg(self.grid, self.scale, self.root)
+                    
         else:
             g = self.gridShift(self.grid, direction)
             with self.lock:
@@ -489,6 +517,63 @@ class Looper:
         self.grid = obj
         self.prog = self.gridToProg(obj, self.scale, self.root)
         self.pullUpGrid(obj, "/grid")
+    
+    def gridKeyToString(self, grid, key):
+        strgrid = [[str(grid[i][j]) for i in range(len(grid))] for j in range(len(grid))]
+        colstr = [",".join(strgrid[i]) for i in range(len(strgrid))]
+        gridstring = ";".join(colstr)
+        
+        strkey = [str(i) for i in key]
+        keystr = ",".join(strkey)
+        return gridstring + "+" + keystr
+    
+    def stringToGridKey(self, string): #rename 
+        gridstring = string.split("+")[0]
+        colstr = gridstring.split(";")
+        strgrid = [i.split(",") for i in colstr]
+        grid = [[round(float(strgrid[i][j])) for i in range(len(strgrid))] for j in range(len(strgrid))]
+        
+        keystr = string.split("+")[1]
+        strkey = keystr.split(",")
+        key = [int(i) for i in strkey]
+        return grid, key
+    
+    def sendButtonTest(self, addr, tags, stuff, source):
+        if stuff[0] == 0:
+            return
+        else:
+            self.sendGrid()
+    
+    def sendGrid(self):
+        #recipient = raw_input("Who do you want to send a grid to: ")
+        recipient = "all"
+        msg = OSC.OSCMessage()
+        msg.setAddress("/send/GD")
+        msg.append(recipient)
+        msg.append("/gridrecv")
+        msg.append(self.gridKeyToString(self.grid, self.scale)) #replace with edit grid?
+        print self.gridKeyToString(self.grid, self.scale)
+        self.oscLANdiniClient.send(msg)
+        
+    def recieveGrid(self, addr, tags, stuff, source):
+        grid, scale = self.stringToGridKey(stuff[0])
+        self.recievedGrid = grid
+        self.pullUpGrid(grid, "/recieved")
+        self.pullUpScale(scale, "/custScale")
+        self.customScale = [i+1 for i in scale]
+        
+    def applyRecvGrid(self, addr, tags, stuff, source):
+        return
+        
+    
+    def gameOfLife(self, oldG):
+        newG = [[0 for i in range(len(oldG))] for j in range(len(oldG))]
+        for i in range(len(oldG)):
+            for j in range(len(oldG)):
+                k = 5
+        return 
+        
+        
     
     def gridNoise(self, k):
         #print "in noise"

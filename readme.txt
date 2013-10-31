@@ -93,10 +93,8 @@ LANdini code added to backend but not tested
 grid send/recieve ui roughly put together
 ______________________________________
 
-LANdini working for stepping with 1 instance/computer
-- for sending grids: simple solution:
-	create custom toString/from string methods for grid/context and send it
-	alternatively, figure out how to serialize objects, or use OSC bundles
+basic grid sending working, need to change "recipient" in sendGrid()
+only tested with 1 instance/computer 
 	
 Working feature list: 
 	- changing root note via up/down buttons with toggle on
