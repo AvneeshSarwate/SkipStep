@@ -95,6 +95,17 @@ ______________________________________
 
 basic grid sending working, need to change "recipient" in sendGrid()
 only tested with 1 instance/computer 
+______________________________________
+
+Game of life simulator written but not tested
+
+for multi instrument looping:
+	give Looper class an int argument in constructor. this int is used for:
+		differentiating touchOSC addresses between instruments
+		pass as argument to phrase.play() which will
+		pass it through OSC and
+		pass it finally to the midOn/midOff functions to specify the channel 
+		
 	
 Working feature list: 
 	- changing root note via up/down buttons with toggle on

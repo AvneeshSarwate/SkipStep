@@ -565,12 +565,28 @@ class Looper:
     def applyRecvGrid(self, addr, tags, stuff, source):
         return
         
-    
+    def neighborCount(self, grid, i, j):
+        count = 0
+        for m in [-1, 0, 1]:
+            for k in [-1, 0, 1]:
+                if abs(m) + abs(k) == 0:
+                    continue
+                if grid[i+m][j+k] != 0:
+                    count += 1
+        return count
+                    
+        
     def gameOfLife(self, oldG):
         newG = [[0 for i in range(len(oldG))] for j in range(len(oldG))]
         for i in range(len(oldG)):
             for j in range(len(oldG)):
-                k = 5
+                c = self.neighborCount(oldG, i, j)
+                if c < 2 or c > 3:
+                    newG[i][j] = 0
+                if c in [2, 3]:
+                    newG[i][j] = oldG[i][j]
+                if c == 3:
+                    newG[i][j] = 1
         return 
         
         
