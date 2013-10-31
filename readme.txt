@@ -98,6 +98,7 @@ only tested with 1 instance/computer
 ______________________________________
 
 Game of life simulator written but not tested
+blend function written but not tested (and no UI)
 
 for multi instrument looping:
 	give Looper class an int argument in constructor. this int is used for:
