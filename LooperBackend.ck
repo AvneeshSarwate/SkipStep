@@ -117,7 +117,7 @@ fun void timerLANdini(){
 }
 
 
-
+//for multi loop, send over multiple ports
 OscSend conf;
 "127.0.0.1" => string hostname;
 5174 => int port;
@@ -268,7 +268,7 @@ while ( true )
         objs => now;
         objs.nextMsg();
         objs.getInt() => int nobj;
-        for(0=>int i; i < nobj; i++){
+        for(0=>int i; i < nobj; i++){ //for multiloop, nobj is looper index, and instead of for loop, directly index by nobj
             type => now;
             type.nextMsg();
             type.getString() => string mtype;

@@ -583,7 +583,7 @@ def fillPhrase(phr, txt, root):
     return cmap
 
 def play(*args, **kwargs):    #send object type to reciever 
-    print "                kwargs len",  len(kwargs)
+    #print "                kwargs len",  len(kwargs)
     if len(kwargs) > 0:
         print kwargs["toggle"]
     
@@ -598,7 +598,7 @@ def play(*args, **kwargs):    #send object type to reciever
     objs.append(len(args))
     client.send(start)
     client.send(objs)
-    for i in range(len(args)):
+    for i in range(len(args)): #for multiloop, instead of i in loop, have it be the looper index, send as an arguement 
         obj = args[i]
         if(obj.type == "phrase"):
             noteA = obj.n
