@@ -99,6 +99,10 @@ ______________________________________
 
 Game of life simulator written but not tested
 blend function written but not tested (and no UI)
+_________________________________________________
+
+multi looping code written, not tested
+extra/unused functions need to be removed 
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state
