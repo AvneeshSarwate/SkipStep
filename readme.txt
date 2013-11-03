@@ -101,11 +101,18 @@ Game of life simulator written but not tested
 blend function written but not tested (and no UI)
 
 for multi instrument looping:
-	give Looper class an int argument in constructor. this int is used for:
-		differentiating touchOSC addresses between instruments
-		pass as argument to phrase.play() which will
-		pass it through OSC and
-		pass it finally to the midOn/midOff functions to specify the channel 
+	create a gridState class that holds all data for a grid/state
+	create a MultiLoop class that contains several gridState instances
+	each UI element type will exist on multiple pages (ex "/1/colsub/1/1", "/2colsub/1/1")
+	all ui elements/addresses of same type will map to a single callback
+	the callback parses which index element it is, and acts on that indexed gridState
+	single callback coordinates stepping over all gridStates
+	instead of "realPlay", the function finds the chord to play for each gridState
+		use multi-object playing functionality of phrase.play to play all at once
+	what it looks like in the code:
+		callback assignment inside a loop to account for multiple pages
+		callback functions act on gridState[index] instead of self
+		realPlay returns a deep copy of the chords to be played (other side effects happen as normal)
 		
 	
 Working feature list: 
