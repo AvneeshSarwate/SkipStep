@@ -108,10 +108,14 @@ _______________________________
 pianoprog variable added to Looper, needs to be added to MultiLoop
 cleaned up variable usage for different grid/prog objects
 cleaned up usage of self.pullupgrid()
+cleaned up usage of assign2
 
-basic grid sending mostly tested on one device (send/recieve loop thru landini):
-	tested sending/recieving/"applying" grid
-	DID NOT test this for scale yet, but sending/recieving worked before fixes, shoudl work after
+basic grid sending/recieving/"applying" of grid and scale tested on one device 
+	send/recieve loop thru landini, sending to "all" - should work for multiple 
+
+______________
+clear button and save/pullup of grid/scale pairs implemented but not tested
+
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state
@@ -129,6 +133,8 @@ for multi instrument looping:
 		
 	
 Working feature list: 
+	- SAVE/LOAD - grid/scale for active and all saved grids
+	- make live-grid saving also save scale
 	- changing root note via up/down buttons with toggle on
 	- GRID SHARING
 	- multi scale interface

@@ -91,6 +91,8 @@ class Looper:
         self.oscServUI.addMsgHandler("/sendgrid", self.sendButtonTest)
         self.oscServUI.addMsgHandler("/4", self.prepareToSend)
         self.oscServUI.addMsgHandler("/setgrid", self.applyRecvGrid)
+        self.oscServUI.addMsgHandler("/clear", self.gridClear)
+        
         
         #need to add everything for moving piano mode grid back to main 
         
@@ -263,12 +265,23 @@ class Looper:
             k = args[0]
             #print "                                dos "
         return [[k[j][i] for i in range(len(k))] for j in range(len(k))]
-   #new 
+    #new
+    def saveGrid(self, addr, tags, stuff, source):
+        ind = int(addr.split("/")[2]) - 1
+        if stuff[0] != 0:
+            self.gridzz[ind] = self.gridKeyToString(self.grid, self.key)#self.gridcopy()
+        else: 
+            self.gridzz[ind] = 0 
+    #new 
     def gridload(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
-        ind = int(addr.split("/")[2]) - 1
-        self.pullUpGrid(self.gridzz[ind], "/grid")
-        self.grid = self.gridcopy(self.gridzz[ind])
+        ind, j = self.gridAddrInd(addr)#int(addr.split("/")[2]) - 1
+        grid, scale = self.stringToGridKey(self.gridzz[ind])
+        self.pullUpGrid(grid, "/grid")
+        self.pullUpScale(scale, "/custScale")
+        self.customScale = [1+i for i in scale]
+        self.grid = grid
+        self.scale = scale
         self.prog = self.gridToProg(self.grid, self.scale, self.root)
     #new
     def pullUpGrid(self, grid, gridAddr):
@@ -360,18 +373,13 @@ class Looper:
             self.grid = self.gridcopy(self.compareFrontGrid)
             self.prog = self.gridToProg(self.grid, self.scale, self.root)
             
-    #new
-    def saveGrid(self, addr, tags, stuff, source):
-        ind = int(addr.split("/")[2]) - 1
-        if stuff[0] != 0:
-            self.gridzz[ind] = self.gridcopy()
-        else: 
-            self.gridzz[ind] = 0 
+    
     #new        
-    def gridClear(self):
-        self.prog = self.prog.c = [phrase.Chord([-1]) for i in range(16)]
+    def gridClear(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.pullUpGrid([[0 for i in range(16)] for j in range (16)], "/grid")
-        self.prog = [phrase.Chord([-1]) for i in range(16)]
+        
     
     def stopCallback(self):
         #self.oscServSelf.close() #do we need to close server? probs not
