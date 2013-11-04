@@ -34,6 +34,9 @@ class Looper:
         self.prog = phrase.Progression()
         self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.prog.t = [.25 for i in range(16)]
+        self.pianoprog = phrase.Progression()
+        self.pianoprog.c = [phrase.Chord([-1]) for i in range(16)]
+        self.pianoprog.t = [.25 for i in range(16)]
         self.customScale = []
         self.refprog = 0
         self.root = 48
@@ -49,14 +52,14 @@ class Looper:
         
         
         self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 50505)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("10.76.205.109", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.252.125", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.133.247", 9000))
+        self.oscClientUI.connect(("169.254.48.128", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.stepTrack = OSC.OSCMessage()
@@ -72,7 +75,7 @@ class Looper:
         self.oscServUI.addDefaultHandlers()
         #print "buildcheck\n\n\n"
         
-        self.oscServSelf.addMsgHandler("/gridrecv", self.recieveGrid)
+        self.oscServSelf.addMsgHandler("/recievedGrid", self.recieveGrid)
         self.oscServUI.addMsgHandler("/noisy", self.noiseFlip)
         self.oscServUI.addMsgHandler("/colsel", self.colsubflip)
         self.oscServUI.addMsgHandler("/piano", self.pianoModeOn)
@@ -115,28 +118,28 @@ class Looper:
             
         for i in range(16):
             for j in range(16):
-                self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff)
+                self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff, self.prog)
                 ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("grid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
         
         for i in range(16):
             for j in range(16):
                 
-                self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.pianogrid, addr, stuff)
+                self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.pianogrid, addr, stuff, self.pianoprog)
                 ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[i][j])
         
         for i in range(16):
             for j in range(16):
                 
-                self.recievedcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.recievedGrid, addr, stuff)
+                self.recievedcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.recievedGrid, addr, stuff, 0)
                 ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("recievedGrid/"+str(i+1)+"/"+str(j+1), self.recievedcallbacks[i][j])
         
         for i in range(16):
             for j in range(16):
                 
-                self.copycallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.copyGrid, addr, stuff)
+                self.copycallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.copyGrid, addr, stuff, 0)
                 ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                 self.oscServUI.addMsgHandler("copyGrid/"+str(i+1)+"/"+str(j+1), self.copycallbacks[i][j])
         
@@ -265,20 +268,20 @@ class Looper:
         if stuff[0] == 0: return
         ind = int(addr.split("/")[2]) - 1
         self.pullUpGrid(self.gridzz[ind], "/grid")
+        self.grid = self.gridcopy(self.gridzz[ind])
+        self.prog = self.gridToProg(self.grid, self.scale, self.root)
     #new
     def pullUpGrid(self, grid, gridAddr):
         msg = OSC.OSCMessage()
+        print "pullup outside lock"
         with self.lock:
+            print "updating grid of", gridAddr
             for i in range(len(grid)):
                 for j in range(len(grid)):
                     msg.setAddress(gridAddr + "/"+str(i+1) +"/" + str(16-j))
                     msg.append(grid[i][j])
                     self.oscClientUI.send(msg)
                     msg.clearData()
-            #print "                          pre", type(grid), type(self.scale), type(self.root)
-            self.prog = self.gridToProg(grid, self.scale, self.root)
-            #print "                          progged"
-            self.grid = self.gridcopy(grid)
     
     def pullUpScale(self, scale, scaleAddr):
         print "           ", scale 
@@ -308,8 +311,9 @@ class Looper:
         msg.setAddress("/3")
         #msg.append(1)
         self.oscClientUI.send(msg)
-        self.pianogrid = self.gridcopy()
-        self.pullUpGrid(self.grid, "/pianoGrid")
+        self.pianogrid = self.gridcopy(self.grid)
+        self.pianoprog = self.gridToProg(self.pianogrid, self.scale, self.root)
+        self.pullUpGrid(self.pianogrid, "/pianoGrid")
         #hanlders for "piano keys" should already be set up
         return
     #SHOULD PIANO GRID BE EDITABLE AND SHOULD EDITS UPDATE TO MAIN GRID
@@ -317,12 +321,13 @@ class Looper:
     #set up handler using lambda functions like with normal grid 
     def pianoKey(self, addr, tags, stuff, source):
         i, j = self.gridAddrInd(addr)
+        print i
         if(stuff[0] == 1):
             #print "piano on"
-            phrase.play(self.prog.c[i], toggle="on")
+            phrase.play(self.pianoprog.c[i], toggle="on")
         else:
             #print "piano off"
-            phrase.play(self.prog.c[i], toggle="off")
+            phrase.play(self.pianoprog.c[i], toggle="off")
     
     def applyCustomScale(self, addr, tags, stuff, source):
         if stuff[0] == 0:
@@ -366,6 +371,7 @@ class Looper:
     def gridClear(self):
         self.prog = self.prog.c = [phrase.Chord([-1]) for i in range(16)]
         self.pullUpGrid([[0 for i in range(16)] for j in range (16)], "/grid")
+        self.prog = [phrase.Chord([-1]) for i in range(16)]
     
     def stopCallback(self):
         #self.oscServSelf.close() #do we need to close server? probs not
@@ -506,8 +512,8 @@ class Looper:
     def indToUIInd(self, i, j):
         return i+1, 16-j
     
-    #a is actually self.grid - change this later    
-    def assign2(self, a, b, c):
+    #a - grid, b - addr, c - stuff, d - prog  
+    def assign2(self, a, b, c, d):
         with self.lock:
             #print c
 #            s = b.split("/")
@@ -515,8 +521,11 @@ class Looper:
 #            j = 16-int(s[3])
             i, j = self.gridAddrInd(b)
             a[i][j] = c[0]
-            print "          assigned " + str(c[0]) + " to " + str(i+1) +" " + str(16-j) #correct?
-            self.prog.c[i] = self.colToChord(a[i], self.root, self.scale)
+            print "          assigned " + str(c[0]) + " to " + str(i+1) +" " + str(16-j), sum(a[i]) #correct?
+            if d == 0: 
+                print "no prog"
+                return
+            d.c[i] = self.colToChord(a[i], self.root, self.scale)
             #print self.prog, "\n\n\n"        
     
     def saveGridtoFile(self):
@@ -559,19 +568,26 @@ class Looper:
             
     def prepareToSend(self, addr, tags, stuff, source):
         self.pullUpGrid(self.grid, "/copyGrid")
+        self.copyGrid = self.gridcopy(self.grid)
     
     def sendGrid(self):
         recipient = raw_input("Who do you want to send a grid to: ")
+        print recipient
         #recipient = "all"
         msg = OSC.OSCMessage()
         msg.setAddress("/send/GD")
         msg.append(recipient)
-        msg.append("/gridrecv")
+        msg.append("/recievedGrid")
+        print self.copyGrid 
+        print
+        print
         msg.append(self.gridKeyToString(self.copyGrid, self.scale)) #replace with edit grid?
-        print self.gridKeyToString(self.grid, self.scale)
+        #print self.gridKeyToString(self.grid, self.scale)
         self.oscLANdiniClient.send(msg)
+        print "sent"
         
     def recieveGrid(self, addr, tags, stuff, source):
+        print stuff[0], "got it"
         grid, scale = self.stringToGridKey(stuff[0])
         self.recievedGrid = grid
         self.pullUpGrid(grid, "/recievedGrid")
@@ -584,7 +600,7 @@ class Looper:
             self.scale = [i - min(self.customScale) for i in self.customScale]
             self.scale.sort()
             self.prog = self.gridToProg(self.grid, self.scale, self.root)
-            self.pullUpGrid(self.grid, "/grid")
+        self.pullUpGrid(self.grid, "/grid")
         
         
     def neighborCount(self, grid, i, j):

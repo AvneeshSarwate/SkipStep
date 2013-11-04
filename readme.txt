@@ -103,6 +103,15 @@ _________________________________________________
 
 multi looping code written, not tested
 extra/unused functions need to be removed 
+_______________________________
+
+pianoprog variable added to Looper, needs to be added to MultiLoop
+cleaned up variable usage for different grid/prog objects
+cleaned up usage of self.pullupgrid()
+
+basic grid sending mostly tested on one device (send/recieve loop thru landini):
+	tested sending/recieving/"applying" grid
+	DID NOT test this for scale yet, but sending/recieving worked before fixes, shoudl work after
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state
