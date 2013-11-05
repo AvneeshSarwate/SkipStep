@@ -113,8 +113,14 @@ cleaned up usage of assign2
 basic grid sending/recieving/"applying" of grid and scale tested on one device 
 	send/recieve loop thru landini, sending to "all" - should work for multiple 
 
-______________
+____________________________
 clear button and save/pullup of grid/scale pairs implemented but not tested
+____________________________
+
+clear button, save/pullup if grid/scale pairs, save/load of files for "sets",
+and multi-computer grid sending all tested 
+*didn't test sending diff scales, but it should work
+
 
 
 for multi instrument looping:

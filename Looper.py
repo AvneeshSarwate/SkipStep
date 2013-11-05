@@ -23,7 +23,7 @@ class Looper:
         self.loopObj = loopO
         self.loopVect = loopV
         self.loopInd = 0
-        self.progInd = len(loopO)
+        self.progInd = 0#len(loopO)
         self.grid = [[0 for i in range(16)] for j in range (16)]
         self.refgrid = [[0 for i in range(16)] for j in range (16)]
         self.pianogrid = [[0 for i in range(16)] for j in range (16)]
@@ -92,6 +92,8 @@ class Looper:
         self.oscServUI.addMsgHandler("/4", self.prepareToSend)
         self.oscServUI.addMsgHandler("/setgrid", self.applyRecvGrid)
         self.oscServUI.addMsgHandler("/clear", self.gridClear)
+        self.oscServUI.addMsgHandler("/save", self.saveGridtoFile)
+        self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
         
         
         #need to add everything for moving piano mode grid back to main 
@@ -166,7 +168,7 @@ class Looper:
                 l = 16
                 self.progInd %= 16
                 playind = self.progInd
-            #print playind, "playind"
+            print playind, "playind", self.prog.c[playind].n
             #turn light on for progind+1
             self.stepTrack.setAddress("/step/" + str(playind+1) + "/1")
             self.stepTrack.append(1)
@@ -269,7 +271,7 @@ class Looper:
     def saveGrid(self, addr, tags, stuff, source):
         ind = int(addr.split("/")[2]) - 1
         if stuff[0] != 0:
-            self.gridzz[ind] = self.gridKeyToString(self.grid, self.key)#self.gridcopy()
+            self.gridzz[ind] = self.gridKeyToString(self.grid, self.scale)#self.gridcopy()
         else: 
             self.gridzz[ind] = 0 
     #new 
@@ -287,14 +289,14 @@ class Looper:
     def pullUpGrid(self, grid, gridAddr):
         msg = OSC.OSCMessage()
         print "pullup outside lock"
-        with self.lock:
-            print "updating grid of", gridAddr
-            for i in range(len(grid)):
-                for j in range(len(grid)):
-                    msg.setAddress(gridAddr + "/"+str(i+1) +"/" + str(16-j))
-                    msg.append(grid[i][j])
-                    self.oscClientUI.send(msg)
-                    msg.clearData()
+        #with self.lock:
+        print "updating grid of", gridAddr
+        for i in range(len(grid)):
+            for j in range(len(grid)):
+                msg.setAddress(gridAddr + "/"+str(i+1) +"/" + str(16-j))
+                msg.append(grid[i][j])
+                self.oscClientUI.send(msg)
+                msg.clearData()
     
     def pullUpScale(self, scale, scaleAddr):
         print "           ", scale 
@@ -378,7 +380,8 @@ class Looper:
     def gridClear(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         self.prog.c = [phrase.Chord([-1]) for i in range(16)]
-        self.pullUpGrid([[0 for i in range(16)] for j in range (16)], "/grid")
+        self.grid = [[0 for i in range(16)] for j in range (16)]
+        self.pullUpGrid(self.grid, "/grid")
         
     
     def stopCallback(self):
@@ -536,17 +539,43 @@ class Looper:
             d.c[i] = self.colToChord(a[i], self.root, self.scale)
             #print self.prog, "\n\n\n"        
     
-    def saveGridtoFile(self):
-        filename = raw_input("Grid Name: ")
-        savefile = open(filename +".ss", "rw")
-        cPickle.dump(self.grid, savefile)
+    def saveGridtoFile(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        with self.lock:
+            filename = raw_input("Set Name: ")
+            savefile = open(filename +".ss", "w")
+            savestr = []
+            savestr.append(self.gridKeyToString(self.grid, self.scale))
+            for i in self.gridzz:
+                if i != 0:
+                    savestr.append(i)
+            print savestr
+            savefile.write("\n".join(savestr))
+            savefile.close()
+        
     
-    def loadGridFromFile(self):
-        filename = raw_input("File Name: ")
-        obj = cPickle.load(open(filename))
-        self.grid = obj
-        self.prog = self.gridToProg(obj, self.scale, self.root)
-        self.pullUpGrid(obj, "/grid")
+    def loadGridFromFile(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        with self.lock:
+            filename = raw_input("File Name: ")
+            filestr = open(filename).read()
+            gridstrs = filestr.split("\n")
+            #print gridstrs[0]
+            grid, scale = self.stringToGridKey(gridstrs[0])
+            self.pullUpGrid(grid, "/grid")
+            self.pullUpScale(scale, "/custScale")
+            self.customScale = [1+i for i in scale]
+            self.grid = grid
+            self.scale = scale
+            self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            for i in range(1, len(gridstrs)):
+                print gridstrs[i]
+                self.gridzz[i-1] = gridstrs[i]
+                msg = OSC.OSCMessage()
+                msg.setAddress("/gridsave/" + str(i) + "/1")
+                msg.append(1)
+                self.oscClientUI.send(msg)
+                msg.clearData()
     
     def gridKeyToString(self, grid, key):
         strgrid = [[str(grid[i][j]) for i in range(len(grid))] for j in range(len(grid))]
@@ -632,7 +661,7 @@ class Looper:
                     newG[i][j] = oldG[i][j]
                 if c == 3:
                     newG[i][j] = 1
-        return 
+        return newG
         
     def blend(self, grid1, grid2, direction, amount):
         blend = [[0 for i in range(len(grid1))] for j in range (len(grid1))]
@@ -656,6 +685,29 @@ class Looper:
                 else:
                     for j in range(len(grid1)):
                         blend[j][i] = grid2[j][i]
+    
+    def smartNoise(self, grid):
+        newgrid = [[0 for i in range(16)] for j in range (16)]
+        vert = [i for i in range(1, 6)] + [i for i in range(-5, 0)]
+        hor = [i for i in range(1, 4)] + [i for i in range(-3, 0)]
+        v = random.choice(vert)
+        h = random.choice(hor)
+        for i in range(len(grid)):
+            for j in range(len(grid)):
+                if grid[i][j] != 0:
+                    if random.uniform(0, 1) < (1.0 * self.noiselev) / 20: #if any change happens
+                        if random.uniform(0, 1) < .2: #probability of add/remove
+                            if random.uniform(0, 1) < .5:
+                                newgrid[i][j] = 0
+                            else:
+                                newgrid[(i+h)%len(grid)][(j+v)%len(grid)] = 1
+                        else:
+                            newgrid[i][(j+v)%len(grid)] = 1
+                    else:
+                        newgrid[i][j] = 1
+        return newgrid
+                        
+                
               
     
     def gridNoise(self, k):

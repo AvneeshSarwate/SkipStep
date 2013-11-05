@@ -252,7 +252,7 @@ fun void playChord(Mandolin m[], chord c, dur whole) {
     <<<"function played chord">>>;
 }
 
-spork~ timerLANdini();
+spork~ timer();
 
 // infinite event loop
 while ( true )
