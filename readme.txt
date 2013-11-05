@@ -121,6 +121,8 @@ clear button, save/pullup if grid/scale pairs, save/load of files for "sets",
 and multi-computer grid sending all tested 
 *didn't test sending diff scales, but it should work
 
+added smart noise
+
 
 
 for multi instrument looping:

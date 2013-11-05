@@ -702,7 +702,7 @@ class Looper:
                             else:
                                 newgrid[(i+h)%len(grid)][(j+v)%len(grid)] = 1
                         else:
-                            newgrid[i][(j+v)%len(grid)] = 1
+                            newgrid[i][(j+v)%len(grid)] = 1 
                     else:
                         newgrid[i][j] = 1
         return newgrid
