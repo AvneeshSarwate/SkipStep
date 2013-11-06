@@ -128,6 +128,10 @@ added/tested ability to switch between smartNoise/naive noise/game of life
 added/tested undo button (only undoes noise changes)
 added/tested tap tempo
 
+added/tested simplify(k) - in each column, keeps only k notes, throws away rest
+
+also, need to clean up noise function signatures/class variable usage
+
 
 
 for multi instrument looping:

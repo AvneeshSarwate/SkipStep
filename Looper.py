@@ -61,7 +61,7 @@ class Looper:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.144.204", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.73.82", 9000))
+        self.oscClientUI.connect(("169.254.49.155", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -127,7 +127,7 @@ class Looper:
         for i in range(16):
             self.oscServUI.addMsgHandler("/custScale/" + str(i+1) + "/1", self.custScale)
             
-        for i in range(3):
+        for i in range(4):
             self.oscServUI.addMsgHandler("/noiseSel/" + str(i+1) + "/1", self.noiseSelector)
         
         for i in range(16):
@@ -727,6 +727,22 @@ class Looper:
     def noiseHit(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         self.noiseChoice()
+        
+    
+    def simplify(self, grid, voices):
+        sets = [[] for i in range(len(grid))]
+        newG = [[0 for i in range(16)] for j in range (16)]
+        for i in range(len(grid)):
+            for j in range(len(grid)):
+                if grid[i][j] != 0:
+                    sets[i].append(j)
+        for i in range(len(sets)):
+            for j in range(voices):
+                if len(sets[i]) == 0: break
+                k = random.choice(sets[i])
+                newG[i][k] = 1
+                sets[i].remove(k)
+        return newG
     
     def noiseChoice(self):
         self.undoStack.append(self.gridcopy(self.grid))
@@ -750,7 +766,14 @@ class Looper:
                 self.grid = g
                 self.pullUpGrid(self.grid, "/grid")
                 self.prog = self.gridToProg(self.grid, self.scale, self.root)
-            return     
+            return  
+        if self.noiseInd == 4:
+            g = self.simplify(self.grid, self.noiselev/2)
+            with self.lock:
+                self.grid = g
+                self.pullUpGrid(self.grid, "/grid")
+                self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            return   
     
     def tempo(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
