@@ -49,6 +49,7 @@ class Looper:
         self.refreshing = False
         self.arrowToggle = False
         self.stepIncrement = 1
+        self.noiseInd = 1
         
         
         self.audioThread = 0
@@ -59,7 +60,7 @@ class Looper:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.144.204", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.249.160", 9000))
+        self.oscClientUI.connect(("169.254.190.20", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.stepTrack = OSC.OSCMessage()
@@ -94,6 +95,7 @@ class Looper:
         self.oscServUI.addMsgHandler("/clear", self.gridClear)
         self.oscServUI.addMsgHandler("/save", self.saveGridtoFile)
         self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
+        self.oscServUI.addMsgHandler("/noiseHit", self.noiseHit)
         
         
         #need to add everything for moving piano mode grid back to main 
@@ -119,7 +121,9 @@ class Looper:
         for i in range(16):
             self.oscServUI.addMsgHandler("/custScale/" + str(i+1) + "/1", self.custScale)
             
-            
+        for i in range(3):
+            self.oscServUI.addMsgHandler("/noiseSel/" + str(i+1) + "/1", self.noiseSelector)
+        
         for i in range(16):
             for j in range(16):
                 self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff, self.prog)
@@ -168,7 +172,7 @@ class Looper:
                 l = 16
                 self.progInd %= 16
                 playind = self.progInd
-            print playind, "playind", self.prog.c[playind].n
+            #print playind, "playind", self.prog.c[playind].n
             #turn light on for progind+1
             self.stepTrack.setAddress("/step/" + str(playind+1) + "/1")
             self.stepTrack.append(1)
@@ -182,7 +186,8 @@ class Looper:
             self.loopInd += 1
             self.progInd += self.stepIncrement
         if self.noisy and (self.progInd == (l) or(self.progInd == -1)):
-            self.gridNoise(self.noiselev)
+            self.noiseChoice()
+            #self.gridNoise(self.noiselev)
             #print "                             noise at", l
             
     
@@ -708,7 +713,35 @@ class Looper:
                         newgrid[i][j] = 1
         return newgrid
                         
-                
+    def noiseSelector(self, addr, tags, stuff, source):
+        i, j = self.gridAddrInd(addr)
+        print i, "noise selector"
+        self.noiseInd = i
+    
+    def noiseHit(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        self.noiseChoice()
+    
+    def noiseChoice(self):
+        print "the noise that was selected was", self.noiseInd
+        if self.noiseInd == 1:
+            self.gridNoise(self.noiselev)
+            return
+        if self.noiseInd == 2:
+            with self.lock:
+                self.grid = self.smartNoise(self.grid)
+                self.pullUpGrid(self.grid, "grid")
+                self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            return
+        if self.noiseInd == 3:
+            g = self.copyGrid(self.grid)
+            for i in range(self.noiselev/2):
+                g = self.gameOfLife(g)
+            with self.lock:
+                g = self.grid
+                self.pullUpGrid(self.grid, "grid")
+                self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            return     
               
     
     def gridNoise(self, k):
