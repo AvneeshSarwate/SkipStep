@@ -82,6 +82,7 @@ for(0 => int i; i < nInst; i++) {
 }
 
 1::second => dur whole;
+2::second => dur slowest;
 .01::second => dur split;
 
 
@@ -98,6 +99,32 @@ for(0 => int i; i < nInst; i++) {
 //"all" => conf.addString; LANDINI
 //"/played" => conf.addString; LANDINI
 
+OscRecv recvTempo;
+// use port 6449
+5678 => recvTempo.port;
+// start listening (launch thread)
+recvTempo.listen();
+
+recv.event("/touch, s") @=> OscEvent touchEv;
+
+fun void touchTempo(){
+    now => time newT;
+    now => time oldT;
+    while(true){
+        <<<"                  starting thread">>>;
+        touchEv => now;
+        <<<"                                   got a touch event">>>;
+        while(touchEv.nextMsg() != 0) {
+            now => newT;
+            if((newT - oldT) < slowest){
+                newT - oldT => whole;
+            }
+            newT => oldT;
+        }
+    }   
+}
+
+spork~ touchTempo();
 
 OscSend confLANdini;
 confLANdini.setHost( "127.0.0.1", 50506 );
@@ -252,7 +279,7 @@ fun void playChord(Mandolin m[], chord c, dur whole) {
     <<<"function played chord">>>;
 }
 
-spork~ timer();
+spork~ timerLANdini();
 
 // infinite event loop
 while ( true )

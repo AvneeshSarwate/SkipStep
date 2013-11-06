@@ -122,6 +122,11 @@ and multi-computer grid sending all tested
 *didn't test sending diff scales, but it should work
 
 added smart noise
+____________________________
+
+added/tested ability to switch between smartNoise/naive noise/game of life
+added/tested undo button (only undoes noise changes)
+added/tested tap tempo
 
 
 

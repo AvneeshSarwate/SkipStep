@@ -50,6 +50,7 @@ class Looper:
         self.arrowToggle = False
         self.stepIncrement = 1
         self.noiseInd = 1
+        self.undoStack = []
         
         
         self.audioThread = 0
@@ -60,9 +61,11 @@ class Looper:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.144.204", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.190.20", 9000))
+        self.oscClientUI.connect(("169.254.73.82", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
+        self.touchClient = OSC.OSCClient()
+        self.touchClient.connect( ('127.0.0.1', 6449) )
         self.stepTrack = OSC.OSCMessage()
         
         
@@ -96,6 +99,9 @@ class Looper:
         self.oscServUI.addMsgHandler("/save", self.saveGridtoFile)
         self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
         self.oscServUI.addMsgHandler("/noiseHit", self.noiseHit)
+        self.oscServUI.addMsgHandler("/undo", self.undo)
+        self.oscServUI.addMsgHandler("/tempo", self.tempo)
+        
         
         
         #need to add everything for moving piano mode grid back to main 
@@ -715,14 +721,15 @@ class Looper:
                         
     def noiseSelector(self, addr, tags, stuff, source):
         i, j = self.gridAddrInd(addr)
-        print i, "noise selector"
-        self.noiseInd = i
+        print i+1, "noise selector"
+        self.noiseInd = i+1
     
     def noiseHit(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         self.noiseChoice()
     
     def noiseChoice(self):
+        self.undoStack.append(self.gridcopy(self.grid))
         print "the noise that was selected was", self.noiseInd
         if self.noiseInd == 1:
             self.gridNoise(self.noiselev)
@@ -730,19 +737,48 @@ class Looper:
         if self.noiseInd == 2:
             with self.lock:
                 self.grid = self.smartNoise(self.grid)
-                self.pullUpGrid(self.grid, "grid")
+                self.pullUpGrid(self.grid, "/grid")
                 self.prog = self.gridToProg(self.grid, self.scale, self.root)
             return
         if self.noiseInd == 3:
-            g = self.copyGrid(self.grid)
+            print "game of life chosen"
+            g = self.gridcopy(self.grid)
             for i in range(self.noiselev/2):
                 g = self.gameOfLife(g)
+                print "iteration number", i, "diff", self.gridDif(g, self.grid)
             with self.lock:
-                g = self.grid
-                self.pullUpGrid(self.grid, "grid")
+                self.grid = g
+                self.pullUpGrid(self.grid, "/grid")
                 self.prog = self.gridToProg(self.grid, self.scale, self.root)
             return     
-              
+    
+    def tempo(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        print "sent touch message"
+        msg = OSC.OSCMessage()
+        msg.setAddress("/touch")
+        msg.append("touched")
+#        msg.setAddress("/send/GD")
+#        msg.append("all")
+#        msg.append("/touch")
+#        msg.append("stuff")
+        self.touchClient.send(msg)
+        
+    
+    def undo(self, addr, tags, stuff, source):
+        if stuff[0] == 0 or len(self.undoStack) == 0: return
+        with self.lock:
+            self.grid = self.undoStack.pop()
+            self.prog = self.gridToProg(self.grid, self.scale, self.root)
+            self.pullUpGrid(self.grid, "/grid")
+     
+    def gridDif(self, g1, g2):
+        hamming = 0
+        for i in range(len(g1)):
+            for j in range(len(g1)):
+                if (g1[i][j] != 0 and g2[i][j] == 0) or (g1[i][j] == 0 and g2[i][j] != 0): #both not zero or both zero
+                    hamming += 1
+        return hamming
     
     def gridNoise(self, k):
         #print "in noise"
