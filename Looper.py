@@ -57,9 +57,9 @@ class Looper:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.252.125", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.144.204", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.48.128", 9000))
+        self.oscClientUI.connect(("169.254.249.160", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.stepTrack = OSC.OSCMessage()
@@ -670,7 +670,7 @@ class Looper:
         for i in range(amount):
             k = random.choice(allslots)
             allslots.remove(k)
-            set.append(k)
+            set1.append(k)
         if direction == "hor":  #blending columns  
             for i in range(len(grid1)):
                 if i in set1:
@@ -685,6 +685,7 @@ class Looper:
                 else:
                     for j in range(len(grid1)):
                         blend[j][i] = grid2[j][i]
+        return blend
     
     def smartNoise(self, grid):
         newgrid = [[0 for i in range(16)] for j in range (16)]
