@@ -131,8 +131,24 @@ added/tested tap tempo
 added/tested simplify(k) - in each column, keeps only k notes, throws away rest
 
 also, need to clean up noise function signatures/class variable usage
+____________________________
 
+ARRANGER TOOL IDEA
 
+8 labels in a row - the number in each label corresponds to the index of a 
+	grid saved in the grid-save tool. thus [5, 8, 8, 2, 3] means that the grids
+	will be played in that order. 
+	
+Diagram
+
+	[toggle1]	[8 labels]
+	[toggle2]	[step tracker]
+	
+	to set an arrangement of grids: turn on toggle 1:
+		the order in which you hit the gridLoad buttons determines the
+		order of the grid arrangement. turning toggle 1 off clears the arrangement
+	toggle 2: used to turn arrangement looping on or off
+		
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state
