@@ -154,7 +154,7 @@ MultiLoop2 is newer version of MultiLooper. includes all new features from this 
 
 basic multilooping kind of working-
 	backend not changed to handle multiple instruments/midi channels 
-	list index exception - last grid not working
+	FIXED: indexing problems between pages 
 
 
 for multi instrument looping:

@@ -66,7 +66,7 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.214.184", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.89.75", 9000))
+        self.oscClientUI.connect(("169.254.133.162", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -74,10 +74,8 @@ class MultiLoop:
         self.stepTrack = OSC.OSCMessage()
         
         
-        self.gridcallbacks = [[0 for i in range(16)] for j in range (16)]
-        self.pianocallbacks = [[0 for i in range(16)] for j in range (16)]
-        self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
-        self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
+        self.gridcallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
+        self.pianocallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         #print "buildcheck\n\n\n"
@@ -131,16 +129,16 @@ class MultiLoop:
             
             for i in range(16):
                 for j in range(16):
-                    self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[k].grid, addr, stuff, self.gridStates[k].prog)
+                    self.gridcallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].grid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].prog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
-                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/grid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
+                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/grid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[k][i][j])
             
             for i in range(16):
                 for j in range(16):
                     
-                    self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[k].pianogrid, addr, stuff, self.gridStates[k].pianoprog)
+                    self.pianocallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[k].pianogrid, addr, stuff, self.gridStates[k].pianoprog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
-                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[i][j])
+                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[k][i][j])
             
             #print "\n\n\nbuildcheck\n\n"
 
@@ -168,7 +166,7 @@ class MultiLoop:
                     playind = self.gridStates[si].progInd
                 #print playind, "playind", self.prog.c[playind].n
                 #turn light on for progind+1
-                self.stepTrack.setAddress("/" + str(si) + "/step/" + str(playind+1) + "/1")
+                self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
                 self.stepTrack.append(1)
                 self.oscClientUI.send(self.stepTrack)
                 self.stepTrack.clearData()
@@ -475,7 +473,7 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0:
             return
-        direction = addr.split("/")[1]
+        direction = addr.split("/")[2]
         print "                   direction:", direction
         if(self.gridStates[si].arrowToggle):
             if direction == "left":
@@ -492,7 +490,10 @@ class MultiLoop:
                     self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
                     
         else:
+            print "normal grid before", self.gridSum(self.gridStates[0].grid), self.gridSum(self.gridStates[1].grid), self.gridSum(self.gridStates[2].grid)
             g = self.gridShift(self.gridStates[si].grid, direction)
+            print "si", si, direction, sum([sum(k) for k in self.gridStates[si].grid]), sum([sum(i) for i in g])
+            print self.gridStates[si].grid
             with self.gridStates[si].lock:
                 self.gridStates[si].grid = g
                 self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
@@ -526,10 +527,13 @@ class MultiLoop:
         
     def indToUIInd(self, i, j):
         return i+1, 16-j
+    def gridSum(self, grid):
+        return sum([sum(k) for k in grid])
     
     #a - grid, b - addr, c - stuff, d - prog  
     def assign2(self, a, b, c, d):
-        si = int(b.split("/")[1]) #index of grid action was taken on
+        si = int(b.split("/")[1]) - 1 #index of grid action was taken on
+        print si 
         with self.gridStates[si].lock:
             #print c
 #            s = b.split("/")
@@ -537,6 +541,7 @@ class MultiLoop:
 #            j = 16-int(s[3])
             i, j = self.gridAddrInd(b)
             a[i][j] = c[0]
+            print "grid count", self.gridSum(a)
             print "          assigned " + str(c[0]) + " to " + str(i+1) +" " + str(16-j), sum(a[i]) #correct?
             if d == 0: 
                 print "no prog"
