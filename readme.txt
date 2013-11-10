@@ -149,6 +149,9 @@ Diagram
 		order of the grid arrangement. turning toggle 1 off clears the arrangement
 	toggle 2: used to turn arrangement looping on or off
 		
+___________________
+MultiLoop2 is newer version of MultiLooper. includes all new features from this week
+
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state
