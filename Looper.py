@@ -61,7 +61,7 @@ class Looper:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.144.204", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.49.155", 9000))
+        self.oscClientUI.connect(("169.254.236.85", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -118,10 +118,10 @@ class Looper:
         for i in range(5):
             self.oscServUI.addMsgHandler("/noiselev/" + str(i+1) + "/1", self.noiseLevHandler)
         
-        for i in range(6):
+        for i in range(8):
             self.oscServUI.addMsgHandler("/gridload/" + str(i+1) + "/1", self.gridload)
         
-        for i in range(6):
+        for i in range(8):
             self.oscServUI.addMsgHandler("/gridsave/" + str(i+1) + "/1", self.saveGrid)
             
         for i in range(16):

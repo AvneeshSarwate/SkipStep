@@ -152,6 +152,10 @@ Diagram
 ___________________
 MultiLoop2 is newer version of MultiLooper. includes all new features from this week
 
+basic multilooping kind of working-
+	backend not changed to handle multiple instruments/midi channels 
+	list index exception - last grid not working
+
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state

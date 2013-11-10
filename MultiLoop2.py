@@ -16,10 +16,8 @@ import copy
 
 class Looper:
 
-    def __init__(self, loopO, loopV):
+    def __init__(self):
         #self.recvAddr = 
-        self.loopObj = loopO
-        self.loopVect = loopV
         self.loopInd = 0
         self.progInd = 0#len(loopO)
         self.grid = [[0 for i in range(16)] for j in range (16)]
@@ -66,9 +64,9 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.144.204", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.214.184", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.236.85", 9000))
+        self.oscClientUI.connect(("169.254.89.75", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -86,22 +84,16 @@ class MultiLoop:
         
         for k in range(n):
         
-            self.oscServSelf.addMsgHandler("/" +str(k+1) +"/recievedGrid", self.recieveGrid)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noisy", self.noiseFlip)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/colsel", self.colsubflip)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/piano", self.pianoModeOn)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/refresh", self.refreshHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/compare", self.toCompareView)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/compareReturn", self.compareToMain)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/scaleApply", self.applyCustomScale)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/up", self.gridShiftHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/down", self.gridShiftHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/left", self.gridShiftHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/right", self.gridShiftHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/arrowToggle", self.arrowTogHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sendgrid", self.sendButtonTest)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/4", self.prepareToSend)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/setgrid", self.applyRecvGrid)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/clear", self.gridClear)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/save", self.saveGridtoFile)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/load", self.loadGridFromFile)
@@ -139,14 +131,14 @@ class MultiLoop:
             
             for i in range(16):
                 for j in range(16):
-                    self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.grid, addr, stuff, self.prog)
+                    self.gridcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[k].grid, addr, stuff, self.gridStates[k].prog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/grid/"+str(i+1)+"/"+str(j+1), self.gridcallbacks[i][j])
             
             for i in range(16):
                 for j in range(16):
                     
-                    self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.pianogrid, addr, stuff, self.pianoprog)
+                    self.pianocallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[k].pianogrid, addr, stuff, self.gridStates[k].pianoprog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[i][j])
             
@@ -163,7 +155,7 @@ class MultiLoop:
 #            self.loopInd += 1 
 
         chords = []
-        for si in range(self.gridStates[si].num):
+        for si in range(self.num):
             with self.gridStates[si].lock: 
                 if(self.gridStates[si].subsets):
                     l = len(self.gridStates[si].columnsub)
@@ -181,7 +173,7 @@ class MultiLoop:
                 self.oscClientUI.send(self.stepTrack)
                 self.stepTrack.clearData()
                 ##print "in play"
-                phrase.play(self.gridStates[si].prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+                chords.append(self.gridStates[si].prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
                 if self.gridStates[si].refreshing:
                     ##print "                                   refresh", playind
                     self.refreshColumn(playind, si)
@@ -191,7 +183,7 @@ class MultiLoop:
                 self.noiseChoice(si)
                 #self.gridNoise(self.noiselev)
                 #print                               noise at", l
-            phrase.play(chords[0], chords[1], chords[2])
+        phrase.play(chords[0], chords[1], chords[2])
             
     
     def refreshColumn(self, k, si):
@@ -537,7 +529,7 @@ class MultiLoop:
     
     #a - grid, b - addr, c - stuff, d - prog  
     def assign2(self, a, b, c, d):
-        si = int(a.split("/")[1]) #index of grid action was taken on
+        si = int(b.split("/")[1]) #index of grid action was taken on
         with self.gridStates[si].lock:
             #print c
 #            s = b.split("/")
@@ -802,7 +794,7 @@ t = [1, 1, 1, 1]
 p = phrase.Phrase(n, t)
 trans = [1, 2, 5, 1]
 
-loop = Looper(p, trans)
+loop = MultiLoop(3)
 #loop2 = Looper(p, trans)
 #loop.check()
 loop.uiStart()
