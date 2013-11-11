@@ -155,7 +155,23 @@ MultiLoop2 is newer version of MultiLooper. includes all new features from this 
 basic multilooping kind of working-
 	backend not changed to handle multiple instruments/midi channels 
 	FIXED: indexing problems between pages 
+	
+______________________
+multi loop backend updated: working over different midi channels 
 
+problems:
+	piano mode still doesn't work. current hack of phrase.play() w/ lists leads to
+		stall in backend at line 304 (no nums events coming in for "skipped" objects in list)
+	things are a bit sketchy with midi playing (too many messages and things getting dropped?)
+
+future steps ideas:
+	add some "continuousness" controls/features:
+		PITCH BEND SLIDER USING XY TOUCHPAD
+		rhythmic jitter idea
+		microtonal stuff
+	independent metronomes for each channel? time control features 
+		(making grids work at preset fractional speeds of each other)
+	have a single "master control" page for inter-page settings/control 
 
 for multi instrument looping:
 	create a gridState class that holds all data for a grid/state

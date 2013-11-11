@@ -66,7 +66,7 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.214.184", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.133.162", 9000))
+        self.oscClientUI.connect(("169.254.59.192", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -79,6 +79,8 @@ class MultiLoop:
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         #print "buildcheck\n\n\n"
+        
+        self.oscServUI.addMsgHandler("/tempo", self.tempo)
         
         for k in range(n):
         
@@ -97,7 +99,6 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/load", self.loadGridFromFile)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseHit", self.noiseHit)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/undo", self.undo)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/tempo", self.tempo)
             
             
             
@@ -190,7 +191,7 @@ class MultiLoop:
         for i in range(len(self.gridStates[si].grid)):
             if(self.gridStates[si].refgrid[k][i] != self.gridStates[si].grid[k][i]):
                 #print "                            single element refresh", k+1, i+1, self.refgrid[k][i]
-                msg.setAddress("/grid/" + str(k+1) + "/" + str(16-i))
+                msg.setAddress("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i))
                 msg.append(self.gridStates[si].refgrid[k][i])
                 self.oscClientUI.send(msg)
                 msg.clearData()
@@ -238,7 +239,7 @@ class MultiLoop:
     def noiseLevHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         i, j = self.gridAddrInd(addr)
-        self.gridStates[si].noiselev = 2 * i
+        self.gridStates[si].noiselev = 2 * (i+1)
     
     def colsub(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
@@ -324,6 +325,7 @@ class MultiLoop:
         #switch tab to piano mode tab
         if(stuff[0] == 0):
             self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+            self.oscServSelf.delMsgHandler("/played")
             self.oscServSelf.addMsgHandler("/played", self.realPlay)
             self.realPlay()
             return
@@ -331,7 +333,7 @@ class MultiLoop:
         self.stopCallback()
         print "                      stop callback returned"
         msg = OSC.OSCMessage()
-        msg.setAddress("/3")
+        msg.setAddress("/" + str((si+1)*2))
         #msg.append(1)
         self.oscClientUI.send(msg)
         self.gridStates[si].pianogrid = self.gridcopy(self.gridStates[si].grid)
@@ -346,12 +348,17 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         i, j = self.gridAddrInd(addr)
         print i
+        playargs = []
+        for i in range(si):
+            k = 0
+            playargs.append(k)
+        playargs.append(self.gridStates[si].pianoprog.c[i])
         if(stuff[0] == 1):
             #print "piano on"
-            phrase.play(self.gridStates[si].pianoprog.c[i], toggle="on")
+            phrase.play(playargs, toggle="on", list="yes")
         else:
             #print "piano off"
-            phrase.play(self.gridStates[si].pianoprog.c[i], toggle="off")
+            phrase.play(playargs, toggle="off", list="yes")
     
     def applyCustomScale(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
@@ -387,8 +394,12 @@ class MultiLoop:
     def stopCallback(self):
         #self.oscServSelf.close() #do we need to close server? probs not
         self.oscServSelf.delMsgHandler("/played")
+        self.oscServSelf.addMsgHandler("/played", self.pianoModeMetronomeCatcher)
         print "                    thread closed"
         #self.audioThread.join()
+    
+    def pianoModeMetronomeCatcher(self, addr, tags, stuff, source):
+        return
         
     def playStart(self):
         self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
@@ -709,7 +720,12 @@ class MultiLoop:
         self.gridStates[si].undoStack.append(self.gridcopy(self.gridStates[si].grid))
         print "the noise that was selected was", self.gridStates[si].noiseInd
         if self.gridStates[si].noiseInd == 1:
-            self.gridNoise(self.gridStates[si].noiselev, si)
+            #self.gridNoise(self.gridStates[si].noiselev, si)
+            with self.gridStates[si].lock:
+                g = self.naiveNoise(self.gridStates[si].grid, self.gridStates[si].noiselev)
+                self.gridStates[si].grid = g
+                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+                self.pullUpGrid(g, "/" +str(si+1) + "/grid")
             return
         if self.gridStates[si].noiseInd == 2:
             with self.gridStates[si].lock:
@@ -720,6 +736,7 @@ class MultiLoop:
         if self.gridStates[si].noiseInd == 3:
             print "game of life chosen"
             g = self.gridcopy(self.gridStates[si].grid)
+            print "the level of noise is", self.gridStates[si].noiselev/2
             for i in range(self.gridStates[si].noiselev/2):
                 g = self.gameOfLife(g)
                 print "iteration number", i, "diff", self.gridDif(g, self.gridStates[si].grid)
@@ -765,6 +782,22 @@ class MultiLoop:
                     hamming += 1
         return hamming
     
+    def naiveNoise(self, grid, lev):
+        l = len(grid)
+        p = 1.0 * lev / (l*l)
+        newG = [[0 for i in range(l)] for k in range(l)]
+        for i in range(l):
+            for j in range(l):
+                if random.uniform(0, 1) < p:
+                    if grid[i][j] != 0:
+                        newG[i][j] = 0
+                    else: 
+                        newG[i][j] = 1
+                else: 
+                    newG[i][j] = grid[i][j]
+        return newG
+        
+    
     def gridNoise(self, k, si):
         #print "in noise"
         with self.gridStates[si].lock:
@@ -776,7 +809,7 @@ class MultiLoop:
             for i in range(l):
                 for j in range(l):
                     if random.uniform(0, 1) < p:
-                        msg.setAddress("/grid/"+str(i+1) +"/" + str(16-j))
+                        msg.setAddress("/" + str(si+1) + "/grid/"+str(i+1) +"/" + str(16-j))
                         if self.gridStates[si].grid[i][j] != 0:
                             self.gridStates[si].grid[i][j] = 0
                             msg.append(0)

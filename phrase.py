@@ -586,6 +586,8 @@ def play(*args, **kwargs):    #send object type to reciever
     #print "                kwargs len",  len(kwargs)
     if len(kwargs) > 0:
         print kwargs["toggle"]
+        
+    if "list" in kwargs.keys(): args = args[0]
     
     client = OSC.OSCClient()
     client.connect( ('127.0.0.1', 6449) )  
@@ -600,6 +602,8 @@ def play(*args, **kwargs):    #send object type to reciever
     client.send(objs)
     for i in range(len(args)): #for multiloop, instead of i in loop, have it be the looper index, send as an arguement 
         obj = args[i]
+        if not hasattr(obj, "type"):
+            continue
         if(obj.type == "phrase"):
             noteA = obj.n
             timeA = obj.t
