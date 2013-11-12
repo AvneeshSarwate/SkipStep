@@ -181,7 +181,18 @@ problems:
 ______________________
 
 piano mode fixed in multiloop
+_______________________
+
+to allow looping in piano mode:
+	if an instrument is in piano mode, skip its realPlay() code and provide an empty chord instead
+
+grid sharing in multi loop:
+	allow sent grid/scale to be selected from main grid, piano grid, saved grid, of all instruments
+	allow it to be sent to main grid/scale of any of your own instruments or "out" to network
+	will need 2 scale editors for grid send page - send editor and recieve editor 
 	
+MAKE PIANO MODE FULLY POWERED - this will let you PLAY like a real instrument while other things loop
+	allow for saved presets, grid shifting/transposing, custom scale defining, all for piano mode	
 
 future steps ideas:
 	get piano mode working so that non-piano instruments still loop
