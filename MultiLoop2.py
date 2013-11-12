@@ -64,9 +64,9 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.214.184", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.205.219", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.59.192", 9000))
+        self.oscClientUI.connect(("169.254.75.196", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -137,7 +137,7 @@ class MultiLoop:
             for i in range(16):
                 for j in range(16):
                     
-                    self.pianocallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[k].pianogrid, addr, stuff, self.gridStates[k].pianoprog)
+                    self.pianocallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].pianogrid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].pianoprog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[k][i][j])
             
@@ -349,10 +349,12 @@ class MultiLoop:
         i, j = self.gridAddrInd(addr)
         print i
         playargs = []
-        for i in range(si):
-            k = 0
+        for m in range(si):
+            k = phrase.Chord()
+            k.type = "skip"
             playargs.append(k)
         playargs.append(self.gridStates[si].pianoprog.c[i])
+        print "len playargs ", len(playargs)
         if(stuff[0] == 1):
             #print "piano on"
             phrase.play(playargs, toggle="on", list="yes")
@@ -370,6 +372,7 @@ class MultiLoop:
             print custScale
             self.gridStates[si].scale = custScale
             self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, custScale, self.gridStates[si].root)
+            self.gridStates[si].pianoprog = self.gridToProg(self.gridStates[si].pianogrid, custScale, self.gridStates[si].root)
     
     def custScale(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on

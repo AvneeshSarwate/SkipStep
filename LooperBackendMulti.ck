@@ -212,6 +212,9 @@ fun void readAndToggle(OscEvent start, OscEvent nums, int n, int on, int chan){
     <<<"starting to read toggle chord">>>;
     readOSCChord2(start, nums, n) @=> chord c;
     <<<"len read chord", c.size()>>>;
+    for(0 => int i; i < c.size(); i++) {
+        <<<"toggle notes ", c.notes[i]>>>;
+    }
     chordToggle(c, on, chan);
 }
 
@@ -297,14 +300,22 @@ while ( true )
         
         start.getString() => string a;
         <<<a>>>;
-        objs => now;
+        objs => now; 
         objs.nextMsg();
         objs.getInt() => int nobj;
         for(0=>int i; i < nobj; i++){ //for multiloop, nobj is looper index, and instead of for loop, directly index by nobj
             type => now;
             type.nextMsg();
             type.getString() => string mtype;
-            <<<"mtype is", mtype>>>;
+            <<<"mtype is", mtype, " n is ", i>>>;
+            if(mtype == "skip") {
+                <<<"about to skip">>>;
+                continue;
+            }
+            if(mtype == "skip") {
+                <<<"SHOULD NOT SEE THIS">>>;
+                continue;
+            }
             nums[i] => now;
             nums[i].nextMsg();
             nums[i].getInt() => int n;

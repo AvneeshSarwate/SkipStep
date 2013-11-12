@@ -163,8 +163,17 @@ problems:
 	piano mode still doesn't work. current hack of phrase.play() w/ lists leads to
 		stall in backend at line 304 (no nums events coming in for "skipped" objects in list)
 	things are a bit sketchy with midi playing (too many messages and things getting dropped?)
+______________________
+
+piano mode fixed in multiloop
+	
 
 future steps ideas:
+	get piano mode working so that non-piano instruments still loop
+	get sharing working in multi looping
+	arranger/scale hotswap features
+	packaging the software
+	
 	add some "continuousness" controls/features:
 		PITCH BEND SLIDER USING XY TOUCHPAD
 		rhythmic jitter idea

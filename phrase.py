@@ -585,7 +585,8 @@ def fillPhrase(phr, txt, root):
 def play(*args, **kwargs):    #send object type to reciever 
     #print "                kwargs len",  len(kwargs)
     if len(kwargs) > 0:
-        print kwargs["toggle"]
+        print "toggle message ", kwargs["toggle"]
+        print [i.type for i in args[0]]
         
     if "list" in kwargs.keys(): args = args[0]
     
@@ -602,8 +603,13 @@ def play(*args, **kwargs):    #send object type to reciever
     client.send(objs)
     for i in range(len(args)): #for multiloop, instead of i in loop, have it be the looper index, send as an arguement 
         obj = args[i]
-        if not hasattr(obj, "type"):
-            continue
+        
+        if (obj.type == "skip"):
+            print "SKIPPED"
+            mtype = OSC.OSCMessage()
+            mtype.setAddress("type")
+            mtype.append(obj.type)
+            client.send(mtype)
         if(obj.type == "phrase"):
             noteA = obj.n
             timeA = obj.t
@@ -647,7 +653,7 @@ def play(*args, **kwargs):    #send object type to reciever
                 mtype.append(obj.type)
             else:
                 mtype.append(kwargs["toggle"])
-                print "                           piano", kwargs["toggle"] 
+                print "                           piano", kwargs["toggle"], "channel ", i 
             nums = OSC.OSCMessage()
             nums.setAddress("nums" + str(i))
             nums.append(n);
