@@ -1,3 +1,18 @@
+BASIC STARTUP INSTRUCTIONS
+1. get iPads and computers onto the same wifi network
+2. update python files on each computer with IP addresses 
+	of that computer and its matched iPad
+3. update each iPad's touchOSC with IP address of its matched computer
+4. start LANdini
+5. set up midi routing so DAW can recieve internally sent midi (IAC bus on Macs)
+6. start DAW and set it up to accept internal midi
+7. load touchOSC layout onto iPad
+8. make sure touchOSC layout is on
+9. start python file
+10. start backend file
+
+
+
 basic looping mechanism working - start chuck, then python
 chord/prog play properly with MIDI
 python handles callbacks for grid correctly 
