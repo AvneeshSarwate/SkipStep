@@ -66,7 +66,7 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer(("169.254.205.219", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.75.196", 9000))
+        self.oscClientUI.connect(("169.254.61.145", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -616,26 +616,31 @@ class MultiLoop:
     def saveGridtoFile(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
+        filename = raw_input("Set Name: ")
+        savefile = open(filename +".ss", "w")
+        instruments = []
         with self.gridStates[si].lock:
-            filename = raw_input("Set Name: ")
-            savefile = open(filename +".ss", "w")
+            
             savestr = []
             savestr.append(self.gridKeyToString(self.gridStates[si].grid, self.gridStates[si].scale))
             for i in self.gridStates[si].gridzz:
                 if i != 0:
                     savestr.append(i)
             print savestr
-            savefile.write("\n".join(savestr))
-            savefile.close()
+            instruments.append("\n".join(savestr))
+        savefile.write("instrument".join(instruments))
+        savefile.close()
         
     
     def loadGridFromFile(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
+        filename = raw_input("File Name: ")    
+        filestr = open(filename).read()
+        instruments = filestr.split("instrument")
         with self.gridStates[si].lock:
-            filename = raw_input("File Name: ")
-            filestr = open(filename).read()
-            gridstrs = filestr.split("\n")
+            
+            gridstrs = instruments[si].split("\n")
             #print gridstrs[0]
             grid, scale = self.stringToGridKey(gridstrs[0])
             self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
@@ -887,7 +892,7 @@ class MultiLoop:
         self.recievedGrid = grid
         self.pullUpGrid(grid, "/recievedGrid")
         self.pullUpScale(scale, "/recievedScale")
-        self.recievedScale = scale #[i+1 for i in scale]
+        self.recievedScale = [i+1 for i in scale]
         
     def applyRecvGrid(self, addr, tags, stuff, source):
         if stuff[0] == 0:
@@ -904,7 +909,7 @@ class MultiLoop:
         si = int(addr.split("/")[2])-1
         with self.gridStates[si].lock:
             minN = min(self.recievedScale)
-            self.gridStates[si].scale = copy.deepcopy(self.recievedScale)
+            self.gridStates[si].scale = [i - minN for i in self.recievedScale]
             self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
         self.pullUpScale(self.gridStates[si].scale, "/" + str(si+1) + "/custScale")
     

@@ -189,6 +189,9 @@ to allow looping in piano mode:
 implemented looping piano mode
 created ui/code for multi loop gridsharing
 generalized function for assigning scales
+multi loop save/load coded
+
+none ov above is tested 
 
 TODO - look at consistency of how scales are stored (is 0 always smallest element?)
 
