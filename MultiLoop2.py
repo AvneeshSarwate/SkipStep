@@ -43,6 +43,7 @@ class Looper:
         self.stepIncrement = 1
         self.noiseInd = 1
         self.undoStack = []
+        self.pianomode = False
         
         self.lock = threading.Lock()
 
@@ -56,7 +57,6 @@ class MultiLoop:
         self.gridStates = []
         for i in range(n):
             self.gridStates.append(Looper())
-        
         
         self.audioThread = 0
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", 50505)) #LANdini 50505, 5174 chuck
@@ -81,6 +81,33 @@ class MultiLoop:
         #print "buildcheck\n\n\n"
         
         self.oscServUI.addMsgHandler("/tempo", self.tempo)
+        
+        self.recievedGrid = [[0 for i in range(16)] for j in range (16)]
+        self.copyGrid = [[0 for i in range(16)] for j in range (16)]
+        self.copyScale = []
+        self.recievedScale = []
+        self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
+        self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
+        
+        for i in range(16):
+                self.oscServUI.addMsgHandler("/copyScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].copyScale))
+            
+        for i in range(16):
+            self.oscServUI.addMsgHandler("/recievedScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].recievedScale))
+        
+        for i in range(16):
+            for j in range(16):
+                self.recievedcallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.recievedGrid, addr, stuff, 0)
+                ##print "grid ui listener " + str(i+1) + " " + str(j+1)
+                self.oscServUI.addMsgHandler("recievedGrid/"+str(i+1)+"/"+str(j+1), self.recievedcallbacks[i][j])
+        
+        for i in range(16):
+            for j in range(16):
+                self.copycallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.copyGrid, addr, stuff, 0)
+                ##print "grid ui listener " + str(i+1) + " " + str(j+1)
+                self.oscServUI.addMsgHandler("copyGrid/"+str(i+1)+"/"+str(j+1), self.copycallbacks[i][j])
+        
+        self.oscServUI.addMsgHandler("/sendGrid", self.sendButtonTest)
         
         for k in range(n):
         
@@ -122,8 +149,11 @@ class MultiLoop:
             for i in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridsave/" + str(i+1) + "/1", self.saveGrid)
                 
+#            for i in range(16):
+#                self.oscServUI.addMsgHandler("/" +str(k+1) +"/custScale/" + str(i+1) + "/1", self.custScale)
+#            
             for i in range(16):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/custScale/" + str(i+1) + "/1", self.custScale)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/custScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].custScale))
                 
             for i in range(4):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseSel/" + str(i+1) + "/1", self.noiseSelector)
@@ -140,6 +170,11 @@ class MultiLoop:
                     self.pianocallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].pianogrid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].pianoprog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[k][i][j])
+            
+            self.oscServUI.addMsgHandler("/getGridScale/" +str(k+1), self.getGridToSend)
+            self.oscServUI.addMsgHandler("/applyRecvGrid/" +str(k+1), self.applyRecvGrid)
+            self.oscServUI.addMsgHandler("/applyRecvScale/" +str(k+1), self.applyRecvScale)
+            
             
             #print "\n\n\nbuildcheck\n\n"
 
@@ -167,12 +202,15 @@ class MultiLoop:
                     playind = self.gridStates[si].progInd
                 #print playind, "playind", self.prog.c[playind].n
                 #turn light on for progind+1
-                self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
-                self.stepTrack.append(1)
-                self.oscClientUI.send(self.stepTrack)
-                self.stepTrack.clearData()
-                ##print "in play"
-                chords.append(self.gridStates[si].prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+                if self.gridStates[si].pianomode:
+                    chords.append(phrase.Chord([-1]))
+                else:
+                    self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
+                    self.stepTrack.append(1)
+                    self.oscClientUI.send(self.stepTrack)
+                    self.stepTrack.clearData()
+                    ##print "in play"
+                    chords.append(self.gridStates[si].prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
                 if self.gridStates[si].refreshing:
                     ##print "                                   refresh", playind
                     self.refreshColumn(playind, si)
@@ -324,14 +362,16 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         #switch tab to piano mode tab
         if(stuff[0] == 0):
-            self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-            self.oscServSelf.delMsgHandler("/played")
-            self.oscServSelf.addMsgHandler("/played", self.realPlay)
-            self.realPlay()
+            self.gridStates[si].pianomode = False
+#            self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+#            self.oscServSelf.delMsgHandler("/played")
+#            self.oscServSelf.addMsgHandler("/played", self.realPlay)
+#            self.realPlay()
             return
         print "                      going to piano mode"
-        self.stopCallback()
-        print "                      stop callback returned"
+        #self.stopCallback()
+        #print "                      stop callback returned"
+        self.gridStates[si].pianomode = True
         msg = OSC.OSCMessage()
         msg.setAddress("/" + str((si+1)*2))
         #msg.append(1)
@@ -383,6 +423,16 @@ class MultiLoop:
         else:
             if i in self.gridStates[si].customScale:
                 self.gridStates[si].customScale.remove(i)
+                print "                removed note from scale", i
+                
+    def assignScale(self, addr, stuff, scale):
+        i, j = self.gridAddrInd(addr)
+        if(stuff[0] != 0):
+            self.customScale.append(i)
+            print "                added note to scale", i 
+        else:
+            if i in self.customScale:
+                self.customScale.remove(i)
                 print "                removed note from scale", i
     
     #new        
@@ -799,7 +849,64 @@ class MultiLoop:
                 else: 
                     newG[i][j] = grid[i][j]
         return newG
+    
+    def getGridToSend(self, addr, tags, stuff, source):
+        if stuff[0] == 0:
+            return
+        si = int(addr.split("/")[2])-1
+        self.copyGrid = self.gridcopy(self.gridStates[si].grid)
+        self.copyScale = copy.deepcopy(self.gridStates[si].scale)
+        self.pullUpGrid(self.copyGrid, "/copyGrid")
+        self.pullUpScale(self.copyScale, "/copyScale")
+    
+    def sendButtonTest(self, addr, tags, stuff, source):
+        if stuff[0] == 0:
+            return
+        else:
+            self.sendGrid()
+    
+    def sendGrid(self):
+        recipient = raw_input("Who do you want to send a grid to: ")
+        print recipient
+        #recipient = "all"
+        msg = OSC.OSCMessage()
+        msg.setAddress("/send/GD")
+        msg.append(recipient)
+        msg.append("/recievedGrid")
+        print self.copyGrid 
+        print
+        print
+        msg.append(self.gridKeyToString(self.copyGrid, self.copyScale)) #replace with edit grid?
+        #print self.gridKeyToString(self.grid, self.scale)
+        self.oscLANdiniClient.send(msg)
+        print "sent"
+    
+    def recieveGrid(self, addr, tags, stuff, source):
+        print stuff[0], "got it"
+        grid, scale = self.stringToGridKey(stuff[0])
+        self.recievedGrid = grid
+        self.pullUpGrid(grid, "/recievedGrid")
+        self.pullUpScale(scale, "/recievedScale")
+        self.recievedScale = scale #[i+1 for i in scale]
         
+    def applyRecvGrid(self, addr, tags, stuff, source):
+        if stuff[0] == 0:
+            return
+        si = int(addr.split("/")[2])-1
+        with self.gridStates[si].lock:
+            self.gridStates[si].grid = self.gridcopy(self.recievedGrid)
+            self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+        self.pullUpGrid(self.gridStates[si].grid, "/" + str(si+1) + "/grid")
+        
+    def applyRecvScale(self, addr, tags, stuff, source):
+        if stuff[0] == 0:
+            return
+        si = int(addr.split("/")[2])-1
+        with self.gridStates[si].lock:
+            minN = min(self.recievedScale)
+            self.gridStates[si].scale = copy.deepcopy(self.recievedScale)
+            self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+        self.pullUpScale(self.gridStates[si].scale, "/" + str(si+1) + "/custScale")
     
     def gridNoise(self, k, si):
         #print "in noise"

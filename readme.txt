@@ -186,6 +186,12 @@ _______________________
 to allow looping in piano mode:
 	if an instrument is in piano mode, skip its realPlay() code and provide an empty chord instead
 
+implemented looping piano mode
+created ui/code for multi loop gridsharing
+generalized function for assigning scales
+
+TODO - look at consistency of how scales are stored (is 0 always smallest element?)
+
 grid sharing in multi loop:
 	allow sent grid/scale to be selected from main grid, piano grid, saved grid, of all instruments
 	allow it to be sent to main grid/scale of any of your own instruments or "out" to network

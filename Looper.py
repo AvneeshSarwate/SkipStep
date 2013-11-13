@@ -127,6 +127,7 @@ class Looper:
         for i in range(16):
             self.oscServUI.addMsgHandler("/custScale/" + str(i+1) + "/1", self.custScale)
             
+            
         for i in range(4):
             self.oscServUI.addMsgHandler("/noiseSel/" + str(i+1) + "/1", self.noiseSelector)
         
@@ -374,6 +375,9 @@ class Looper:
             if i in self.customScale:
                 self.customScale.remove(i)
                 print "                removed note from scale", i
+                
+                
+    
     
     def toCompareView(self, addr, tags, stuff, source):
         #change page
@@ -643,9 +647,11 @@ class Looper:
         self.customScale = [i+1 for i in scale]
         
     def applyRecvGrid(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
         with self.lock:
             self.grid = self.gridcopy(self.recievedGrid)
-            self.scale = [i - min(self.customScale) for i in self.customScale]
+            minN = min(self.customScale)
+            self.scale = [i - minN for i in self.customScale]
             self.scale.sort()
             self.prog = self.gridToProg(self.grid, self.scale, self.root)
         self.pullUpGrid(self.grid, "/grid")
