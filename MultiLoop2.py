@@ -64,9 +64,9 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.180.136", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.13.70", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.138.6", 9000))
+        self.oscClientUI.connect(("169.254.204.222", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -154,7 +154,7 @@ class MultiLoop:
 #                self.oscServUI.addMsgHandler("/" +str(k+1) +"/custScale/" + str(i+1) + "/1", self.custScale)
 #            
             for i in range(16):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/custScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].custScale))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/custScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].customScale))
                 
             for i in range(4):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseSel/" + str(i+1) + "/1", self.noiseSelector)
@@ -217,11 +217,16 @@ class MultiLoop:
                     self.refreshColumn(playind, si)
                 self.gridStates[si].loopInd += 1
                 self.gridStates[si].progInd += self.gridStates[si].stepIncrement
-            if self.gridStates[si].noisy and ((self.gridStates[si].progInd == l) or(self.gridStates[si].progInd == -1)):
-                self.noiseChoice(si)
+            
                 #self.gridNoise(self.noiselev)
                 #print                               noise at", l
         phrase.play(chords[0], chords[1], chords[2])
+        
+        #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
+        #could move other stuff into this loop as well if performance is an issue
+        for si in range(self.num):
+            if self.gridStates[si].noisy and ((self.gridStates[si].progInd == l) or(self.gridStates[si].progInd == -1)):
+                self.noiseChoice(si)
             
     
     def refreshColumn(self, k, si):
@@ -428,7 +433,7 @@ class MultiLoop:
                 
     def assignScale(self, addr, stuff, scale):
         print addr
-        i = int(addr.split("/")[2]) 
+        i = int(addr.split("/")[len(addr.split("/"))-2]) 
         if(stuff[0] != 0):
             scale.append(i)
             print "                added note to scale", i 

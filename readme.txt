@@ -201,7 +201,13 @@ BUG: when playing lots of things fast, nums messages from different key hits get
 BUG: custom scale still not working (error: Looper instance has no attribute custScale)
 
 MULTI GRID SHARING SEEMS TO BE WORKING
+________________________________
+fixed custScale bug
+optimized realPlay - moved "noise" calculations to after the phrase.play() call
+changed addresses for play/toggle to differentiate between chord length and note values
+all tested and seem to be working 
 
+assingScale has unique way of finding right index, maybe use that everywhere?
 
 TODO - look at consistency of how scales are stored (is 0 always smallest element?)
 	 - look at consistency of indexing methods

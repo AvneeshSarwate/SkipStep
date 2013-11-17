@@ -56,13 +56,13 @@ recv.listen();
 
 5 => int maxMultiplay;
 OscEvent nums[maxMultiplay];
-OscEvent nums2[maxMultiplay];
+OscEvent objLen[maxMultiplay];
 
 for(0 => int i; i < maxMultiplay; i++) {
     recv.event("nums" + i + ", i") @=> nums[i];
 }
 for(0 => int i; i < maxMultiplay; i++) {
-    recv.event("nums2" + i + ", f") @=> nums2[i];
+    recv.event("objLen" + i + ", i") @=> objLen[i];
 }
 
 // create an address in the receiver, store in new variable
@@ -316,9 +316,10 @@ while ( true )
                 <<<"SHOULD NOT SEE THIS">>>;
                 continue;
             }
-            nums[i] => now;
-            nums[i].nextMsg();
-            nums[i].getInt() => int n;
+            objLen[i] => now;
+            <<<"got length">>>;
+            objLen[i].nextMsg();
+            objLen[i].getInt() => int n;
             if(mtype == "chord") {
                 spork~ readOSCChord(start, nums[i], n, m, whole, i);
             }

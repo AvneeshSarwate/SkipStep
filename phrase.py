@@ -655,11 +655,15 @@ def play(*args, **kwargs):    #send object type to reciever
                 mtype.append(kwargs["toggle"])
                 print "                           piano", kwargs["toggle"], "channel ", i 
             nums = OSC.OSCMessage()
-            nums.setAddress("nums" + str(i))
+            nums.setAddress("objLen" + str(i))
             nums.append(n);
             
             client.send(mtype)
             client.send(nums)
+            
+            #print nums.address, "  was sent yo, with val ", nums[0]
+            
+            nums.setAddress("nums" + str(i))
             for i in range(n):
                 nums.clearData()
                 nums.append(noteA[i])
