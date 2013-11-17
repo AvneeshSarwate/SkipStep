@@ -202,7 +202,9 @@ BUG: custom scale still not working (error: Looper instance has no attribute cus
 
 MULTI GRID SHARING SEEMS TO BE WORKING
 
+
 TODO - look at consistency of how scales are stored (is 0 always smallest element?)
+	 - look at consistency of indexing methods
 
 grid sharing in multi loop:
 	allow sent grid/scale to be selected from main grid, piano grid, saved grid, of all instruments
