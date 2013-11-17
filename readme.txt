@@ -191,7 +191,16 @@ created ui/code for multi loop gridsharing
 generalized function for assigning scales
 multi loop save/load coded
 
-none ov above is tested 
+none of above is tested 
+________________________
+mostly fixed multiloop piano mode
+BUG: when playing lots of things fast, nums messages from different key hits get interleaved:
+	a message meant to be read as a rest note (-1) can be read as a length for another key hit
+	SOLUTION: different message addresses for chord lengths and note values
+
+BUG: custom scale still not working (error: Looper instance has no attribute custScale)
+
+MULTI GRID SHARING SEEMS TO BE WORKING
 
 TODO - look at consistency of how scales are stored (is 0 always smallest element?)
 

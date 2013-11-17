@@ -64,9 +64,9 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.205.219", 8000))
+        self.oscServUI = OSC.OSCServer(("169.254.180.136", 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.61.145", 9000))
+        self.oscClientUI.connect(("169.254.138.6", 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -90,10 +90,10 @@ class MultiLoop:
         self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
         
         for i in range(16):
-                self.oscServUI.addMsgHandler("/copyScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].copyScale))
+                self.oscServUI.addMsgHandler("/copyScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.copyScale))
             
         for i in range(16):
-            self.oscServUI.addMsgHandler("/recievedScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].recievedScale))
+            self.oscServUI.addMsgHandler("/recievedScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.recievedScale))
         
         for i in range(16):
             for j in range(16):
@@ -108,6 +108,7 @@ class MultiLoop:
                 self.oscServUI.addMsgHandler("copyGrid/"+str(i+1)+"/"+str(j+1), self.copycallbacks[i][j])
         
         self.oscServUI.addMsgHandler("/sendGrid", self.sendButtonTest)
+        self.oscServSelf.addMsgHandler("/recievedGrid", self.recieveGrid)
         
         for k in range(n):
         
@@ -171,9 +172,9 @@ class MultiLoop:
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[k][i][j])
             
-            self.oscServUI.addMsgHandler("/getGridScale/" +str(k+1), self.getGridToSend)
-            self.oscServUI.addMsgHandler("/applyRecvGrid/" +str(k+1), self.applyRecvGrid)
-            self.oscServUI.addMsgHandler("/applyRecvScale/" +str(k+1), self.applyRecvScale)
+            self.oscServUI.addMsgHandler("/getGridScale/" +str(k+1) + "/1", self.getGridToSend)
+            self.oscServUI.addMsgHandler("/applyRecvGrid/" +str(k+1) + "/1", self.applyRecvGrid)
+            self.oscServUI.addMsgHandler("/applyRecvScale/" +str(k+1) + "/1", self.applyRecvScale)
             
             
             #print "\n\n\nbuildcheck\n\n"
@@ -390,8 +391,8 @@ class MultiLoop:
         print i
         playargs = []
         for m in range(si):
-            k = phrase.Chord()
-            k.type = "skip"
+            k = phrase.Chord([-1])
+            #k.type = "skip"
             playargs.append(k)
         playargs.append(self.gridStates[si].pianoprog.c[i])
         print "len playargs ", len(playargs)
@@ -426,14 +427,17 @@ class MultiLoop:
                 print "                removed note from scale", i
                 
     def assignScale(self, addr, stuff, scale):
-        i, j = self.gridAddrInd(addr)
+        print addr
+        i = int(addr.split("/")[2]) 
         if(stuff[0] != 0):
-            self.customScale.append(i)
+            scale.append(i)
             print "                added note to scale", i 
         else:
-            if i in self.customScale:
-                self.customScale.remove(i)
+            if i in scale:
+                scale.remove(i)
                 print "                removed note from scale", i
+        scale.sort()
+        print scale
     
     #new        
     def gridClear(self, addr, tags, stuff, source):
@@ -893,6 +897,7 @@ class MultiLoop:
         self.pullUpGrid(grid, "/recievedGrid")
         self.pullUpScale(scale, "/recievedScale")
         self.recievedScale = [i+1 for i in scale]
+        print self.recievedScale
         
     def applyRecvGrid(self, addr, tags, stuff, source):
         if stuff[0] == 0:
