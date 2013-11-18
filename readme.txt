@@ -10,6 +10,7 @@ BASIC STARTUP INSTRUCTIONS
 8. make sure touchOSC layout is on
 9. start python file
 10. start backend file
+	(comment out line that sporks the timer thread if you're not the master user)
 
 
 
@@ -212,17 +213,16 @@ assingScale has unique way of finding right index, maybe use that everywhere?
 TODO - look at consistency of how scales are stored (is 0 always smallest element?)
 	 - look at consistency of indexing methods
 
-grid sharing in multi loop:
-	allow sent grid/scale to be selected from main grid, piano grid, saved grid, of all instruments
-	allow it to be sent to main grid/scale of any of your own instruments or "out" to network
-	will need 2 scale editors for grid send page - send editor and recieve editor 
-	
 MAKE PIANO MODE FULLY POWERED - this will let you PLAY like a real instrument while other things loop
-	allow for saved presets, grid shifting/transposing, custom scale defining, all for piano mode	
+	allow for saved presets, grid shifting/transposing, custom scale defining, all for piano mode
+	also with vibrato for expressivity
+	it is essentially a DIFFERENT INSTRUMENT (looper is more score like, piano-mode more instrument like)
 
 future steps ideas:
-	get piano mode working so that non-piano instruments still loop
-	get sharing working in multi looping
+	think of cool "tricks" and uses that are unique to skipstep
+		develop a stardard "technique"/set of techniques for skipstep like real instruments have
+	save/load of multi-instrument sets
+	fully powered piano mode (with vibrato)
 	arranger/scale hotswap features
 	packaging the software
 	

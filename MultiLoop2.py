@@ -53,6 +53,9 @@ class MultiLoop:
     def __init__(self, n):
         #self.recvAddr = 
         
+        iPadIP = "169.254.204.222"
+        selfIP = "169.254.13.70"
+        
         self.num = n
         self.gridStates = []
         for i in range(n):
@@ -64,9 +67,9 @@ class MultiLoop:
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
-        self.oscServUI = OSC.OSCServer(("169.254.13.70", 8000))
+        self.oscServUI = OSC.OSCServer((selfIP, 8000))
         self.oscClientUI = OSC.OSCClient()
-        self.oscClientUI.connect(("169.254.204.222", 9000))
+        self.oscClientUI.connect((iPadIP, 9000))
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
