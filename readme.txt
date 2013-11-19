@@ -217,6 +217,11 @@ MAKE PIANO MODE FULLY POWERED - this will let you PLAY like a real instrument wh
 	allow for saved presets, grid shifting/transposing, custom scale defining, all for piano mode
 	also with vibrato for expressivity
 	it is essentially a DIFFERENT INSTRUMENT (looper is more score like, piano-mode more instrument like)
+_____________
+
+fixed touchOSC ui so all grids send only 0/1
+wrote a gridDif function for faster UI updating, but may require some rework
+	(see coment on function)
 
 future steps ideas:
 	think of cool "tricks" and uses that are unique to skipstep
@@ -234,20 +239,7 @@ future steps ideas:
 		(making grids work at preset fractional speeds of each other)
 	have a single "master control" page for inter-page settings/control 
 
-for multi instrument looping:
-	create a gridState class that holds all data for a grid/state
-	create a MultiLoop class that contains several gridState instances
-	each UI element type will exist on multiple pages (ex "/1/colsub/1/1", "/2colsub/1/1")
-	all ui elements/addresses of same type will map to a single callback
-	the callback parses which index element it is, and acts on that indexed gridState
-	single callback coordinates stepping over all gridStates
-	instead of "realPlay", the function finds the chord to play for each gridState
-		use multi-object playing functionality of phrase.play to play all at once
-	what it looks like in the code:
-		callback assignment inside a loop to account for multiple pages
-		callback functions act on gridState[index] instead of self
-		realPlay returns a deep copy of the chords to be played (other side effects happen as normal)
-		
+
 	
 Working feature list: 
 	- SAVE/LOAD - grid/scale for active and all saved grids

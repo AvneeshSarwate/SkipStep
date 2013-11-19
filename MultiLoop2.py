@@ -53,7 +53,7 @@ class MultiLoop:
     def __init__(self, n):
         #self.recvAddr = 
         
-        iPadIP = "169.254.204.222"
+        iPadIP = "169.254.90.179"
         selfIP = "169.254.13.70"
         
         self.num = n
@@ -341,18 +341,29 @@ class MultiLoop:
         self.gridStates[si].scale = scale
         self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
     #new
-    def pullUpGrid(self, grid, gridAddr):
+    def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
         msg = OSC.OSCMessage()
         print "pullup outside lock"
         #with self.lock:
         print "updating grid of", gridAddr
         for i in range(len(grid)):
             for j in range(len(grid)):
+                #if diG[i][j]
                 msg.setAddress(gridAddr + "/"+str(i+1) +"/" + str(16-j))
                 msg.append(grid[i][j])
                 self.oscClientUI.send(msg)
                 msg.clearData()
     
+    def difGrid(self, g1, g2):
+        difG = [[0 for i in range(len(g1))] for j in range(len(g2))]
+        for i in range(len(g1)):
+            for j in range(len(g2)):
+                if g1[i][j] == g2[i][j]:    #assuming all grid values  jsut 0/1
+                    difG[i][j] = False
+                else:
+                    difG[i][j] = True
+        return difG
+                
     def pullUpScale(self, scale, scaleAddr):
         print "           ", scale 
         msg = OSC.OSCMessage()
