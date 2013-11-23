@@ -222,6 +222,10 @@ _____________
 fixed touchOSC ui so all grids send only 0/1
 wrote a gridDif function for faster UI updating, but may require some rework
 	(see coment on function)
+__________________
+
+IMMEDIATE PRIORITY - have note names show up next to grid
+
 
 future steps ideas:
 	think of cool "tricks" and uses that are unique to skipstep
