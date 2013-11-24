@@ -227,21 +227,24 @@ __________________
 IMMEDIATE PRIORITY - have note names show up next to grid
 
 
+
 future steps ideas:
+	NON TRIVIAL PHONE VERSION
 	think of cool "tricks" and uses that are unique to skipstep
 		develop a stardard "technique"/set of techniques for skipstep like real instruments have
-	save/load of multi-instrument sets
 	fully powered piano mode (with vibrato)
+	ADD "PAGES" for controls below grid using invisibility toggle on touchOSC
 	arranger/scale hotswap features
 	packaging the software
 	
+	independent metronomes for each channel? time control features 
+		(making grids work at preset fractional speeds of each other)
 	add some "continuousness" controls/features:
 		PITCH BEND SLIDER USING XY TOUCHPAD
 		rhythmic jitter idea
 		microtonal stuff
-	independent metronomes for each channel? time control features 
-		(making grids work at preset fractional speeds of each other)
-	have a single "master control" page for inter-page settings/control 
+	have a single "master control" page for inter-page settings/control
+	
 
 
 	
