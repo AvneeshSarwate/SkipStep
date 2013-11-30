@@ -245,6 +245,12 @@ future steps ideas:
 		microtonal stuff
 	have a single "master control" page for inter-page settings/control
 	
+	Let multiple users work with the same "set" - different iPads show same "score"
+		- allows "full blended" interactive playing 
+		- increase number of loops/instruments to 6
+		- have only 1 piano page, each pianoModeOn sends you to same page
+		
+	
 
 
 	
