@@ -124,22 +124,32 @@ fun void touchTempo(){
     }   
 }
 
+
 spork~ touchTempo();
+<<<"touch tempo sporked">>>;
 
 OscSend confLANdini;
 confLANdini.setHost( "127.0.0.1", 50506 );
 "all" => confLANdini.addString;
 "/played" => confLANdini.addString;
 "played0" => confLANdini.addString;
-
+0 => int track;
+now => time old;
+now => time nu;
 fun void timerLANdini(){
     while(true) {
+        //1 => m[0].noteOn;
         .25 * whole => now;
+        //now => nu;
         confLANdini.startMsg("/send/GD, s, s, s");
         "all" => confLANdini.addString;
         "/played" => confLANdini.addString;
         "played0" => confLANdini.addString;
-//        <<<"                  step">>>;
+        //<<<"                  step", nu-old, track>>>;
+        //nu => old;
+        //track++;
+        
+        
     }
 }
 

@@ -13,6 +13,7 @@ import thread
 import random
 import cPickle
 import copy
+import subprocess
 
 class Looper:
 
@@ -53,8 +54,22 @@ class MultiLoop:
     def __init__(self, n):
         #self.recvAddr = 
         
-        iPadIP = "169.254.90.179"
-        selfIP = "169.254.13.70"
+        k = subprocess.check_output(["ifconfig | grep \"inet \" | grep -v 127.0.0.1"], shell=True)
+        ip = k.split(" ")[1]
+        selfIP = ip
+        print "\n" + "Your computer's IP address is: " + selfIP + "\n enter this into your iPad"
+        
+        ipadFile = open("ipadIP.txt")
+        oldIpadIP = ipadFile.read().strip("\n")
+        ipadFile.close()
+        iPadRead = raw_input("\n\nIs the IP address of your iPad " + oldIpadIP +"?" +
+                           "\n If so, hit enter. If not, type it in below:\n")
+        if(iPadRead == ""): iPadIP = oldIpadIP
+        else:
+            iPadIP = iPadRead
+            ipadFile = open("ipadIP.txt", "w")
+            ipadFile.write(iPadRead)
+            ipadFile.close()
         
         self.num = n
         self.gridStates = []
@@ -113,6 +128,9 @@ class MultiLoop:
         self.oscServUI.addMsgHandler("/sendGrid", self.sendButtonTest)
         self.oscServSelf.addMsgHandler("/recievedGrid", self.recieveGrid)
         
+        self.oscServUI.addMsgHandler("/save", self.saveGridtoFile)
+        self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
+        
         for k in range(n):
         
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noisy", self.noiseFlip)
@@ -126,8 +144,6 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/right", self.gridShiftHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/arrowToggle", self.arrowTogHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/clear", self.gridClear)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/save", self.saveGridtoFile)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/load", self.loadGridFromFile)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseHit", self.noiseHit)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/undo", self.undo)
             
@@ -228,9 +244,11 @@ class MultiLoop:
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
         for si in range(self.num):
-            if self.gridStates[si].noisy and ((self.gridStates[si].progInd == l) or(self.gridStates[si].progInd == -1)):
-                self.noiseChoice(si)
-            
+            if self.gridStates[si].noisy:
+                if not self.gridStates[si].subsets and ((self.gridStates[si].progInd == 16) or(self.gridStates[si].progInd == -1)):
+                    self.noiseChoice(si)
+                if self.gridStates[si].subsets and ((self.gridStates[si].progInd == len(self.gridStates[si].columnsub)) or(self.gridStates[si].progInd == -1)):
+                    self.noiseChoice(si)
     
     def refreshColumn(self, k, si):
         msg = OSC.OSCMessage()
@@ -307,7 +325,7 @@ class MultiLoop:
             self.gridStates[si].subsets = (stuff[0] == 1)
             #print "                             past bool", self.subsets 
             self.gridStates[si].progInd = 0 if stuff[0] == 1 else self.gridStates[si].columnsub[self.gridStates[si].progInd]
-            print "                      colsub ", str(self.gridStates[si].subsets), "progind" + str(self.gridStates[si].progind)
+            print "                      colsub ", str(self.gridStates[si].subsets), "progind" + str(self.gridStates[si].progInd)
         
     #new       
     def gridcopy(self, *args):
@@ -637,49 +655,51 @@ class MultiLoop:
             #print self.prog, "\n\n\n"        
     
     def saveGridtoFile(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        #si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
         filename = raw_input("Set Name: ")
         savefile = open(filename +".ss", "w")
         instruments = []
-        with self.gridStates[si].lock:
-            
-            savestr = []
-            savestr.append(self.gridKeyToString(self.gridStates[si].grid, self.gridStates[si].scale))
-            for i in self.gridStates[si].gridzz:
-                if i != 0:
-                    savestr.append(i)
-            print savestr
-            instruments.append("\n".join(savestr))
+        for si in range(3):
+            with self.gridStates[si].lock:
+                
+                savestr = []
+                savestr.append(self.gridKeyToString(self.gridStates[si].grid, self.gridStates[si].scale))
+                for i in self.gridStates[si].gridzz:
+                    if i != 0:
+                        savestr.append(i)
+                print savestr
+                instruments.append("\n".join(savestr))
         savefile.write("instrument".join(instruments))
         savefile.close()
         
     
     def loadGridFromFile(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        #si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
         filename = raw_input("File Name: ")    
         filestr = open(filename).read()
         instruments = filestr.split("instrument")
-        with self.gridStates[si].lock:
-            
-            gridstrs = instruments[si].split("\n")
-            #print gridstrs[0]
-            grid, scale = self.stringToGridKey(gridstrs[0])
-            self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
-            self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
-            self.gridStates[si].customScale = [1+i for i in scale]
-            self.gridStates[si].grid = grid
-            self.gridStates[si].scale = scale
-            self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-            for i in range(1, len(gridstrs)):
-                print gridstrs[i]
-                self.gridStates[si].gridzz[i-1] = gridstrs[i]
-                msg = OSC.OSCMessage()
-                msg.setAddress("/gridsave/" + str(i) + "/1")
-                msg.append(1)
-                self.oscClientUI.send(msg)
-                msg.clearData()
+        for si in range(3):
+            with self.gridStates[si].lock:
+                
+                gridstrs = instruments[si].split("\n")
+                #print gridstrs[0]
+                grid, scale = self.stringToGridKey(gridstrs[0])
+                self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
+                self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
+                self.gridStates[si].customScale = [1+i for i in scale]
+                self.gridStates[si].grid = grid
+                self.gridStates[si].scale = scale
+                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+                for i in range(1, len(gridstrs)):
+                    print "send hte save light message"
+                    self.gridStates[si].gridzz[i-1] = gridstrs[i]
+                    msg = OSC.OSCMessage()
+                    msg.setAddress("/" +str(si+1) +"/gridsave/" + str(i) + "/1")
+                    msg.append(1)
+                    self.oscClientUI.send(msg)
+                    msg.clearData()
     
     def gridKeyToString(self, grid, key):
         strgrid = [[str(grid[i][j]) for i in range(len(grid))] for j in range(len(grid))]

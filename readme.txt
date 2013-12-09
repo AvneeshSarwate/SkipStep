@@ -224,9 +224,14 @@ wrote a gridDif function for faster UI updating, but may require some rework
 	(see coment on function)
 __________________
 
+Got IP stuff as seamless as possible on computer side.
+	autofind computer IP and display it for user
+	diplay last used IP address for ipad and give prompt for changing it if needed
+	
+PROBLEM - chuck doesn't run in realtime from command line
+
+
 IMMEDIATE PRIORITY - have note names show up next to grid
-
-
 
 future steps ideas:
 	NON TRIVIAL PHONE VERSION
