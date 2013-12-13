@@ -1,16 +1,27 @@
+DEMOS
+Feature Demo: https://www.dropbox.com/s/ndofpnnq278b2wz/Song_Demo.m4v
+Song Demo: https://www.dropbox.com/s/ndofpnnq278b2wz/Song_Demo.m4v
+
+
+SOFTWARE YOU NEED
+touchOSC (on your iPad/android tablet)
+touchOSC editor (on your computer)
+Python 2.7 (on your computer)
+LANdini (on your computer)
+any DAW (on your computer)
+
 BASIC STARTUP INSTRUCTIONS
 1. get iPads and computers onto the same wifi network
-2. update python files on each computer with IP addresses 
-	of that computer and its matched iPad
-3. update each iPad's touchOSC with IP address of its matched computer
-4. start LANdini
-5. set up midi routing so DAW can recieve internally sent midi (IAC bus on Macs)
-6. start DAW and set it up to accept internal midi
-7. load touchOSC layout onto iPad
-8. make sure touchOSC layout is on
-9. start python file
-10. start backend file
+2. start LANdini
+3. set up midi routing so DAW can recieve internally sent midi (IAC bus on Macs)
+4. start DAW and set it up to accept internal midi
+5. load touchOSC layout onto iPad (you only need to do this the first time you run it)
+6. make sure touchOSC layout is on
+7. start backend file
 	(comment out line that sporks the timer thread if you're not the master user)
+8. start python file from the terminal
+	upon startup, follow instructions from the python script
+	to set all the needed IP addresses
 
 
 
