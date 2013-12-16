@@ -244,7 +244,9 @@ _______________________
 
 wrote function for changing pages, wrote page1.txt
 
-
+--Allow subset and randomized stepping for grid sequences
+	allow users to upload 0-order markov chains to use with grid sequencing
+	allow for "blank" grids in grid sequencing, provide shortcut for that?
 
 IMMEDIATE PRIORITY - have note names show up next to grid
 
