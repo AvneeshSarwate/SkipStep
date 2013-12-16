@@ -168,13 +168,14 @@ ARRANGER TOOL IDEA
 	
 Diagram
 
-	[toggle1]	[8 labels]
+	[toggle1]	[8 labels]	
 	[toggle2]	[step tracker]
 	
 	to set an arrangement of grids: turn on toggle 1:
 		the order in which you hit the gridLoad buttons determines the
 		order of the grid arrangement. turning toggle 1 off clears the arrangement
 	toggle 2: used to turn arrangement looping on or off
+	8 lables:  "-" for unused, "b" used for blank, "1-8" used for grids
 		
 ___________________
 MultiLoop2 is newer version of MultiLooper. includes all new features from this week
@@ -247,6 +248,7 @@ wrote function for changing pages, wrote page1.txt
 --Allow subset and randomized stepping for grid sequences
 	allow users to upload 0-order markov chains to use with grid sequencing
 	allow for "blank" grids in grid sequencing, provide shortcut for that?
+--minipage for grid sequencing also allows you to save different "grid sets" and grid sequences
 
 IMMEDIATE PRIORITY - have note names show up next to grid
 
