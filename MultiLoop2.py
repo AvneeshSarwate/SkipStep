@@ -54,6 +54,8 @@ class MultiLoop:
     def __init__(self, n):
         #self.recvAddr = 
         
+        self.chuckThread = threading.Thread(target=self.chuckThreadFunc)
+        
         k = subprocess.check_output(["ifconfig | grep \"inet \" | grep -v 127.0.0.1"], shell=True)
         ip = k.split(" ")[1]
         selfIP = ip
@@ -70,6 +72,9 @@ class MultiLoop:
             ipadFile = open("ipadIP.txt", "w")
             ipadFile.write(iPadRead)
             ipadFile.close()
+            
+        self.pageAddrs = []
+        self.pageAddrs.append(open("page1.txt").read().split(" "))
         
         self.num = n
         self.gridStates = []
@@ -497,6 +502,7 @@ class MultiLoop:
         
     def playStart(self):
         self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
+        #self.chuckThread.start()
         self.audioThread.start()
         self.realPlay()
     
@@ -522,6 +528,7 @@ class MultiLoop:
                 self.audioThread.join() ##!!!
             if self.uiThread != 0:
                 self.uiThread.join() ##!!!
+            #self.chuckThread.join()
             #print "Done"
     
     def tester(self, *args):
@@ -982,8 +989,28 @@ class MultiLoop:
                 self.gridStates[si].prog.c[i] = self.colToChord(self.gridStates[si].grid[i], self.gridStates[si].root, self.gridStates[si].scale)
             print "                                randomized"
             #self.prog = self.gridToProg(self.grid, self.scale, self.root) 
-            
-                
+    
+    def chuckThreadFunc(self):
+        subprocess.call("chuck LooperBackendMulti.ck", shell=True)  
+        
+    def changePage(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        minipageNum = int(addr.split("/")[4]) - 1 #assuming column multiselect
+        if stuff[0] == 1:
+            for k in self.pageAddrs[minipageNum]:
+                msg = OSC.OSCMessage()
+                msg.setAddress("/" + str(si+1) + k + "/visible")
+                msg.append(1)
+                self.oscClientUI.send(msg)
+                msg.clear()
+        else:
+            for k in self.pageAddrs[minipageNum]:
+                msg = OSC.OSCMessage()
+                msg.setAddress("/" + str(si+1) + k + "/visible")
+                msg.append(0)
+                self.oscClientUI.send(msg)
+                msg.clear()
+        
         
     
 n = [60, 62, 64, 65]

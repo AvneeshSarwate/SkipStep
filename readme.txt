@@ -240,6 +240,10 @@ Got IP stuff as seamless as possible on computer side.
 	diplay last used IP address for ipad and give prompt for changing it if needed
 	
 PROBLEM - chuck doesn't run in realtime from command line
+_______________________
+
+wrote function for changing pages, wrote page1.txt
+
 
 
 IMMEDIATE PRIORITY - have note names show up next to grid
