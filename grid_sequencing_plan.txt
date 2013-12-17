@@ -1,0 +1,38 @@
+
+see supergridMultiDrafts for layout
+(a different colored grid ("/seqgrid") is overlayed over normal grid (e.g. "/grid")
+
+	[toggle 3][button]   (both red)
+[toggle 1][munti toggle 1]   (all grey)
+[toggle 2][multi toggle 2]
+
+toggle 1 - edit toggle on/off
+toggle 2 - grid sequencing on/off
+toggle 3 - measure by measure grid sequence jumping on/off
+button - clears saved sequence
+multi toggle 1 - sequence tracker and indicator where grid will be added in edit mode
+multi toggle 2 - will actually be a list of text boxes indicated what grid is there 
+	(identified by its index in the "saved grids" selector element)
+	
+
+to edit a sequence: 
+	turn on edit mode toggle
+	move toggle 1 to place in sequence you want to set a grid
+	press the pullup button of that grid 
+	
+text boxes show "-" if no grid, "b" if blank grid, index # otherwise
+
+pressing grid pullup button when not in edit mode displays it on "/sequgrid"
+	
+clear button adds "blank" grid in edit mode
+
+noise on during grid sequencing changes saved grids
+	allow for saving of grid sets/sequences to bring back "original" sequence
+	
+a grid is not "unsaved" from a slot (and program memory) until the next grid is saved into it
+	(solves problem of what to do when a grid in a sequence gets unsaved)
+	alternative, unsaving makes that slot an "empty" grid, instead of skipping the space
+
+
+
+save/load needs to include root note and subsets
