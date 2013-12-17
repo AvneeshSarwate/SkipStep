@@ -5,13 +5,9 @@ Created on Nov 10, 2013
 '''
 
 import phrase
-import Levenshtein as lv
 import threading
 import OSC
-import time
-import thread
 import random
-import cPickle
 import copy
 import subprocess
 
@@ -19,7 +15,6 @@ class Looper:
 
     def __init__(self):
         #self.recvAddr = 
-        self.loopInd = 0
         self.progInd = 0#len(loopO)
         self.grid = [[0 for i in range(16)] for j in range (16)]
         self.refgrid = [[0 for i in range(16)] for j in range (16)]
@@ -45,6 +40,11 @@ class Looper:
         self.noiseInd = 1
         self.undoStack = []
         self.pianomode = False
+        self.gridseq = [0]*8
+        self.gridseqInd = 0
+        self.gridseqFlag = False
+        self.gridseqEdit = False
+        
         
         self.lock = threading.Lock()
 
@@ -239,7 +239,7 @@ class MultiLoop:
                 if self.gridStates[si].refreshing:
                     ##print "                                   refresh", playind
                     self.refreshColumn(playind, si)
-                self.gridStates[si].loopInd += 1
+                #self.gridStates[si].loopInd += 1
                 self.gridStates[si].progInd += self.gridStates[si].stepIncrement
             
                 #self.gridNoise(self.noiselev)
@@ -248,12 +248,23 @@ class MultiLoop:
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
+        
         for si in range(self.num):
             if self.gridStates[si].noisy:
                 if not self.gridStates[si].subsets and ((self.gridStates[si].progInd == 16) or(self.gridStates[si].progInd == -1)):
                     self.noiseChoice(si)
                 if self.gridStates[si].subsets and ((self.gridStates[si].progInd == len(self.gridStates[si].columnsub)) or(self.gridStates[si].progInd == -1)):
                     self.noiseChoice(si)
+            if self.gridStates[si].gridseqFlag:
+                state = self.gridStates[si]
+                nextgrid = state.gridzz[state.gridseq[state.gridseqInd]]
+                state.grid = self.gridcopy(nextgrid)
+                state.prog = self.gridToProg(state.grid, state.scale, state.root)
+                self.pullUpGrid(nextgrid, "grid")
+                #update visual stepper for grid indexes. 
+                state.gridseqInd = (state.gridseqInd+1) % len(state.gridseq)
+        
+                
     
     def refreshColumn(self, k, si):
         msg = OSC.OSCMessage()
@@ -353,16 +364,26 @@ class MultiLoop:
             self.gridStates[si].gridzz[ind] = 0 
     #new 
     def gridload(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
-        ind, j = self.gridAddrInd(addr)#int(addr.split("/")[2]) - 1
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        ind = self.gridAddrInd(addr)[0]
+        if stuff[0] == 0: return
+        if state.gridseqEdit:
+            state.gridseq[state.gridseqInd] = ind-1
+            msg = OSC.OSCMessage()
+            msg.setAddress("/" + si + "/seqtext/" + str(state.gridseqInd))
+            msg.append(str(ind))
+            self.oscClientUI.send(msg)
+            return
+            
         grid, scale = self.stringToGridKey(self.gridStates[si].gridzz[ind])
         self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
         self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
-        self.gridStates[si].customScale = [1+i for i in scale]
-        self.gridStates[si].grid = grid
-        self.gridStates[si].scale = scale
-        self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+        state.customScale = [1+i for i in scale]
+        state.grid = grid
+        state.scale = scale
+        state.prog = self.gridToProg(state.grid, state.scale, state.root)
     #new
     def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
         msg = OSC.OSCMessage()
@@ -483,11 +504,19 @@ class MultiLoop:
     
     #new        
     def gridClear(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
-        self.gridStates[si].prog.c = [phrase.Chord([-1]) for i in range(16)]
-        self.gridStates[si].grid = [[0 for i in range(16)] for j in range (16)]
-        self.pullUpGrid(self.gridStates[si].grid, "/" +str(si+1) + "/grid")
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        if state.gridseqEdit:
+            state.gridseq[state.gridseqInd] = 0
+            msg = OSC.OSCMessage()
+            msg.setAddress("/" + si + "/seqtext/" + str(state.gridseqInd))
+            msg.append("b")
+            self.oscClientUI.send(msg)
+            return
+        state.prog.c = [phrase.Chord([-1]) for i in range(16)]
+        state.grid = [[0 for i in range(16)] for j in range (16)]
+        self.pullUpGrid(state.grid, "/" +str(si+1) + "/grid")
         
     
     def stopCallback(self):
@@ -1010,6 +1039,43 @@ class MultiLoop:
                 msg.append(0)
                 self.oscClientUI.send(msg)
                 msg.clear()
+    
+    def gridSeqToggleHandler(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        self.gridStates[si].girdseqFlag = (stuff[0] == 1)
+    
+    def gridSeqEditHandler(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        self.gridStates[si].girdseqEdit = (stuff[0] == 1)
+    
+    def gridSeqIndHandler(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        if stuff[0] == 1:
+            self.gridStates[si].girdseqInd = self.gridAddrInd(addr)[0]
+    
+    def gridSeqClear(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        si = int(addr.split("/")[1]) - 1
+        state = self.gridStates[si]
+        state.gridseq = [0]*8
+        msg = OSC.OSCMessage()
+        for i in range(8):
+            msg.setAddress("/" + si + "/seqtext/" + str(state.gridseqInd))
+            msg.append("-")
+            self.oscClientUI.send(msg)
+            msg.clear()
+    
+    def gridwiseStepSynch(self, addr, tags, stuff, source):
+        return
+            
+    def putGridLive(self, grid, si):
+        self.gridStates[si].grid = grid
+        self.pullUpGrid(self.gridStates[si].grid, "/" + str(si+1) + "/grid")
+        self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root) 
+        
+        
+    
+    
         
         
     
