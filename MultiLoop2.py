@@ -152,7 +152,11 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseHit", self.noiseHit)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/undo", self.undo)
             
-            
+            for j in range(8):
+                self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridseq/" + str(j) + "/1", self.gridSeqIndHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqtoggle", self.gridSeqToggleHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqedit", self.gridSeqEditHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqedit", self.gridSeqClear)
             
             #need to add everything for moving piano mode grid back to main 
             
@@ -215,19 +219,20 @@ class MultiLoop:
 
         chords = []
         for si in range(self.num):
-            with self.gridStates[si].lock: 
-                if(self.gridStates[si].subsets):
-                    l = len(self.gridStates[si].columnsub)
-                    self.gridStates[si].progInd %= len(self.gridStates[si].columnsub)
-                    playind = self.gridStates[si].columnsub[self.gridStates[si].progInd]
+            state = self.gridStates[si]
+            with state.lock: 
+                if(state.subsets):
+                    l = len(state.columnsub)
+                    state.progInd %= len(state.columnsub)
+                    playind = state.columnsub[state.progInd]
                     
                 else:
                     l = 16
-                    self.gridStates[si].progInd %= 16
-                    playind = self.gridStates[si].progInd
+                    state.progInd %= 16
+                    playind = state.progInd
                 #print playind, "playind", self.prog.c[playind].n
                 #turn light on for progind+1
-                if self.gridStates[si].pianomode:
+                if state.pianomode:
                     chords.append(phrase.Chord([-1]))
                 else:
                     self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
@@ -235,12 +240,12 @@ class MultiLoop:
                     self.oscClientUI.send(self.stepTrack)
                     self.stepTrack.clearData()
                     ##print "in play"
-                    chords.append(self.gridStates[si].prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
-                if self.gridStates[si].refreshing:
+                    chords.append(state.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+                if state.refreshing:
                     ##print "                                   refresh", playind
                     self.refreshColumn(playind, si)
                 #self.gridStates[si].loopInd += 1
-                self.gridStates[si].progInd += self.gridStates[si].stepIncrement
+                state.progInd += state.stepIncrement
             
                 #self.gridNoise(self.noiselev)
                 #print                               noise at", l
@@ -250,19 +255,40 @@ class MultiLoop:
         #could move other stuff into this loop as well if performance is an issue
         
         for si in range(self.num):
-            if self.gridStates[si].noisy:
-                if not self.gridStates[si].subsets and ((self.gridStates[si].progInd == 16) or(self.gridStates[si].progInd == -1)):
-                    self.noiseChoice(si)
-                if self.gridStates[si].subsets and ((self.gridStates[si].progInd == len(self.gridStates[si].columnsub)) or(self.gridStates[si].progInd == -1)):
-                    self.noiseChoice(si)
-            if self.gridStates[si].gridseqFlag:
-                state = self.gridStates[si]
-                nextgrid = state.gridzz[state.gridseq[state.gridseqInd]]
-                state.grid = self.gridcopy(nextgrid)
-                state.prog = self.gridToProg(state.grid, state.scale, state.root)
-                self.pullUpGrid(nextgrid, "grid")
-                #update visual stepper for grid indexes. 
-                state.gridseqInd = (state.gridseqInd+1) % len(state.gridseq)
+            if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
+                if state.gridseqFlag:
+                    msg = OSC.OSCMessage()
+                    msg.setAddress("/" + si + "/gridseq/" + str(state.gridseqInd) + "/1")
+                    msg.append(1)
+                    self.oscClientUI.send(msg)
+                    if state.gridseqInd == -1: state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                    g = state.gridzz[state.gridseq[state.gridseqInd]]
+                    if g == 0: g = [[0 for i in range(16)] for j in range(16)]
+                    if state.noisy:
+                        g = self.noiseChoice(si)
+                        state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
+                    self.putGridLive(g, si) 
+                    state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                    
+                else:
+                    if state.noisy:
+                        g = self.noiseChoice(si)
+                        with state.lock:
+                            self.putGridLive(g, si)
+                        
+#            if self.gridStates[si].noisy:
+#                if not self.gridStates[si].subsets and ((self.gridStates[si].progInd == 16) or(self.gridStates[si].progInd == -1)):
+#                    self.noiseChoice(si)
+#                if self.gridStates[si].subsets and ((self.gridStates[si].progInd == len(self.gridStates[si].columnsub)) or(self.gridStates[si].progInd == -1)):
+#                    self.noiseChoice(si)
+#            if self.gridStates[si].gridseqFlag:
+#                state = self.gridStates[si]
+#                nextgrid = state.gridzz[state.gridseq[state.gridseqInd]]
+#                state.grid = self.gridcopy(nextgrid)
+#                state.prog = self.gridToProg(state.grid, state.scale, state.root)
+#                self.pullUpGrid(nextgrid, "grid")
+#                #update visual stepper for grid indexes. 
+#                state.gridseqInd = (state.gridseqInd+1) % len(state.gridseq)
         
                 
     
@@ -857,19 +883,20 @@ class MultiLoop:
         self.gridStates[si].undoStack.append(self.gridcopy(self.gridStates[si].grid))
         print "the noise that was selected was", self.gridStates[si].noiseInd
         if self.gridStates[si].noiseInd == 1:
+            g = self.naiveNoise(self.gridStates[si].grid, self.gridStates[si].noiselev)
             #self.gridNoise(self.gridStates[si].noiselev, si)
-            with self.gridStates[si].lock:
-                g = self.naiveNoise(self.gridStates[si].grid, self.gridStates[si].noiselev)
-                self.gridStates[si].grid = g
-                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-                self.pullUpGrid(g, "/" +str(si+1) + "/grid")
-            return
+#            with self.gridStates[si].lock:
+#                self.gridStates[si].grid = g
+#                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+#                self.pullUpGrid(g, "/" +str(si+1) + "/grid")
+#            return
         if self.gridStates[si].noiseInd == 2:
-            with self.gridStates[si].lock:
-                self.gridStates[si].grid = self.smartNoise(self.gridStates[si].grid, si)
-                self.pullUpGrid(self.gridStates[si].grid, "/" + str(si+1) + "/grid")
-                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-            return
+            g = self.smartNoise(self.gridStates[si].grid, si)
+#            with self.gridStates[si].lock:
+#                self.gridStates[si].grid = self.smartNoise(self.gridStates[si].grid, si)
+#                self.pullUpGrid(self.gridStates[si].grid, "/" + str(si+1) + "/grid")
+#                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+#            return
         if self.gridStates[si].noiseInd == 3:
             print "game of life chosen"
             g = self.gridcopy(self.gridStates[si].grid)
@@ -877,18 +904,19 @@ class MultiLoop:
             for i in range(self.gridStates[si].noiselev/2):
                 g = self.gameOfLife(g)
                 print "iteration number", i, "diff", self.gridDif(g, self.gridStates[si].grid)
-            with self.gridStates[si].lock:
-                self.gridStates[si].grid = g
-                self.pullUpGrid(self.gridStates[si].grid, "/" +str(si+1) + "/grid")
-                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-            return  
+#            with self.gridStates[si].lock:
+#                self.gridStates[si].grid = g
+#                self.pullUpGrid(self.gridStates[si].grid, "/" +str(si+1) + "/grid")
+#                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+#            return  
         if self.gridStates[si].noiseInd == 4:
             g = self.simplify(self.gridStates[si].grid, self.gridStates[si].noiselev/2)
-            with self.gridStates[si].lock:
-                self.gridStates[si].grid = g
-                self.pullUpGrid(self.gridStates[si].grid, "/" +str(si+1) + "/grid")
-                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-            return   
+#            with self.gridStates[si].lock:
+#                self.gridStates[si].grid = g
+#                self.pullUpGrid(self.gridStates[si].grid, "/" +str(si+1) + "/grid")
+#                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+#            return   
+        return g
     
     def tempo(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
@@ -1051,7 +1079,11 @@ class MultiLoop:
     def gridSeqIndHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1
         if stuff[0] == 1:
-            self.gridStates[si].girdseqInd = self.gridAddrInd(addr)[0]
+            state = self.gridStates[si]
+            state.gridseqInd = self.gridAddrInd(addr)[0]
+            with state.lock:
+                self.putGridLive(state.gridzz[state.gridseq[state.gridseqInd]], si)
+            
     
     def gridSeqClear(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
