@@ -40,12 +40,15 @@ save/load needs to include root note and subsets
 
 pseudocode for noise/gridseq loop
 
+DEALING WITH REFRESH MODE
+
 if loopending conditions
 	if gridseq:
 		g = next grid in gridseq
 		if noisy:
 			g = noise(g)
-			save g to gridzzz
+			if not refresh mode
+				save g to gridzzz
 		put g live
 		update gridseq index
 	else

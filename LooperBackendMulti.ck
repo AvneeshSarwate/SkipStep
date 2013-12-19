@@ -140,14 +140,14 @@ fun void timerLANdini(){
     while(true) {
         //1 => m[0].noteOn;
         .25 * whole => now;
-        //now => nu;
+        now => nu;
         confLANdini.startMsg("/send/GD, s, s, s");
         "all" => confLANdini.addString;
         "/played" => confLANdini.addString;
         "played0" => confLANdini.addString;
         //<<<"                  step", nu-old, track>>>;
-        //nu => old;
-        //track++;
+        nu => old;
+        track++;
         
         
     }

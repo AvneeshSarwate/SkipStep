@@ -251,7 +251,12 @@ wrote function for changing pages, wrote page1.txt
 --minipage for grid sequencing also allows you to save different "grid sets" and grid sequences
 ______________________________
 
-grid sequencing basics coded but not tested
+most basic grid sequencing working, no cross-feature compatibility tested
+
+still to implement:
+	handling refresh mode
+	adding root note and column subsets to "gridKey" string 
+	adding saving of "grid sets"
 
 
 IMMEDIATE PRIORITY - have note names show up next to grid

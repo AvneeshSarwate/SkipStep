@@ -40,7 +40,7 @@ class Looper:
         self.noiseInd = 1
         self.undoStack = []
         self.pianomode = False
-        self.gridseq = [0]*8
+        self.gridseq = [-1]*8
         self.gridseqInd = 0
         self.gridseqFlag = False
         self.gridseqEdit = False
@@ -82,7 +82,7 @@ class MultiLoop:
             self.gridStates.append(Looper())
         
         self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 50505)) #LANdini 50505, 5174 chuck
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         self.oscServSelf.addMsgHandler("/tester", self.tester)
@@ -111,6 +111,8 @@ class MultiLoop:
         self.recievedScale = []
         self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
         self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
+        
+        self.oscServUI.addMsgHandler("/test", self.seqtest)
         
         for i in range(16):
                 self.oscServUI.addMsgHandler("/copyScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.copyScale))
@@ -156,7 +158,7 @@ class MultiLoop:
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridseq/" + str(j) + "/1", self.gridSeqIndHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqtoggle", self.gridSeqToggleHandler)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqedit", self.gridSeqEditHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqedit", self.gridSeqClear)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqclear", self.gridSeqClear)
             
             #need to add everything for moving piano mode grid back to main 
             
@@ -222,12 +224,10 @@ class MultiLoop:
             state = self.gridStates[si]
             with state.lock: 
                 if(state.subsets):
-                    l = len(state.columnsub)
                     state.progInd %= len(state.columnsub)
                     playind = state.columnsub[state.progInd]
                     
                 else:
-                    l = 16
                     state.progInd %= 16
                     playind = state.progInd
                 #print playind, "playind", self.prog.c[playind].n
@@ -255,22 +255,38 @@ class MultiLoop:
         #could move other stuff into this loop as well if performance is an issue
         
         for si in range(self.num):
+            state = self.gridStates[si]
             if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
-                if state.gridseqFlag:
+                #print "LOOPEND " + str(si+1)
+                if state.gridseqFlag and sum(state.gridseq) != -8:
+                    while state.gridseq[state.gridseqInd] == -1: 
+                        state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                        print "       progressing to index", state.gridseqInd
+                    
+                    
+                    print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
                     msg = OSC.OSCMessage()
-                    msg.setAddress("/" + si + "/gridseq/" + str(state.gridseqInd) + "/1")
+                    msg.setAddress("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1")
                     msg.append(1)
                     self.oscClientUI.send(msg)
-                    if state.gridseqInd == -1: state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                    g = state.gridzz[state.gridseq[state.gridseqInd]]
-                    if g == 0: g = [[0 for i in range(16)] for j in range(16)]
+                    
+                    if state.gridzz[state.gridseq[state.gridseqInd]] == "blank": 
+                        g = [[0 for i in range(16)] for j in range(16)]
+                    else:
+                        g = self.stringToGridKey(state.gridzz[state.gridseq[state.gridseqInd]])[0]
+                    #print "          g is grid number ", state.gridseq[state.gridseqInd], "of length ", len(g)
+                    
                     if state.noisy:
                         g = self.noiseChoice(si)
-                        state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
-                    self.putGridLive(g, si) 
+                        if not state.refeshing:
+                            state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
+                    with state.lock:
+                        self.putGridLive(g, si) 
                     state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                    print "done with sequencing update"
                     
                 else:
+                    print "NOT SEQUENCING ", si+1
                     if state.noisy:
                         g = self.noiseChoice(si)
                         with state.lock:
@@ -396,13 +412,15 @@ class MultiLoop:
         ind = self.gridAddrInd(addr)[0]
         if stuff[0] == 0: return
         if state.gridseqEdit:
-            state.gridseq[state.gridseqInd] = ind-1
+            state.gridseq[state.gridseqInd] = ind
             msg = OSC.OSCMessage()
-            msg.setAddress("/" + si + "/seqtext/" + str(state.gridseqInd))
-            msg.append(str(ind))
+            print "/" + str(si+1) + "/seqtext/" + str(state.gridseqInd)
+            msg.setAddress("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1))
+            msg.append(str(ind+1))
             self.oscClientUI.send(msg)
             return
-            
+        else:
+            print "grid seq edit is" + str(state.gridseqEdit)   
         grid, scale = self.stringToGridKey(self.gridStates[si].gridzz[ind])
         self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
         self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
@@ -413,9 +431,9 @@ class MultiLoop:
     #new
     def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
         msg = OSC.OSCMessage()
-        print "pullup outside lock"
+        #print "pullup outside lock"
         #with self.lock:
-        print "updating grid of", gridAddr
+        #print "updating grid of", gridAddr
         for i in range(len(grid)):
             for j in range(len(grid)):
                 #if diG[i][j]
@@ -534,9 +552,9 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         if state.gridseqEdit:
-            state.gridseq[state.gridseqInd] = 0
+            state.gridseq[state.gridseqInd] = "blank"
             msg = OSC.OSCMessage()
-            msg.setAddress("/" + si + "/seqtext/" + str(state.gridseqInd))
+            msg.setAddress("/" + str(si) + "/seqtext/" + str(state.gridseqInd))
             msg.append("b")
             self.oscClientUI.send(msg)
             return
@@ -1069,30 +1087,34 @@ class MultiLoop:
                 msg.clear()
     
     def gridSeqToggleHandler(self, addr, tags, stuff, source):
+        print "grid sequencing " + str(stuff[0])
         si = int(addr.split("/")[1]) - 1
-        self.gridStates[si].girdseqFlag = (stuff[0] == 1)
+        self.gridStates[si].gridseqFlag = (stuff[0] == 1)
+        print "grid sequencing " + str(si+1) + " " + str(self.gridStates[si].gridseqFlag)
     
     def gridSeqEditHandler(self, addr, tags, stuff, source):
+        print" grid sequence edit " + str(stuff[0])
         si = int(addr.split("/")[1]) - 1
-        self.gridStates[si].girdseqEdit = (stuff[0] == 1)
+        self.gridStates[si].gridseqEdit = (stuff[0] == 1)
+        print "grid sequence edit" + str(self.gridStates[si].gridseqEdit)
     
     def gridSeqIndHandler(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        print "in seq ind"
         si = int(addr.split("/")[1]) - 1
         if stuff[0] == 1:
             state = self.gridStates[si]
             state.gridseqInd = self.gridAddrInd(addr)[0]
-            with state.lock:
-                self.putGridLive(state.gridzz[state.gridseq[state.gridseqInd]], si)
-            
+            print" grid sequence index " + str(state.gridseqInd)
     
     def gridSeqClear(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         si = int(addr.split("/")[1]) - 1
         state = self.gridStates[si]
-        state.gridseq = [0]*8
+        state.gridseq = [-1]*8
         msg = OSC.OSCMessage()
         for i in range(8):
-            msg.setAddress("/" + si + "/seqtext/" + str(state.gridseqInd))
+            msg.setAddress("/" + str(si+1) + "/seqtext/" + str(i+1))
             msg.append("-")
             self.oscClientUI.send(msg)
             msg.clear()
@@ -1104,7 +1126,10 @@ class MultiLoop:
         self.gridStates[si].grid = grid
         self.pullUpGrid(self.gridStates[si].grid, "/" + str(si+1) + "/grid")
         self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root) 
-        
+    
+    def seqtest(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        print "           gridseqFlag", self.gridStates[0].gridseqFlag  
         
     
     
