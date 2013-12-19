@@ -255,9 +255,11 @@ most basic grid sequencing working, no cross-feature compatibility tested
 
 still to implement:
 	handling refresh mode
-	adding root note and column subsets to "gridKey" string 
+	
 	adding saving of "grid sets"
 
+function for adding root note and column subsets to "gridKey" string  written
+	NOT TESTED OR INCORPORATED INTO CODE 
 
 IMMEDIATE PRIORITY - have note names show up next to grid
 

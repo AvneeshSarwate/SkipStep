@@ -790,6 +790,20 @@ class MultiLoop:
         keystr = ",".join(strkey)
         return gridstring + "+" + keystr
     
+    def miniStateToString(self, grid, scale, root, colsub = [], si):
+        state = self.gridStates[si]
+        
+        if state.subsets:
+            colsublist = [str(i) for i in state.columnsub]
+        else:
+            colsublist = []
+        colsubstring = ";".join(colsublist)
+        
+        rootstr = str(state.root)
+        
+        return self.gridKeyToString(state.grid, state.scale) + "+" + rootstr + "+" + colsubstring
+        
+    
     def stringToGridKey(self, string): #rename 
         gridstring = string.split("+")[0]
         colstr = gridstring.split(";")
@@ -801,6 +815,12 @@ class MultiLoop:
         key = [int(i) for i in strkey]
         return grid, key
         
+    def stringToMiniState(self, string):
+        grid, scale = self.stringToGridKey(string.split("+")[0]+"+"+string.split("+")[1])
+        
+        root = int(string.split("+")[2])
+        colsub = [int(i) for i in string.split("+")[3].split(";")]
+        return grid, scale, root, colsub
         
     def neighborCount(self, grid, i, j):
         count = 0
@@ -1126,6 +1146,42 @@ class MultiLoop:
         self.gridStates[si].grid = grid
         self.pullUpGrid(self.gridStates[si].grid, "/" + str(si+1) + "/grid")
         self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root) 
+    
+    def putMiniStateLive(self, grid, scale, root, columnsub, si):
+        state = self.gridStates[si]
+        with state.lock:
+            state.customScale = [1+i for i in scale]
+            state.grid = grid
+            state.scale = scale
+            state.root = root
+            state.columnsub = columnsub
+            msg = OSC.OSCMessage()
+            if len(columnsub) == 0:
+                state.subsets = False
+                msg.setAddress("/" +str(si+1) + "/colsel")
+                msg.append(0)
+                self.oscClientUI.send(msg)
+                msg.clear()
+                
+                #change UI, switch and selecors
+            else:
+                state.subsets = True
+                msg.setAddress("/" +str(si+1) + "/colsel")
+                msg.append(1)
+                self.oscClientUI.send(msg)
+                msg.clear()
+            for i in range(16):
+                msg.setAddress("/" +str(si+1) + "/colsel/" + str(i+1) + "/1")
+                if i in columnsub:
+                    msg.append(1)
+                else:
+                    msg.append(0)
+                self.oscClientUI.send(msg)
+                msg.clear()
+                #change UI, switch and selecors
+            state.prog = self.gridToProg(state.grid, state.scale, state.root)
+            self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
+            self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
     
     def seqtest(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
