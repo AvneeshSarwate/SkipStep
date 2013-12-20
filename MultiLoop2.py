@@ -270,18 +270,21 @@ class MultiLoop:
                     msg.append(1)
                     self.oscClientUI.send(msg)
                     
-                    if state.gridzz[state.gridseq[state.gridseqInd]] == "blank": 
+                    if state.gridseq[state.gridseqInd] == "blank": 
                         g = [[0 for i in range(16)] for j in range(16)]
                     else:
                         g = self.stringToGridKey(state.gridzz[state.gridseq[state.gridseqInd]])[0]
+                        #g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
                     #print "          g is grid number ", state.gridseq[state.gridseqInd], "of length ", len(g)
                     
                     if state.noisy:
                         g = self.noiseChoice(si)
                         if not state.refeshing:
                             state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
+                            #state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
                     with state.lock:
-                        self.putGridLive(g, si) 
+                        self.putGridLive(g, si)
+                        #self.putMiniStateLive(g, scale, root, columnsub, si) 
                     state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
                     print "done with sequencing update"
                     
@@ -399,11 +402,13 @@ class MultiLoop:
     #new
     def saveGrid(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
         ind, j = self.gridAddrInd(addr)
         if stuff[0] != 0:
-            self.gridStates[si].gridzz[ind] = self.gridKeyToString(self.gridStates[si].grid, self.gridStates[si].scale)#self.gridStates[si].gridcopy()
+            #state.gridzz[ind] = self.gridKeyToString(state.grid, state.scale)#self.gridStates[si].gridcopy()
+            state.gridzz[ind] = self.miniStateToString(state.grid, state.scale, state.root, state.columnsub, si)
         else: 
-            self.gridStates[si].gridzz[ind] = 0 
+            state.gridzz[ind] = 0 
     #new 
     def gridload(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
@@ -420,14 +425,16 @@ class MultiLoop:
             self.oscClientUI.send(msg)
             return
         else:
-            print "grid seq edit is" + str(state.gridseqEdit)   
-        grid, scale = self.stringToGridKey(self.gridStates[si].gridzz[ind])
-        self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
-        self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
-        state.customScale = [1+i for i in scale]
-        state.grid = grid
-        state.scale = scale
-        state.prog = self.gridToProg(state.grid, state.scale, state.root)
+            print "grid seq edit is" + str(state.gridseqEdit) 
+        grid, scale, root, columnsub = self.stringToMiniState(self.gridStates[si].gridzz[ind])  
+        self.putMiniStateLive(grid, scale, root, columnsub, si)
+#        grid, scale = self.stringToGridKey(self.gridStates[si].gridzz[ind])
+#        self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
+#        self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
+#        state.customScale = [1+i for i in scale]
+#        state.grid = grid
+#        state.scale = scale
+#        state.prog = self.gridToProg(state.grid, state.scale, state.root)
     #new
     def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
         msg = OSC.OSCMessage()
@@ -790,7 +797,7 @@ class MultiLoop:
         keystr = ",".join(strkey)
         return gridstring + "+" + keystr
     
-    def miniStateToString(self, grid, scale, root, colsub = [], si):
+    def miniStateToString(self, grid, scale, root, colsub, si):
         state = self.gridStates[si]
         
         if state.subsets:
@@ -819,7 +826,10 @@ class MultiLoop:
         grid, scale = self.stringToGridKey(string.split("+")[0]+"+"+string.split("+")[1])
         
         root = int(string.split("+")[2])
-        colsub = [int(i) for i in string.split("+")[3].split(";")]
+        if string.split("+")[3].split(";")[0] == "":
+            colsub = []
+        else:
+            colsub = [int(i) for i in string.split("+")[3].split(";")]
         return grid, scale, root, colsub
         
     def neighborCount(self, grid, i, j):
@@ -1171,7 +1181,7 @@ class MultiLoop:
                 self.oscClientUI.send(msg)
                 msg.clear()
             for i in range(16):
-                msg.setAddress("/" +str(si+1) + "/colsel/" + str(i+1) + "/1")
+                msg.setAddress("/" +str(si+1) + "/col/" + str(i+1) + "/1")
                 if i in columnsub:
                     msg.append(1)
                 else:

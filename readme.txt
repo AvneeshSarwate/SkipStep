@@ -252,14 +252,14 @@ wrote function for changing pages, wrote page1.txt
 ______________________________
 
 most basic grid sequencing working, no cross-feature compatibility tested
+miniState save/load tested
 
 still to implement:
-	handling refresh mode
-	
 	adding saving of "grid sets"
+	
+handling of refresh mode not tested
+incorporating miniState into grid sequencing not tested
 
-function for adding root note and column subsets to "gridKey" string  written
-	NOT TESTED OR INCORPORATED INTO CODE 
 
 IMMEDIATE PRIORITY - have note names show up next to grid
 
