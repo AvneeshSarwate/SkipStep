@@ -259,7 +259,7 @@ still to implement:
 	
 handling of refresh mode not tested
 incorporating miniState into grid sequencing not tested
-
+notes names not tested
 
 IMMEDIATE PRIORITY - have note names show up next to grid
 

@@ -81,6 +81,8 @@ class MultiLoop:
         for i in range(n):
             self.gridStates.append(Looper())
         
+        self.notenames = ["C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"]
+        
         self.audioThread = 0
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
@@ -528,6 +530,7 @@ class MultiLoop:
             self.gridStates[si].scale = custScale
             self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, custScale, self.gridStates[si].root)
             self.gridStates[si].pianoprog = self.gridToProg(self.gridStates[si].pianogrid, custScale, self.gridStates[si].root)
+        self.updateNoteLabels(self.scale, si)
     
     def custScale(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
@@ -676,10 +679,12 @@ class MultiLoop:
                 self.gridStates[si].root += 1
                 with self.gridStates[si].lock:
                     self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+                self.updateNoteLabels(self.scale, si)
             if direction == "down":
                 self.gridStates[si].root -= 1
                 with self.gridStates[si].lock:
                     self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
+                self.updateNoteLabels(self.scale, si)
                     
         else:
             print "normal grid before", self.gridSum(self.gridStates[0].grid), self.gridSum(self.gridStates[1].grid), self.gridSum(self.gridStates[2].grid)
@@ -1192,10 +1197,21 @@ class MultiLoop:
             state.prog = self.gridToProg(state.grid, state.scale, state.root)
             self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
             self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
+            self.updateNoteLabels(self.scale, si)
     
     def seqtest(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
-        print "           gridseqFlag", self.gridStates[0].gridseqFlag  
+        print "           gridseqFlag", self.gridStates[0].gridseqFlag
+    
+    def updateNoteLabels(self, scale, si):
+        msg = OSC.OSCMessage()
+        notes = self.scaleNotes(self.root, scale)
+        for i in range(16):
+            msg.setAddress("/"+str(si)+"/notelabel/" + str(i))
+            msg.append(self.notenames[notes[i]%12])
+            self.oscClientUI.send(msg)
+            msg.clear()
+         
         
     
     
