@@ -260,8 +260,17 @@ still to implement:
 handling of refresh mode not tested
 incorporating miniState into grid sequencing not tested
 notes names not tested
+_____________________________
+all implemented and tested:
+	note name labels
+	miniStates in grid sequencing
+	refresh mode in grid sequencing
+	logic for miniPages (still needs to be fully implemented, but core logic works)  
 
-IMMEDIATE PRIORITY - have note names show up next to grid
+BUG: when sequencing with a blank grid, conditional at line 290 fails
+	sum(state.gridseq) tries to sum integers and strings 
+
+
 
 future steps ideas:
 	NON TRIVIAL PHONE VERSION

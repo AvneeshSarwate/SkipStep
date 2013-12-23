@@ -72,9 +72,6 @@ class MultiLoop:
             ipadFile = open("ipadIP.txt", "w")
             ipadFile.write(iPadRead)
             ipadFile.close()
-            
-        self.pageAddrs = []
-        self.pageAddrs.append(open("page1.txt").read().split(" "))
         
         self.num = n
         self.gridStates = []
@@ -82,6 +79,18 @@ class MultiLoop:
             self.gridStates.append(Looper())
         
         self.notenames = ["C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"]
+        
+        self.pageAddrs = open("page1.txt").read().split(" ")
+        self.miniPages = []
+        self.miniPages.append(["/noisy", "/noiselev", "/noiseSel", "/refresh", "/clear", "/gridload", "/gridsave"])
+        self.miniPages.append([])
+        for i in self.pageAddrs:
+            if i not in self.miniPages[0]: 
+                self.miniPages[1].append(i)
+        self.miniPages.append(["/seqedit", "/seqtoggle", "/gridseq", "/seqclear", "/stepMode"])
+        self.miniPages[2] = self.miniPages[2] + ['/seqtext/' + str(i) for i in range(1, 9)]
+        
+        
         
         self.audioThread = 0
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
@@ -97,6 +106,20 @@ class MultiLoop:
         self.touchClient = OSC.OSCClient()
         self.touchClient.connect( ('127.0.0.1', 6449) )
         self.stepTrack = OSC.OSCMessage()
+        
+        msg = OSC.OSCMessage()
+        for si in range(n):
+            for i in range(2, len(self.miniPages)):
+                for ad in self.miniPages[i]:
+                    msg.setAddress("/" + str(si+1) + ad + "/visible")
+                    msg.append(0)
+                    self.oscClientUI.send(msg)
+                    msg.clear()
+            msg.setAddress("/" + str(si+1) + "/pageSelector/1/3")
+            msg.append(1)
+            self.oscClientUI.send(msg)
+            msg.clear()
+            
         
         
         self.gridcallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
@@ -204,10 +227,14 @@ class MultiLoop:
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), self.pianocallbacks[k][i][j])
             
+            for j in range(3):
+                self.oscServUI.addMsgHandler("/" +str(k+1) +"/pageSelector/1/"+str(j+1), self.changeMiniPage)
+            
             self.oscServUI.addMsgHandler("/getGridScale/" +str(k+1) + "/1", self.getGridToSend)
             self.oscServUI.addMsgHandler("/applyRecvGrid/" +str(k+1) + "/1", self.applyRecvGrid)
             self.oscServUI.addMsgHandler("/applyRecvScale/" +str(k+1) + "/1", self.applyRecvScale)
             
+            self.updateNoteLabels(self.gridStates[k].scale, k)
             
             #print "\n\n\nbuildcheck\n\n"
 
@@ -220,7 +247,6 @@ class MultiLoop:
 #        if self.progInd == len(16):     #for playing chord progs (matrix)
 #            self.progInd %= len(self.loopObj)
 #            self.loopInd += 1 
-
         chords = []
         for si in range(self.num):
             state = self.gridStates[si]
@@ -260,7 +286,10 @@ class MultiLoop:
             state = self.gridStates[si]
             if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
                 #print "LOOPEND " + str(si+1)
+                print "                      after gridend, before seq check"
                 if state.gridseqFlag and sum(state.gridseq) != -8:
+                    print "                      after seq check"
+                    state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
                     while state.gridseq[state.gridseqInd] == -1: 
                         state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
                         print "       progressing to index", state.gridseqInd
@@ -272,21 +301,25 @@ class MultiLoop:
                     msg.append(1)
                     self.oscClientUI.send(msg)
                     
+                    
                     if state.gridseq[state.gridseqInd] == "blank": 
                         g = [[0 for i in range(16)] for j in range(16)]
+                        scale = state.scale
+                        root = state.root
+                        colsub = []
                     else:
-                        g = self.stringToGridKey(state.gridzz[state.gridseq[state.gridseqInd]])[0]
-                        #g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
+                        #g = self.stringToGridKey(state.gridzz[state.gridseq[state.gridseqInd]])[0]
+                        g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
                     #print "          g is grid number ", state.gridseq[state.gridseqInd], "of length ", len(g)
                     
                     if state.noisy:
                         g = self.noiseChoice(si)
-                        if not state.refeshing:
-                            state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
-                            #state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
+                        if not state.refreshing:
+                            #state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
+                            state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
                     with state.lock:
-                        self.putGridLive(g, si)
-                        #self.putMiniStateLive(g, scale, root, columnsub, si) 
+                        #self.putGridLive(g, si)
+                        self.putMiniStateLive(g, scale, root, colsub, si) 
                     state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
                     print "done with sequencing update"
                     
@@ -523,14 +556,15 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0:
             return
-        with self.gridStates[si].lock:
-            custScale = [i - min(self.gridStates[si].customScale) for i in self.gridStates[si].customScale]
+        state = self.gridStates[si]
+        with state.lock:
+            custScale = [i - min(state.customScale) for i in state.customScale]
             custScale.sort()
             print custScale
-            self.gridStates[si].scale = custScale
-            self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, custScale, self.gridStates[si].root)
-            self.gridStates[si].pianoprog = self.gridToProg(self.gridStates[si].pianogrid, custScale, self.gridStates[si].root)
-        self.updateNoteLabels(self.scale, si)
+            state.scale = custScale
+            state.prog = self.gridToProg(state.grid, custScale, state.root)
+            state.pianoprog = self.gridToProg(state.pianogrid, custScale, state.root)
+        self.updateNoteLabels(state.scale, si)
     
     def custScale(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
@@ -564,7 +598,7 @@ class MultiLoop:
         if state.gridseqEdit:
             state.gridseq[state.gridseqInd] = "blank"
             msg = OSC.OSCMessage()
-            msg.setAddress("/" + str(si) + "/seqtext/" + str(state.gridseqInd))
+            msg.setAddress("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1))
             msg.append("b")
             self.oscClientUI.send(msg)
             return
@@ -668,33 +702,34 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0:
             return
+        state = self.gridStates[si]
         direction = addr.split("/")[2]
         print "                   direction:", direction
-        if(self.gridStates[si].arrowToggle):
+        if(state.arrowToggle):
             if direction == "left":
-                self.gridStates[si].stepIncrement = -1
+                state.stepIncrement = -1
             if direction == "right":
-                self.gridStates[si].stepIncrement = 1
+                state.stepIncrement = 1
             if direction == "up":
-                self.gridStates[si].root += 1
-                with self.gridStates[si].lock:
-                    self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-                self.updateNoteLabels(self.scale, si)
+                state.root += 1
+                with state.lock:
+                    state.prog = self.gridToProg(state.grid, state.scale, state.root)
+                self.updateNoteLabels(state.scale, si)
             if direction == "down":
-                self.gridStates[si].root -= 1
-                with self.gridStates[si].lock:
-                    self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-                self.updateNoteLabels(self.scale, si)
+                state.root -= 1
+                with state.lock:
+                    state.prog = self.gridToProg(state.grid, state.scale, state.root)
+                self.updateNoteLabels(state.scale, si)
                     
         else:
             print "normal grid before", self.gridSum(self.gridStates[0].grid), self.gridSum(self.gridStates[1].grid), self.gridSum(self.gridStates[2].grid)
-            g = self.gridShift(self.gridStates[si].grid, direction)
-            print "si", si, direction, sum([sum(k) for k in self.gridStates[si].grid]), sum([sum(i) for i in g])
-            print self.gridStates[si].grid
-            with self.gridStates[si].lock:
-                self.gridStates[si].grid = g
-                self.gridStates[si].prog = self.gridToProg(self.gridStates[si].grid, self.gridStates[si].scale, self.gridStates[si].root)
-            self.pullUpGrid(self.gridStates[si].grid, "/" +str(si+1) + "/grid")
+            g = self.gridShift(state.grid, direction)
+            print "si", si, direction, sum([sum(k) for k in state.grid]), sum([sum(i) for i in g])
+            print state.grid
+            with state.lock:
+                state.grid = g
+                state.prog = self.gridToProg(state.grid, state.scale, state.root)
+            self.pullUpGrid(state.grid, "/" +str(si+1) + "/grid")
             
     
     def scaleNotes(self, root, scale):
@@ -1164,40 +1199,40 @@ class MultiLoop:
     
     def putMiniStateLive(self, grid, scale, root, columnsub, si):
         state = self.gridStates[si]
-        with state.lock:
-            state.customScale = [1+i for i in scale]
-            state.grid = grid
-            state.scale = scale
-            state.root = root
-            state.columnsub = columnsub
-            msg = OSC.OSCMessage()
-            if len(columnsub) == 0:
-                state.subsets = False
-                msg.setAddress("/" +str(si+1) + "/colsel")
-                msg.append(0)
-                self.oscClientUI.send(msg)
-                msg.clear()
-                
-                #change UI, switch and selecors
-            else:
-                state.subsets = True
-                msg.setAddress("/" +str(si+1) + "/colsel")
+        #with state.lock:
+        state.customScale = [1+i for i in scale]
+        state.grid = grid
+        state.scale = scale
+        state.root = root
+        state.columnsub = columnsub
+        state.prog = self.gridToProg(state.grid, state.scale, state.root)
+        msg = OSC.OSCMessage()
+        if len(columnsub) == 0:
+            state.subsets = False
+            msg.setAddress("/" +str(si+1) + "/colsel")
+            msg.append(0)
+            self.oscClientUI.send(msg)
+            msg.clear()
+            
+            #change UI, switch and selecors
+        else:
+            state.subsets = True
+            msg.setAddress("/" +str(si+1) + "/colsel")
+            msg.append(1)
+            self.oscClientUI.send(msg)
+            msg.clear()
+        for i in range(16):
+            msg.setAddress("/" +str(si+1) + "/col/" + str(i+1) + "/1")
+            if i in columnsub:
                 msg.append(1)
-                self.oscClientUI.send(msg)
-                msg.clear()
-            for i in range(16):
-                msg.setAddress("/" +str(si+1) + "/col/" + str(i+1) + "/1")
-                if i in columnsub:
-                    msg.append(1)
-                else:
-                    msg.append(0)
-                self.oscClientUI.send(msg)
-                msg.clear()
-                #change UI, switch and selecors
-            state.prog = self.gridToProg(state.grid, state.scale, state.root)
-            self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
-            self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
-            self.updateNoteLabels(self.scale, si)
+            else:
+                msg.append(0)
+            self.oscClientUI.send(msg)
+            msg.clear()
+            #change UI, switch and selecors
+        self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
+        self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
+        self.updateNoteLabels(scale, si)
     
     def seqtest(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
@@ -1205,13 +1240,29 @@ class MultiLoop:
     
     def updateNoteLabels(self, scale, si):
         msg = OSC.OSCMessage()
-        notes = self.scaleNotes(self.root, scale)
+        notes = self.scaleNotes(self.gridStates[si].root, scale)
+        print "in label update"
         for i in range(16):
-            msg.setAddress("/"+str(si)+"/notelabel/" + str(i))
+            print self.notenames[notes[i]%12]
+            msg.setAddress("/"+str(si+1)+"/notelabel/" + str(i+1))
             msg.append(self.notenames[notes[i]%12])
             self.oscClientUI.send(msg)
             msg.clear()
-         
+    
+    def changeMiniPage(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        ind = 4 - int(addr.split("/")[4])
+        msg = OSC.OSCMessage()
+        print "miniPage address", addr
+        for i in self.miniPages:
+            print
+            print i
+        for ad in self.miniPages[ind]:
+            msg.setAddress("/" + str(si+1) + ad + "/visible")
+            msg.append(stuff[0])
+            self.oscClientUI.send(msg)
+            msg.clear()
+                 
         
     
     
