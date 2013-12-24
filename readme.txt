@@ -7,18 +7,18 @@ SOFTWARE YOU NEED
 touchOSC (on your iPad/android tablet)
 touchOSC editor (on your computer)
 Python 2.7 (on your computer)
-LANdini (on your computer)
+LANdini (on your computer)  (ONLY FOR MULTI-PERSON USE)
 any DAW (on your computer)
 
 BASIC STARTUP INSTRUCTIONS
 1. get iPads and computers onto the same wifi network
-2. start LANdini
+2. (MULTI PERSON ONLY) start LANdini 
 3. set up midi routing so DAW can recieve internally sent midi (IAC bus on Macs)
 4. start DAW and set it up to accept internal midi
 5. load touchOSC layout onto iPad (you only need to do this the first time you run it)
 6. make sure touchOSC layout is on
 7. start backend file
-	(comment out line that sporks the timer thread if you're not the master user)
+	(MULTI PERSON ONLY: comment out line that sporks the timer thread if you're not the master user)
 8. start python file from the terminal
 	upon startup, follow instructions from the python script
 	to set all the needed IP addresses
@@ -261,12 +261,29 @@ handling of refresh mode not tested
 incorporating miniState into grid sequencing not tested
 notes names not tested
 _____________________________
+
 all implemented and tested:
 	note name labels
 	miniStates in grid sequencing
 	refresh mode in grid sequencing
 	logic for miniPages (still needs to be fully implemented, but core logic works)  
+_______________________________
 
+play/backend refactoring logic
+	play:
+		single obj, single channel arg - default channel 1 if no channel arg
+		multi obj list, matching channel list - default 1, 2, 3... if no channel arg
+		objs
+		
+	backend: (instead of nobjs loop, chuck recieves the channel as part of object data
+		nums[] (OSCEvent array) is indexed by channel
+			(still need separate addresses so diff Loopers don't accidentally
+			"cross streams" and send data to each other's channels)
+		objs address recieves channel#
+			(remove nobj loop)
+		spork chord reader/player after objs with nums[objs] as event to further listen to
+		objLen[] events are redundant 
+	
 BUG: when sequencing with a blank grid, conditional at line 290 fails
 	sum(state.gridseq) tries to sum integers and strings 
 
