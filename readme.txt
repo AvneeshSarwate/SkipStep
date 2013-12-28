@@ -286,7 +286,14 @@ play/backend refactoring logic
 	
 BUG: when sequencing with a blank grid, conditional at line 290 fails
 	sum(state.gridseq) tries to sum integers and strings 
+	
+___________________________
 
+phrase.play with channel arguments coded, 
+	working enough that it is usable in single-timer MultiLoop2.py
+	(refactor did not break the basics)
+
+actually giving of channel arguments does not work yet
 
 
 future steps ideas:

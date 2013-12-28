@@ -584,24 +584,22 @@ def fillPhrase(phr, txt, root):
 
 def play(*args, **kwargs):    #send object type to reciever 
     #print "                kwargs len",  len(kwargs)
-    if len(kwargs) > 0:
-        print "toggle message ", kwargs["toggle"]
-        print [i.type for i in args[0]]
+#    if len(kwargs) > 0:
+#        print "toggle message ", kwargs["toggle"]
+#        print [i.type for i in args[0]]
         
     if "list" in kwargs.keys(): args = args[0]
     
+    
     client = OSC.OSCClient()
     client.connect( ('127.0.0.1', 6449) )  
-    start = OSC.OSCMessage()
-    start.setAddress("start")
-    start.append("started")
-    objs = OSC.OSCMessage()
-    objs.setAddress("objs")
-    #print "args", len(args)
-    objs.append(len(args))
-    client.send(start)
-    client.send(objs)
+    
     for i in range(len(args)): #for multiloop, instead of i in loop, have it be the looper index, send as an arguement 
+        start = OSC.OSCMessage()
+        start.setAddress("start")
+        start.append("started")
+        client.send(start)
+        
         obj = args[i]
         
         if (obj.type == "skip"):
@@ -631,17 +629,29 @@ def play(*args, **kwargs):    #send object type to reciever
             
             client.send(mtype)
             client.send(nums)
-            for i in range(n):
+            for j in range(n):
                 nums.clearData()
-                nums.append(noteA[i])
+                nums.append(noteA[j])
                 client.send(nums)
                 nums2.clearData()
-                nums2.append(timeA[i]*1.0)
+                nums2.append(timeA[j]*1.0)
                 client.send(nums2)
-                print noteA[i], timeA[i], "phrase data sent"
+                print noteA[j], timeA[j], "phrase data sent"
         if(obj.type == "chord"):
-            noteA = obj.n
+            objs = OSC.OSCMessage()
+            objs.setAddress("objs")
+            #print "args", len(args)
+            if "channel" in kwargs.keys():
+                if "list" in kwargs.keys() or len(args) > 1:
+                    objs.append(kwargs["channel"][i])
+                else:
+                    objs.append(kwargs["channel"])
+            else:
+                objs.append(i) #channel number
             
+            client.send(objs)
+            
+            noteA = obj.n
             n = len(noteA);
             #print "chord play: " + str(n)
             #print noteA
@@ -649,13 +659,13 @@ def play(*args, **kwargs):    #send object type to reciever
             
             mtype = OSC.OSCMessage()
             mtype.setAddress("type")
-            if len(kwargs) == 0 or kwargs["toggle"] == "": 
+            if len(kwargs) == 0 or "toggle" not in kwargs or kwargs["toggle"] == "": 
                 mtype.append(obj.type)
             else:
                 mtype.append(kwargs["toggle"])
                 print "                           piano", kwargs["toggle"], "channel ", i 
             nums = OSC.OSCMessage()
-            nums.setAddress("objLen" + str(i))
+            nums.setAddress("objLen" + str(i)) #channel number
             nums.append(n);
             
             client.send(mtype)
@@ -663,10 +673,11 @@ def play(*args, **kwargs):    #send object type to reciever
             
             #print nums.address, "  was sent yo, with val ", nums[0]
             
-            nums.setAddress("nums" + str(i))
-            for i in range(n):
+            nums.setAddress("nums" + str(i)) #channel number
+            #print "nums" + str(i)
+            for j in range(n):
                 nums.clearData()
-                nums.append(noteA[i])
+                nums.append(noteA[j])
                 client.send(nums)
                 
             #print "chord data sent"
