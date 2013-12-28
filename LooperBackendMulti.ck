@@ -173,13 +173,14 @@ fun void timer(){
 
 0 => int chordNum;
 fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur whole, int chan) {
-    <<<n>>>;
-    <<<chordNum + "chordNum">>>;
+    //<<<n>>>;
+    //<<<chordNum + "chordNum">>>;
     chordNum++;
     int notes[n];
     0 => int broken;
     for(0 => int i; i < n; i++) {
         nums => now;
+        <<<"readnote", chan>>>;
         nums.nextMsg();
         nums.getInt() => notes[i];
         if(notes[i] == 0) {
@@ -192,12 +193,12 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     if(broken == 1) return;
     chord c;
     c.setNotes(notes);
-    //<<<"yo chord">>>;
+    <<<"yo chord", chan>>>;
     playChord(m, c, whole, chan);
 }
 
 fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
-    <<<n>>>;
+    //<<<n>>>;
     int notes[n];
     0 => int broken;
     for(0 => int i; i < n; i++) {
@@ -219,11 +220,11 @@ fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
 }
 
 fun void readAndToggle(OscEvent start, OscEvent nums, int n, int on, int chan){
-    <<<"starting to read toggle chord">>>;
+    //<<<"starting to read toggle chord">>>;
     readOSCChord2(start, nums, n) @=> chord c;
-    <<<"len read chord", c.size()>>>;
+    //<<<"len read chord", c.size()>>>;
     for(0 => int i; i < c.size(); i++) {
-        <<<"toggle notes ", c.notes[i]>>>;
+        //<<<"toggle notes ", c.notes[i]>>>;
     }
     chordToggle(c, on, chan);
 }
@@ -272,7 +273,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     c.size() => int len;
     if(c.notes[0] == -1) {
         .25 * whole => now;
-        <<<"chord rest">>>;
+        <<<"chord rest channel", chan >>>;
         //conf.startMsg("/played", "s");
         //"played0" => conf.addString;
         return;
@@ -297,7 +298,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     <<<"function played chord">>>;
 }
 
-spork~ timerLANdini();
+spork~ timer();
 
 // infinite event loop
 while ( true )
@@ -312,12 +313,12 @@ while ( true )
         <<<a>>>;
         objs => now; 
         objs.nextMsg();
-        objs.getInt() => int nobj;
-        for(0=>int i; i < nobj; i++){ //for multiloop, nobj is looper index, and instead of for loop, directly index by nobj
+        objs.getInt() => int i;//nobj;
+        //for(0=>int i; i < nobj; i++){ //for multiloop, nobj is looper index, and instead of for loop, directly index by nobj
             type => now;
             type.nextMsg();
             type.getString() => string mtype;
-            <<<"mtype is", mtype, " n is ", i>>>;
+            <<<"mtype is", mtype, " channel is ", i>>>;
             if(mtype == "skip") {
                 <<<"about to skip">>>;
                 continue;
@@ -327,7 +328,7 @@ while ( true )
                 continue;
             }
             objLen[i] => now;
-            <<<"got length">>>;
+            <<<"got length", i>>>;
             objLen[i].nextMsg();
             objLen[i].getInt() => int n;
             if(mtype == "chord") {
@@ -343,7 +344,7 @@ while ( true )
                 readAndToggle(start, nums[i], n, 0, i);
                 <<<"             OFF">>>;
             }
-        }
+        //}
           
     }
     //now that you have phrase length n, make and play arrays

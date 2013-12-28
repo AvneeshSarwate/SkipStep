@@ -289,11 +289,8 @@ BUG: when sequencing with a blank grid, conditional at line 290 fails
 	
 ___________________________
 
-phrase.play with channel arguments coded, 
-	working enough that it is usable in single-timer MultiLoop2.py
-	(refactor did not break the basics)
-
-actually giving of channel arguments does not work yet
+phrase.play with channel arguments coded and working
+	need to refactor MultiLoop2.py and LooperBackendMulti.ck to work with multiple metronome 
 
 
 future steps ideas:

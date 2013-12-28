@@ -643,11 +643,12 @@ def play(*args, **kwargs):    #send object type to reciever
             #print "args", len(args)
             if "channel" in kwargs.keys():
                 if "list" in kwargs.keys() or len(args) > 1:
-                    objs.append(kwargs["channel"][i])
+                    chan = kwargs["channel"][i]
                 else:
-                    objs.append(kwargs["channel"])
+                    chan = kwargs["channel"]
             else:
-                objs.append(i) #channel number
+                chan = i
+            objs.append(chan) #channel number
             
             client.send(objs)
             
@@ -665,7 +666,7 @@ def play(*args, **kwargs):    #send object type to reciever
                 mtype.append(kwargs["toggle"])
                 print "                           piano", kwargs["toggle"], "channel ", i 
             nums = OSC.OSCMessage()
-            nums.setAddress("objLen" + str(i)) #channel number
+            nums.setAddress("objLen" + str(chan)) #channel number
             nums.append(n);
             
             client.send(mtype)
@@ -673,7 +674,7 @@ def play(*args, **kwargs):    #send object type to reciever
             
             #print nums.address, "  was sent yo, with val ", nums[0]
             
-            nums.setAddress("nums" + str(i)) #channel number
+            nums.setAddress("nums" + str(chan)) #channel number
             #print "nums" + str(i)
             for j in range(n):
                 nums.clearData()

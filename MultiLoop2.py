@@ -96,6 +96,8 @@ class MultiLoop:
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
+        #MultiMetronomoe: replace with lambda functions of self.realPlay(int(addr.split("/")[2]))
+        
         self.oscServSelf.addMsgHandler("/tester", self.tester)
         self.oscServSelf.addMsgHandler("/stop", self.stopCallback)
         self.oscServUI = OSC.OSCServer((selfIP, 8000))
@@ -239,7 +241,7 @@ class MultiLoop:
             #print "\n\n\nbuildcheck\n\n"
 
     
-    def realPlay(self, *args):
+    def realPlay(self, *args): #MultiMetronome: give si as an argument, remove loops
         ##print "aoibay"
         #phrase.play(lv.stableMorph(self.loopObj, self.loopVect[self.loopInd]))
 #        phrase.play(phrase.transpose(self.loopObj, self.loopVect[self.loopInd]))
@@ -286,9 +288,9 @@ class MultiLoop:
             state = self.gridStates[si]
             if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
                 #print "LOOPEND " + str(si+1)
-                print "                      after gridend, before seq check"
+                #print "                      after gridend, before seq check"
                 if state.gridseqFlag and sum(state.gridseq) != -8:
-                    print "                      after seq check"
+                    #print "                      after seq check"
                     state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
                     while state.gridseq[state.gridseqInd] == -1: 
                         state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
@@ -324,7 +326,7 @@ class MultiLoop:
                     print "done with sequencing update"
                     
                 else:
-                    print "NOT SEQUENCING ", si+1
+                    #print "NOT SEQUENCING ", si+1
                     if state.noisy:
                         g = self.noiseChoice(si)
                         with state.lock:
