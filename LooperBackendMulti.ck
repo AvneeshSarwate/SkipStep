@@ -180,7 +180,7 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     0 => int broken;
     for(0 => int i; i < n; i++) {
         nums => now;
-        <<<"readnote", chan>>>;
+        //<<<"readnote", chan>>>;
         nums.nextMsg();
         nums.getInt() => notes[i];
         if(notes[i] == 0) {
@@ -193,7 +193,7 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     if(broken == 1) return;
     chord c;
     c.setNotes(notes);
-    <<<"yo chord", chan>>>;
+    //<<<"yo chord", chan>>>;
     playChord(m, c, whole, chan);
 }
 
@@ -205,6 +205,7 @@ fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
         nums => now;
         nums.nextMsg();
         nums.getInt() => notes[i];
+        <<<"                   ", notes[i]>>>;
         if(notes[i] == 0) {
             <<<"OSC message failure (read)">>>;
             1 => broken;
@@ -220,9 +221,10 @@ fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
 }
 
 fun void readAndToggle(OscEvent start, OscEvent nums, int n, int on, int chan){
-    //<<<"starting to read toggle chord">>>;
+    <<<"starting to read toggle chord">>>;
     readOSCChord2(start, nums, n) @=> chord c;
-    //<<<"len read chord", c.size()>>>;
+    if(c == null) return;
+    <<<"len read chord", c.size()>>>;
     for(0 => int i; i < c.size(); i++) {
         //<<<"toggle notes ", c.notes[i]>>>;
     }
@@ -287,7 +289,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
         } 
         //spork ~ miniPlay(Std.mtof(c.notes[i]), whole, m[i]);
         midOn(c.notes[i], chan);
-        <<<c.notes[i]>>>;
+        //<<<c.notes[i]>>>;
     }   
     .25*whole - split=> now;
     for(0 => int i; i < len; i++) {
@@ -295,7 +297,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     }
     //conf.startMsg("/played", "s");
     //"played0" => conf.addString;
-    <<<"function played chord">>>;
+    //<<<"function played chord">>>;
 }
 
 spork~ timer();
@@ -310,7 +312,7 @@ while ( true )
         
         
         start.getString() => string a;
-        <<<a>>>;
+        //<<<a>>>;
         objs => now; 
         objs.nextMsg();
         objs.getInt() => int i;//nobj;
@@ -318,7 +320,7 @@ while ( true )
             type => now;
             type.nextMsg();
             type.getString() => string mtype;
-            <<<"mtype is", mtype, " channel is ", i>>>;
+            //<<<"mtype is", mtype, " channel is ", i>>>;
             if(mtype == "skip") {
                 <<<"about to skip">>>;
                 continue;
@@ -328,19 +330,20 @@ while ( true )
                 continue;
             }
             objLen[i] => now;
-            <<<"got length", i>>>;
+            //<<<"got length", i>>>;
             objLen[i].nextMsg();
             objLen[i].getInt() => int n;
             if(mtype == "chord") {
                 spork~ readOSCChord(start, nums[i], n, m, whole, i);
             }
-            <<<"before problematic conditional">>>;
+            //<<<"before problematic conditional">>>;
             if(mtype == "on") {
-                <<<"pre read toggle">>>;
+                <<<"pre read toggle ON">>>;
                 readAndToggle(start, nums[i], n, 1, i);
                 <<<"             ON">>>;
             }
             if(mtype == "off") {
+                <<<"pre read toggle OFF">>>;
                 readAndToggle(start, nums[i], n, 0, i);
                 <<<"             OFF">>>;
             }

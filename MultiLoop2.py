@@ -139,7 +139,7 @@ class MultiLoop:
         self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
         self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
         
-        self.oscServUI.addMsgHandler("/test", self.seqtest)
+        self.oscServUI.addMsgHandler("/test", self.miniStateSave)
         
         for i in range(16):
                 self.oscServUI.addMsgHandler("/copyScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.copyScale))
@@ -951,7 +951,8 @@ class MultiLoop:
     def noiseHit(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         if stuff[0] == 0: return
-        self.noiseChoice(si)
+        grid = self.noiseChoice(si)
+        self.putGridLive(grid, si)
         
     
     def simplify(self, grid, voices):
@@ -1236,9 +1237,13 @@ class MultiLoop:
         self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
         self.updateNoteLabels(scale, si)
     
-    def seqtest(self, addr, tags, stuff, source):
+    def miniStateSave(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
-        print "           gridseqFlag", self.gridStates[0].gridseqFlag
+        state = self.gridStates[0]
+        filename = raw_input("Set Name: ")
+        savefile = open(filename +".ss", "w")
+        ministatestr = self.miniStateToString(state.grid, state.scale, state.root, [], 0)
+        savefile.write(ministatestr)
     
     def updateNoteLabels(self, scale, si):
         msg = OSC.OSCMessage()
