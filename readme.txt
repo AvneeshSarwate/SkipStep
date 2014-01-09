@@ -293,6 +293,15 @@ phrase.play with channel arguments coded and mostly working
 	have not tested channel arguments with piano mode
 	need to refactor MultiLoop2.py and LooperBackendMulti.ck to work with multiple metronome 
 
+___________________________
+
+BUG: double triggering on piano mode, possibly mismatch between piano mode flags (caps vs lowecase)
+TODO BEFORE NIME: independent metronomes, google docs style multi screening
+	for independent metronomes, have /played message send same index on all metronomes
+		makes it easier to bring all of the voices together if wanted.
+
+	
+
 
 future steps ideas:
 	NON TRIVIAL PHONE VERSION
