@@ -93,7 +93,7 @@ class MultiLoop:
         
         
         self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 50505)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         #MultiMetronomoe: replace with lambda functions of self.realPlay(int(addr.split("/")[2]))
@@ -103,6 +103,11 @@ class MultiLoop:
         self.oscServUI = OSC.OSCServer((selfIP, 8000))
         self.oscClientUI = OSC.OSCClient()
         self.oscClientUI.connect((iPadIP, 9000))
+        self.iPadClients = []
+        self.iPadClients.append(self.oscClientUI)
+        #TODO: replace self.oscClientUI.send(msg) with loop over iPadClients
+        #for cli in self.iPadClients: cli.send(msg)
+        
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
         self.touchClient = OSC.OSCClient()
@@ -122,7 +127,7 @@ class MultiLoop:
             self.oscClientUI.send(msg)
             msg.clear()
             
-        
+        #TODO:  self.oscServUI.addMsgHandler("/address", lambda addr, tags, stuff, source: bounceBack(addr, tags, stuff, source, callback)) #(callback can be a lambda function)
         
         self.gridcallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         self.pianocallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
@@ -166,7 +171,10 @@ class MultiLoop:
         self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
         
         for k in range(n):
-        
+            
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/miniSave", self.miniStateSave)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/miniLoad", self.miniStateLoad)
+            
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noisy", self.noiseFlip)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/colsel", self.colsubflip)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/piano", self.pianoModeOn)
@@ -239,7 +247,27 @@ class MultiLoop:
             self.updateNoteLabels(self.gridStates[k].scale, k)
             
             #print "\n\n\nbuildcheck\n\n"
-
+    
+    def bounceBack(self, addr, tags, stuff, source, callback):
+        #TODO: send stuff to addr (don't send it to where it came from (check source)
+#        msg = OSC.OSCMessage
+#        msg.setAddress(addr)
+#        for i in range(len(stuff)):
+#            msg.append(stuff[i])
+#        for cli in self.iPadClients:
+#            if cli.address()[0] != source[0]:
+#                cli.send(msg)
+        
+        callback(addr, tags, stuff, source)
+    
+    #TODO: register this handler and add a control to UI
+    def addiPad(self, addr, tags, stuff, source):
+        
+        iPadIP = raw_input("\nEnter the IP address of your iPad (and set its port to 9000):")
+        oscClient = OSC.OSCClient((iPadIP, 9000))
+        self.iPadClients.append(oscClient)
+    
+    
     
     def realPlay(self, *args): #MultiMetronome: give si as an argument, remove loops
         ##print "aoibay"
@@ -1239,11 +1267,25 @@ class MultiLoop:
     
     def miniStateSave(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
+        si = int(addr.split('/')[1]) - 1
         state = self.gridStates[0]
         filename = raw_input("Set Name: ")
         savefile = open(filename +".ss", "w")
-        ministatestr = self.miniStateToString(state.grid, state.scale, state.root, [], 0)
+        ministatestr = self.miniStateToString(state.grid, state.scale, state.root, [], si)
         savefile.write(ministatestr)
+        savefile.close()
+    
+    def miniStateLoad(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        si = int(addr.split('/')[1]) - 1
+        state = self.gridStates[0]
+        filename = raw_input("File Name: ")
+        savefile = open(filename)
+        ministatestr = savefile.read()
+        grid, scale, root, columnsub = self.stringToMiniState(ministatestr)
+        print scale, root
+        self.putMiniStateLive(grid, scale, root, columnsub, si)
+        savefile.close()
     
     def updateNoteLabels(self, scale, si):
         msg = OSC.OSCMessage()

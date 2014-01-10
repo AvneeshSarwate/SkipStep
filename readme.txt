@@ -296,10 +296,13 @@ phrase.play with channel arguments coded and mostly working
 ___________________________
 
 BUG: double triggering on piano mode, possibly mismatch between piano mode flags (caps vs lowecase)
-TODO BEFORE NIME: independent metronomes, google docs style multi screening
+	 Grid sequence editting misses last space 
+TODO BEFORE NIME: independent metronomes, google docs style multi screening, markov chain looping
 	for independent metronomes, have /played message send same index on all metronomes
 		makes it easier to bring all of the voices together if wanted.
-
+___________________________
+added code for google docs mode (bounceBack and addiPad functions)
+	to make it "active", finish stuff written in TODO's
 	
 
 
