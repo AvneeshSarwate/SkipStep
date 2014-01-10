@@ -304,7 +304,12 @@ ___________________________
 added code for google docs mode (bounceBack and addiPad functions)
 	to make it "active", finish stuff written in TODO's
 	
-
+To make indepdnent threads
+	FOR BACKEND
+		give timer() an int arg, and make message address "/i/played"
+		give touchTempo an int arg, make arrays for whole (dur), and touchEv
+	FOR PYTHON
+		have realPlay function parse address for insturment index, remove si loops
 
 future steps ideas:
 	NON TRIVIAL PHONE VERSION
