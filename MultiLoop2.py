@@ -93,7 +93,7 @@ class MultiLoop:
         
         
         self.audioThread = 0
-        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 50505)) #LANdini 50505, 5174 chuck
+        self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         self.oscServSelf.addMsgHandler("/played", self.realPlay)
         #MultiMetronomoe: replace with lambda functions of self.realPlay(int(addr.split("/")[2]))
@@ -152,7 +152,7 @@ class MultiLoop:
         
         self.oscServUI.addMsgHandler("/test", self.miniStateSave)
         
-        self.oscServUI.addMsgHandler("/addiPad", self.aadiPad)
+        self.oscServUI.addMsgHandler("/addiPad", self.addiPad)
         
         for i in range(16):
                 self.oscServUI.addMsgHandler("/copyScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.copyScale)))
@@ -221,7 +221,7 @@ class MultiLoop:
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridload/" + str(i+1) + "/1", self.gridload)
             
             for i in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridsave/" + str(i+1) + "/1", self.saveGrid)
+                self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridsave/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.saveGrid))
                 
 #            for i in range(16):
 #                self.oscServUI.addMsgHandler("/" +str(k+1) +"/custScale/" + str(i+1) + "/1", self.custScale)
@@ -262,7 +262,9 @@ class MultiLoop:
         if addr in self.noBounce:
             return
         
-        msg = OSC.OSCMessage
+        if (not "step" in addr) and stuff[0] != 0:
+            print "bounceback hit ", addr, stuff
+        msg = OSC.OSCMessage()
         msg.setAddress(addr)
         for i in range(len(stuff)):
             msg.append(stuff[i])
@@ -274,9 +276,13 @@ class MultiLoop:
     
     #TODO: DONE register this handler and add a control to UI
     def addiPad(self, addr, tags, stuff, source):
-        if stuff == 0: return
+        print "add iPad stuff", stuff
+        if stuff[0] == 0: return
         iPadIP = raw_input("\nEnter the IP address of your iPad (and set its port to 9000):")
-        oscClient = OSC.OSCClient((iPadIP, 9000))
+        print "test 1"
+        oscClient = OSC.OSCClient()
+        oscClient.connect((iPadIP, 9000))
+        print "test 2"
         self.iPadClients.append(oscClient)
     
     
@@ -307,7 +313,8 @@ class MultiLoop:
                 else:
                     self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
                     self.stepTrack.append(1)
-                    self.oscClientUI.send(self.stepTrack)
+                    #TODO: replace this with loop over all iPads
+                    for cli in self.iPadClients: cli.send(self.stepTrack)
                     self.stepTrack.clearData()
                     ##print "in play"
                     chords.append(state.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
@@ -568,7 +575,7 @@ class MultiLoop:
         msg.setAddress("/" + str((si+1)*2))
         #msg.append(1)
         for cli in self.iPadClients: 
-            if cli.address[0] == source[0]:
+            if cli.address()[0] == source[0]:
                 cli.send(msg) #self.oscClientUI.send(msg)
         self.gridStates[si].pianogrid = self.gridcopy(self.gridStates[si].grid)
         self.gridStates[si].pianoprog = self.gridToProg(self.gridStates[si].pianogrid, self.gridStates[si].scale, self.gridStates[si].root)
@@ -637,6 +644,7 @@ class MultiLoop:
     #new        
     def gridClear(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
+        print source, addr
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         if state.gridseqEdit:
@@ -1324,7 +1332,7 @@ class MultiLoop:
             msg.setAddress("/" + str(si+1) + ad + "/visible")
             msg.append(stuff[0])
             for cli in self.iPadClients: 
-                if cli.address[0] == source[0]:
+                if cli.address()[0] == source[0]:
                     cli.send(msg) #self.oscClientUI.send(msg)
             msg.clear()
                  

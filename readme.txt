@@ -313,7 +313,7 @@ To make indepdnent threads
 
 ___________________________
 code for google docs mode fully implemented/active
-	NOT TESTED YET
+	MOSTLY TESTED YET
 
 
 
