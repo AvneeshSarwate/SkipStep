@@ -311,6 +311,14 @@ To make indepdnent threads
 	FOR PYTHON
 		have realPlay function parse address for insturment index, remove si loops
 
+___________________________
+code for google docs mode fully implemented/active
+	NOT TESTED YET
+
+
+
+
+
 future steps ideas:
 	NON TRIVIAL PHONE VERSION
 	think of cool "tricks" and uses that are unique to skipstep
