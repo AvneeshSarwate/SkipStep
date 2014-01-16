@@ -312,9 +312,20 @@ To make indepdnent threads
 		have realPlay function parse address for insturment index, remove si loops
 
 ___________________________
+
 code for google docs mode fully implemented/active
 	MOSTLY TESTED YET
 
+___________________________
+
+Independent metronomes mostly tested
+	BUGS - sometimes, array index out of bounds
+		 - seems to be an extra thread when metronomes on diff speeds
+		 - when shutting down and reopening backend (with python still running)
+		 	backend doesn't always start interacting with python
+
+Need a general full UI restore/clear function 
+	(if adding a new ipad in google docs mode, want to push the old UI setup to it)
 
 
 

@@ -95,7 +95,8 @@ class MultiLoop:
         self.audioThread = 0
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", 5174)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
-        self.oscServSelf.addMsgHandler("/played", self.realPlay)
+        for i in range(n):
+            self.oscServSelf.addMsgHandler("/" + str(i+1) + "/played", self.realPlay)
         #MultiMetronomoe: replace with lambda functions of self.realPlay(int(addr.split("/")[2]))
         
         self.oscServSelf.addMsgHandler("/tester", self.tester)
@@ -295,90 +296,87 @@ class MultiLoop:
 #        if self.progInd == len(16):     #for playing chord progs (matrix)
 #            self.progInd %= len(self.loopObj)
 #            self.loopInd += 1 
-        chords = []
-        for si in range(self.num):
-            state = self.gridStates[si]
-            with state.lock: 
-                if(state.subsets):
-                    state.progInd %= len(state.columnsub)
-                    playind = state.columnsub[state.progInd]
-                    
-                else:
-                    state.progInd %= 16
-                    playind = state.progInd
-                #print playind, "playind", self.prog.c[playind].n
-                #turn light on for progind+1
-                if state.pianomode:
-                    chords.append(phrase.Chord([-1]))
-                else:
-                    self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
-                    self.stepTrack.append(1)
-                    #TODO: replace this with loop over all iPads
-                    for cli in self.iPadClients: cli.send(self.stepTrack)
-                    self.stepTrack.clearData()
-                    ##print "in play"
-                    chords.append(state.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
-                if state.refreshing:
-                    ##print "                                   refresh", playind
-                    self.refreshColumn(playind, si)
-                #self.gridStates[si].loopInd += 1
-                state.progInd += state.stepIncrement
-            
-                #self.gridNoise(self.noiselev)
-                #print                               noise at", l
-        phrase.play(chords[0], chords[1], chords[2])
+        si = int(args[0].split("/")[1])-1
+        state = self.gridStates[si]
+        with state.lock: 
+            if(state.subsets):
+                state.progInd %= len(state.columnsub)
+                playind = state.columnsub[state.progInd]
+                
+            else:
+                state.progInd %= 16
+                playind = state.progInd
+            #print playind, "playind", self.prog.c[playind].n
+            #turn light on for progind+1
+            if state.pianomode:
+                chord = phrase.Chord([-1])#chords.append(phrase.Chord([-1]))
+            else:
+                self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
+                self.stepTrack.append(1)
+                #TODO: replace this with loop over all iPads
+                for cli in self.iPadClients: cli.send(self.stepTrack)
+                self.stepTrack.clearData()
+                ##print "in play"
+                chord = state.prog.c[playind]#chords.append(state.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+            if state.refreshing:
+                ##print "                                   refresh", playind
+                self.refreshColumn(playind, si)
+            #self.gridStates[si].loopInd += 1
+            state.progInd += state.stepIncrement
+        
+            #self.gridNoise(self.noiselev)
+            #print                               noise at", l
+        phrase.play(chord, channel=si)
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
-        
-        for si in range(self.num):
-            state = self.gridStates[si]
-            if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
-                #print "LOOPEND " + str(si+1)
-                #print "                      after gridend, before seq check"
-                if state.gridseqFlag and sum(state.gridseq) != -8:
-                    #print "                      after seq check"
-                    state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
-                    while state.gridseq[state.gridseqInd] == -1: 
-                        state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                        print "       progressing to index", state.gridseqInd
-                    
-                    
-                    print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
-                    msg = OSC.OSCMessage()
-                    msg.setAddress("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1")
-                    msg.append(1)
-                    for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                    
-                    
-                    if state.gridseq[state.gridseqInd] == "blank": 
-                        g = [[0 for i in range(16)] for j in range(16)]
-                        scale = state.scale
-                        root = state.root
-                        colsub = []
-                    else:
-                        #g = self.stringToGridKey(state.gridzz[state.gridseq[state.gridseqInd]])[0]
-                        g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
-                    #print "          g is grid number ", state.gridseq[state.gridseqInd], "of length ", len(g)
-                    
-                    if state.noisy:
-                        g = self.noiseChoice(si)
-                        if not state.refreshing:
-                            #state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
-                            state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
-                    with state.lock:
-                        #self.putGridLive(g, si)
-                        self.putMiniStateLive(g, scale, root, colsub, si) 
+
+        if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
+            #print "LOOPEND " + str(si+1)
+            #print "                      after gridend, before seq check"
+            if state.gridseqFlag and sum(state.gridseq) != -8:
+                #print "                      after seq check"
+                state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
+                while state.gridseq[state.gridseqInd] == -1: 
                     state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                    print "done with sequencing update"
-                    
+                    print "       progressing to index", state.gridseqInd
+                
+                
+                print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
+                msg = OSC.OSCMessage()
+                msg.setAddress("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1")
+                msg.append(1)
+                for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
+                
+                
+                if state.gridseq[state.gridseqInd] == "blank": 
+                    g = [[0 for i in range(16)] for j in range(16)]
+                    scale = state.scale
+                    root = state.root
+                    colsub = []
                 else:
-                    #print "NOT SEQUENCING ", si+1
-                    if state.noisy:
-                        g = self.noiseChoice(si)
-                        with state.lock:
-                            self.putGridLive(g, si)
-                        
+                    #g = self.stringToGridKey(state.gridzz[state.gridseq[state.gridseqInd]])[0]
+                    g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
+                #print "          g is grid number ", state.gridseq[state.gridseqInd], "of length ", len(g)
+                
+                if state.noisy:
+                    g = self.noiseChoice(si)
+                    if not state.refreshing:
+                        #state.gridzz[state.gridseq[state.gridseqInd]] = self.gridKeyToString(g, state.scale)
+                        state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
+                with state.lock:
+                    #self.putGridLive(g, si)
+                    self.putMiniStateLive(g, scale, root, colsub, si) 
+                state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                print "done with sequencing update"
+                
+            else:
+                #print "NOT SEQUENCING ", si+1
+                if state.noisy:
+                    g = self.noiseChoice(si)
+                    with state.lock:
+                        self.putGridLive(g, si)
+                    
 #            if self.gridStates[si].noisy:
 #                if not self.gridStates[si].subsets and ((self.gridStates[si].progInd == 16) or(self.gridStates[si].progInd == -1)):
 #                    self.noiseChoice(si)
@@ -392,7 +390,7 @@ class MultiLoop:
 #                self.pullUpGrid(nextgrid, "grid")
 #                #update visual stepper for grid indexes. 
 #                state.gridseqInd = (state.gridseqInd+1) % len(state.gridseq)
-        
+    
                 
     
     def refreshColumn(self, k, si):
@@ -673,7 +671,7 @@ class MultiLoop:
         self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
         #self.chuckThread.start()
         self.audioThread.start()
-        self.realPlay()
+        #self.realPlay()
     
     def uiStart(self):
         self.uiThread = threading.Thread(target=self.oscServUI.serve_forever)

@@ -81,7 +81,10 @@ for(0 => int i; i < nInst; i++) {
     m[i] => g;
 }
 
-1::second => dur whole;
+dur whole[maxMultiplay];
+for(0 => int i; i < maxMultiplay; i++) {
+    1::second => whole[i];
+}
 2::second => dur slowest;
 .01::second => dur split;
 
@@ -117,7 +120,7 @@ fun void touchTempo(){
         while(touchEv.nextMsg() != 0) {
             now => newT;
             if((newT - oldT) < slowest){
-                newT - oldT => whole;
+                newT - oldT => whole[0];
             }
             newT => oldT;
         }
@@ -133,22 +136,22 @@ confLANdini.setHost( "127.0.0.1", 50506 );
 "all" => confLANdini.addString;
 "/played" => confLANdini.addString;
 "played0" => confLANdini.addString;
-0 => int track;
+0 => int track; //decide what you want to do with this
 now => time old;
 now => time nu;
-fun void timerLANdini(){
+fun void timerLANdini(int n){
     while(true) {
         //1 => m[0].noteOn;
-        .25 * whole => now;
+        .25 * whole[n] => now;
         now => nu;
-        confLANdini.startMsg("/send/GD, s, s, s");
+        confLANdini.startMsg("/send/GD, s, s, i");
         "all" => confLANdini.addString;
-        "/played" => confLANdini.addString;
-        "played0" => confLANdini.addString;
+        "/" + (n+1) + "/played" => confLANdini.addString;
+         track => confLANdini.addInt;
         //<<<"                  step", nu-old, track>>>;
         nu => old;
         track++;
-        
+        track %16 => track;
         
     }
 }
@@ -162,11 +165,11 @@ conf.setHost( hostname, port );
 conf.startMsg("/played, s");
 "played0" => conf.addString;
 
-fun void timer(){
+fun void timer(int n){
     while(true) {
-        .25 * whole => now;
-        conf.startMsg("/played, s");
-        "played0" => conf.addString;
+        .25 * whole[n] => now;
+        conf.startMsg("/" + (n+1) + "/played, i");
+        track => conf.addInt;
 //        <<<"                  step">>>;
     }
 }
@@ -289,7 +292,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
         } 
         //spork ~ miniPlay(Std.mtof(c.notes[i]), whole, m[i]);
         midOn(c.notes[i], chan);
-        //<<<c.notes[i]>>>;
+        <<<c.notes[i], "chan", chan>>>;
     }   
     .25*whole - split=> now;
     for(0 => int i; i < len; i++) {
@@ -300,7 +303,9 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     //<<<"function played chord">>>;
 }
 
-spork~ timer();
+for(0 => int i; i < 3; i++) {
+    spork~ timer(i);
+}
 
 // infinite event loop
 while ( true )
@@ -334,7 +339,7 @@ while ( true )
             objLen[i].nextMsg();
             objLen[i].getInt() => int n;
             if(mtype == "chord") {
-                spork~ readOSCChord(start, nums[i], n, m, whole, i);
+                spork~ readOSCChord(start, nums[i], n, m, whole[n], i);
             }
             //<<<"before problematic conditional">>>;
             if(mtype == "on") {
