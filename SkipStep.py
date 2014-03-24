@@ -1083,8 +1083,8 @@ class MultiLoop:
 
         msg.clear()
         msg.setAddress("/send/GD")
-        msg.append("allButMe")
-        msg.append("/tempo") #triggers tempo hit on ALL SkipStep.py, which then sends it to chuck back end
+        msg.append("all")
+        msg.append("/touch") #triggers tempo hit on ALL SkipStep.py, which then sends it to chuck back end
         msg.append("stuff")
         self.oscLANdiniClient.send(msg)
         
