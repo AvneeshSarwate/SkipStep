@@ -51,6 +51,9 @@ class Looper:
         self.stepIncrement = 1
         self.noiseInd = 1
         self.undoStack = []
+        self.gridLetters = []
+        self.pianoLetters = []
+        
         
         
         self.audioThread = 0
