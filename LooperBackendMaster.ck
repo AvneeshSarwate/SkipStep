@@ -13,7 +13,7 @@ public class chord{
 }
 
 
-MidiOut mout;
+MidiOut mout; 
 MidiMsg msg;
 // check if port is open
 if( !mout.open( 0 ) ) me.exit();
