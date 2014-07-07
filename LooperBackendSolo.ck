@@ -275,7 +275,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     c.size() => int len;
     if(c.notes[0] == -1) {
         .25 * whole => now;
-        <<<"chord rest channel", chan >>>;
+        //<<<"chord rest channel", chan >>>;
         //conf.startMsg("/played", "s");
         //"played0" => conf.addString;
         return;
@@ -289,7 +289,7 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
         } 
         //spork ~ miniPlay(Std.mtof(c.notes[i]), whole, m[i]);
         midOn(c.notes[i], chan);
-        <<<c.notes[i], "chan ", chan>>>;
+        //<<<c.notes[i], "chan ", chan>>>;
     }   
     .25*whole - split=> now;
     for(0 => int i; i < len; i++) {
