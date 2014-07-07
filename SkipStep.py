@@ -132,22 +132,12 @@ class MultiLoop:
         self.touchClient.connect( ('127.0.0.1', 6449) )
         self.stepTrack = OSC.OSCMessage()
         
-        msg = OSC.OSCMessage()
         for si in range(n):
             for i in range(2, len(self.miniPages)):
                 for ad in (self.miniPages[i] + ["/pianoKey"]):
-                    msg.setAddress("/" + str(si+1) + ad + "/visible")
-                    msg.append(0)
-                    for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                    msg.clear()
-            msg.setAddress("/" + str(si+1) + "/pageSelector/1/3") #used to be /pageSelector/1/3
-            msg.append(1)
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
-            msg.setAddress("/" + str(si+1) + "pianoKey/visible")
-            msg.append(0)
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
+                    self.sendToUI("/" + str(si+1) + ad + "/visible", 0)
+            self.sendToUI("/" + str(si+1) + "/pageSelector/1/3", 1) #used to be /pageSelector/1/3
+            self.sendToUI("/" + str(si+1) + "pianoKey/visible", 0)
             
         #TODO:  self.oscServUI.addMsgHandler("/address", lambda addr, tags, stuff, source: bounceBack(addr, tags, stuff, source, callback)) #(callback can be a lambda function)
         
@@ -282,6 +272,16 @@ class MultiLoop:
             #print "\n\n\nbuildcheck\n\n"
     #TODO: DONE for miniPage and piano mode, page changing should only happen for specific ipad that sent message
     
+
+    def sendToUI(self, addr, *args):
+        msg = OSC.OSCMessage()
+        msg.setAddress(addr)
+        for i in args: msg.append(i)
+        for cli in self.iPadClients: cli.send(msg)
+
+
+
+
     ##wrapper function that allows for UI synchronization in "google docs mode"
     ##the function takes the input OSCmessage, calls the handler for the message
     ##and then sends the input message back out to the UI on all other iPads to update them 
@@ -299,7 +299,6 @@ class MultiLoop:
         for cli in self.iPadClients:
             if cli.address()[0] != source[0]:
                 cli.send(msg)
-        
         callback(addr, tags, stuff, source)
     
     #TODO: DONE register this handler and add a control to UI
@@ -340,11 +339,7 @@ class MultiLoop:
                 if state.pianomode:
                     chords.append(phrase.Chord([-1]))
                 else:
-                    self.stepTrack.setAddress("/" + str(si+1) + "/step/" + str(playind+1) + "/1")
-                    self.stepTrack.append(1)
-                    #TODO: replace this with loop over all iPads
-                    for cli in self.iPadClients: cli.send(self.stepTrack)
-                    self.stepTrack.clearData()
+                    self.sendToUI("/" + str(si+1) + "/step/" + str(playind+1) + "/1", 1)
                     ##print "in play"
                     chords.append(state.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
                 if state.refreshing and not state.pianomode:
@@ -374,11 +369,7 @@ class MultiLoop:
                     
                     
                     print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
-                    msg = OSC.OSCMessage()
-                    msg.setAddress("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1")
-                    msg.append(1)
-                    for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                    
+                    self.sendToUI("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1", 1)
                     
                     if state.gridseq[state.gridseqInd] == "blank": 
                         g = [[0 for i in range(16)] for j in range(16)]
@@ -425,15 +416,11 @@ class MultiLoop:
                 
     ##is called to return columns to their saved state when snapshot mode is on 
     def refreshColumn(self, k, si):
-        msg = OSC.OSCMessage()
         
         for i in range(len(self.gridStates[si].grid)):
             if(self.gridStates[si].refgrid[k][i] != self.gridStates[si].grid[k][i]):
                 #print "                            single element refresh", k+1, i+1, self.refgrid[k][i]
-                msg.setAddress("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i))
-                msg.append(self.gridStates[si].refgrid[k][i])
-                for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                msg.clearData()
+                self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), self.gridStates[si].refgrid[k][i])
                 self.gridStates[si].grid[k][i] = self.gridStates[si].refgrid[k][i]
         self.gridStates[si].prog.c[k] = self.gridStates[si].refprog.c[k]
     
@@ -539,11 +526,8 @@ class MultiLoop:
         if stuff[0] == 0: return
         if state.gridseqEdit:
             state.gridseq[state.gridseqInd] = ind
-            msg = OSC.OSCMessage()
             print "/" + str(si+1) + "/seqtext/" + str(state.gridseqInd)
-            msg.setAddress("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1))
-            msg.append(str(ind+1))
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
+            self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), str(ind+1))
             return
         else:
             print "grid seq edit is" + str(state.gridseqEdit) 
@@ -572,17 +556,13 @@ class MultiLoop:
 
     ## is the helper function used to take a grid and display it in the specified grid UI element  
     def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
-        msg = OSC.OSCMessage()
         #print "pullup outside lock"
         #with self.lock:
         #print "updating grid of", gridAddr
         for i in range(len(grid)):
             for j in range(len(grid)):
                 #if diG[i][j]
-                msg.setAddress(gridAddr + "/"+str(i+1) +"/" + str(16-j))
-                msg.append(grid[i][j])
-                for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                msg.clearData()
+                self.sendToUI(gridAddr + "/"+str(i+1) +"/" + str(16-j), grid[i][j])
     
     ## counts the hamming distance between grids 
     def difGrid(self, g1, g2):
@@ -598,15 +578,11 @@ class MultiLoop:
     ## is the helper function used to take a scale and display it in the specified scale UI element      
     def pullUpScale(self, scale, scaleAddr):
         print "           ", scale 
-        msg = OSC.OSCMessage()
         for i in range(12):
-            msg.clearData()
-            msg.setAddress(scaleAddr + "/"+ str(i+1) +"/1" )
             if i in scale:
-                msg.append(1)
+                self.sendToUI(scaleAddr + "/"+ str(i+1) +"/1", 1)
             else:
-                msg.append(0)
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)           
+                self.sendToUI(scaleAddr + "/"+ str(i+1) +"/1", 0)         
     
     ## is the hanlder for the piano mode toggle control 
     def pianoModeOn(self, addr, tags, stuff, source):
@@ -734,10 +710,7 @@ class MultiLoop:
         state = self.gridStates[si]
         if state.gridseqEdit:
             state.gridseq[state.gridseqInd] = "blank"
-            msg = OSC.OSCMessage()
-            msg.setAddress("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1))
-            msg.append("b")
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
+            self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), "b")
             return
         state.prog.c = [phrase.Chord([-1]) for i in range(16)]
         state.grid = [[0 for i in range(16)] for j in range (16)]
@@ -977,11 +950,7 @@ class MultiLoop:
                 for i in range(1, len(gridstrs)):
                     print "send hte save light message"
                     self.gridStates[si].gridzz[i-1] = gridstrs[i]
-                    msg = OSC.OSCMessage()
-                    msg.setAddress("/" +str(si+1) +"/gridsave/" + str(i) + "/1")
-                    msg.append(1)
-                    for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                    msg.clearData()
+                    self.sendToUI("/" +str(si+1) +"/gridsave/" + str(i) + "/1", 1)
     
 
     def gridKeyToString(self, grid, key):
@@ -1028,11 +997,7 @@ class MultiLoop:
                 state.gridzz[i] = 0
             else:
                 state.gridzz[i] = miniStrList[i+1]
-                msg = OSC.OSCMessage()
-                msg.setAddress("/" + str(si+1) + "/gridsave/" + str(i+1) + "/1")
-                msg.append(1)
-                for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                msg.clearData()
+                self.sendToUI("/" + str(si+1) + "/gridsave/" + str(i+1) + "/1", 1)
 
     def saveState(self, si):
         f = open("savefile" + str(si) + ".ss", "w")
@@ -1400,14 +1365,10 @@ class MultiLoop:
                         msg.setAddress("/" + str(si+1) + "/grid/"+str(i+1) +"/" + str(16-j))
                         if self.gridStates[si].grid[i][j] != 0:
                             self.gridStates[si].grid[i][j] = 0
-                            msg.append(0)
-                            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                            msg.clearData()
+                            self.sendToUI("/" + str(si+1) + "/grid/"+str(i+1) +"/" + str(16-j), 0)
                         else: 
                             self.gridStates[si].grid[i][j] = 18
-                            msg.append(18)
-                            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                            msg.clearData()
+                            self.sendToUI("/" + str(si+1) + "/grid/"+str(i+1) +"/" + str(16-j), 18)
                 self.gridStates[si].prog.c[i] = self.colToChord(self.gridStates[si].grid[i], self.gridStates[si].root, self.gridStates[si].scale)
             print "                                randomized"
             #self.prog = self.gridToProg(self.grid, self.scale, self.root)  
@@ -1418,18 +1379,12 @@ class MultiLoop:
         minipageNum = int(addr.split("/")[4]) - 1 #assuming column multiselect
         if stuff[0] == 1:
             for k in self.pageAddrs[minipageNum]:
-                msg = OSC.OSCMessage()
-                msg.setAddress("/" + str(si+1) + k + "/visible")
-                msg.append(1)
-                for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                msg.clear()
+                self.sendToUI("/" + str(si+1) + k + "/visible", 1)
+            
         else:
             for k in self.pageAddrs[minipageNum]:
-                msg = OSC.OSCMessage()
-                msg.setAddress("/" + str(si+1) + k + "/visible")
-                msg.append(0)
-                for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-                msg.clear()
+                self.sendToUI("/" + str(si+1) + k + "/visible", 0)
+            
     
     ## hanlder for the grid sequence toggle control 
     def gridSeqToggleHandler(self, addr, tags, stuff, source):
@@ -1461,12 +1416,8 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1
         state = self.gridStates[si]
         state.gridseq = [-1]*8
-        msg = OSC.OSCMessage()
         for i in range(8):
-            msg.setAddress("/" + str(si+1) + "/seqtext/" + str(i+1))
-            msg.append("-")
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
+            self.sendToUI("/" + str(si+1) + "/seqtext/" + str(i+1), "-")
     
     def gridwiseStepSynch(self, addr, tags, stuff, source):
         return
@@ -1486,29 +1437,18 @@ class MultiLoop:
         state.root = root
         state.columnsub = columnsub
         state.prog = self.gridToProg(state.grid, state.scale, state.root)
-        msg = OSC.OSCMessage()
         if len(columnsub) == 0:
             state.subsets = False
-            msg.setAddress("/" +str(si+1) + "/colsel")
-            msg.append(0)
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
-            
+            self.sendToUI("/" +str(si+1) + "/colsel", 0)        
             #change UI, switch and selecors
         else:
             state.subsets = True
-            msg.setAddress("/" +str(si+1) + "/colsel")
-            msg.append(1)
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
+            self.sendToUI("/" +str(si+1) + "/colsel", 1)
         for i in range(16):
-            msg.setAddress("/" +str(si+1) + "/col/" + str(i+1) + "/1")
             if i in columnsub:
-                msg.append(1)
+                self.sendToUI("/" +str(si+1) + "/col/" + str(i+1) + "/1", 1)
             else:
-                msg.append(0)
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
+                self.sendToUI("/" +str(si+1) + "/col/" + str(i+1) + "/1", 0)
             #change UI, switch and selecors
         self.pullUpGrid(grid, "/" +str(si+1) + "/grid")
         self.pullUpScale(scale, "/" +str(si+1) + "/custScale")
@@ -1544,15 +1484,11 @@ class MultiLoop:
     
     ## helper function that changes the note labels when a scale is changed 
     def updateNoteLabels(self, scale, si):
-        msg = OSC.OSCMessage()
         notes = self.scaleNotes(self.gridStates[si].root, scale)
         print "in label update"
         for i in range(16):
             print self.notenames[notes[i]%12]
-            msg.setAddress("/"+str(si+1)+"/notelabel/" + str(i+1))
-            msg.append(self.notenames[notes[i]%12])
-            for cli in self.iPadClients: cli.send(msg) #self.oscClientUI.send(msg)
-            msg.clear()
+            self.sendToUI("/"+str(si+1)+"/notelabel/" + str(i+1), self.notenames[notes[i]%12])
             
     ## hanlder function for the minipage selector control 
     def changeMiniPage(self, addr, tags, stuff, source):
