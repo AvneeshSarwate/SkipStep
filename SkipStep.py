@@ -209,6 +209,8 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseHit", self.noiseHit)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/undo", self.undo)
 
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sync", self.indexSync)
+
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/scene/" + str(j) + "/1", self.scene)
 
@@ -440,6 +442,13 @@ class MultiLoop:
         else:
             state.refreshing = False
             print "                           refresh off"   
+
+    def indexSync(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        si = int(addr.split("/")[1]) - 1
+        syncInd = self.gridStates[si].progInd
+        for i in range(self.num):
+            self.gridStates[i].progInd = syncInd
     
     ##is the handler for the stepjump control 
     def stepjump(self, addr, tags, stuff, source):
