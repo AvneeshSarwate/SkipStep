@@ -627,6 +627,10 @@ class MultiLoop:
         self.pullGrid([[0]*16]*16, "/" str(si+1) + "/sceneGrid")
         self.pullUpColSub([], "/" str(si+1) + "/sceneCol")
 
+    def sceneToggle(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        self.sceneToggle[si] = (stuff[0] == 1)
+
 
     ## is the helper function used to take a grid and display it in the specified grid UI element  
     def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
