@@ -162,6 +162,9 @@ class MultiLoop:
         self.recievedScale = []
         self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
         self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
+
+        self.sceneInd = [-1]*4
+        self.sceneToggle = [False] * 4
         
         self.noBounce = [] #addresses that do not get bounced to other pages 
         #self.noBounce.append("/tempo")
@@ -588,6 +591,41 @@ class MultiLoop:
                 self.gridload("/" + str(i) + addr[2:len(addr)], tags, stuff, source)
             else:
                 self.putMiniStateLive([[0 for i in range(16)] for j in range (16)], state.scale, state.root, state.columnsub, i-1)
+
+    ##TODO: IMPORTANT - all scene controls should be NON BOUNCE BACK
+    ## ALSO - all pullUp___() functions used in scene should 
+    def sceneSelector(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        state = self.gridStates[si]
+        ind, j = self.gridAddrInd(addr)
+        self.sceneInd[si] = ind
+        if state.gridzz[ind] == 0:
+            self.pullGrid([[0]*16]*16, "/" str(si+1) + "/sceneGrid")
+            self.pullUpColSub([], "/" str(si+1) + "/sceneCol")
+        else:
+            grid, key, root, col = self.stringToMiniState(state.gridzz[ind])
+            self.pullGrid(grid, "/" str(si+1) + "/sceneGrid")
+            self.pullUpColSub(col, "/" str(si+1) + "/sceneCol")
+
+
+    def sceneHit(self, addr, tags, stuff, source):
+        for i in range(self.num):
+            state = self.gridStates[i]
+            if self.sceneToggle[i]:
+                if self.sceneInd[i] != -1 and state.gridzz[self.sceneInd[i]] != 0:
+                    grid, key, root, col = self.stringToMiniState(state.gridzz[self.sceneInd[i]])
+                    self.putMiniStateLive(grid, key, root, col, i)
+                else:
+                    self.putMiniStateLive([[0]*16]*16, state.key, state.root, [])
+
+    def sceneClear(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        if self.sceneInd[si] != -1:
+            #"clear" the sceneSelector control
+            self.sendToUI("/" + str(si+1) + "/sceneSelect/" + str(self.sceneInd[si]+1) + "/1", 0)
+            self.sceneInd[si] = -1
+        self.pullGrid([[0]*16]*16, "/" str(si+1) + "/sceneGrid")
+        self.pullUpColSub([], "/" str(si+1) + "/sceneCol")
 
 
     ## is the helper function used to take a grid and display it in the specified grid UI element  
