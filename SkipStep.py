@@ -149,6 +149,7 @@ class MultiLoop:
         
         self.gridcallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         self.pianocallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
+        self.offlinecallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         self.uiThread = 0
         self.oscServUI.addDefaultHandlers()
         #print "buildcheck\n\n\n"
@@ -263,10 +264,15 @@ class MultiLoop:
             
             for i in range(16):
                 for j in range(16):
-                    
                     self.pianocallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].pianogrid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].pianoprog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
                     self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianocallbacks[k][i][j]))
+            
+            for i in range(16):
+                for j in range(16):
+                    self.offlinecallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].offlineGrid, addr, stuff, 0)
+                    ##print "grid ui listener " + str(i+1) + " " + str(j+1)
+                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/offGrid/"+str(i+1)+"/"+str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.offlinecallbacks[k][i][j]))
             
             for j in range(4):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/pageSelector/1/"+str(j+1), self.changeMiniPage)
@@ -539,9 +545,10 @@ class MultiLoop:
         if stuff[0] != 0:
             #state.gridzz[ind] = self.gridKeyToString(state.grid, state.scale)#self.gridStates[si].gridcopy()
             if state.offlineEdit:
+                print "OFFLINE SAVE", self.gridDif(state.offlineGrid, state.grid)             
                 state.gridzz[ind] = self.miniStateToString(state.offlineGrid, state.scale, state.root, state.offlineColsub, si)
             else:
-                state.gridzz[ind] = self.miniStateToString(state.grid, state.scale, state.root, state.offlineColsub, si)
+                state.gridzz[ind] = self.miniStateToString(state.grid, state.scale, state.root, state.columnsub, si)
         else: 
             state.gridzz[ind] = 0 #or -1??
     
@@ -1035,7 +1042,7 @@ class MultiLoop:
         
         rootstr = str(state.root)
         
-        return self.gridKeyToString(state.grid, state.scale) + "+" + rootstr + "+" + colsubstring
+        return self.gridKeyToString(grid, scale) + "+" + rootstr + "+" + colsubstring
     
     def stateToString(self, si):
         state = self.gridStates[si]
@@ -1239,7 +1246,7 @@ class MultiLoop:
         if stuff[0] == 0: return
         grid = self.noiseChoice(si)
         if state.offlineEdit:
-            self.offlineGrid = grid
+            state.offlineGrid = grid
             self.pullUpGrid(grid, "/" + str(si+1) + "/offGrid")
         else:
             self.putGridLive(grid, si)
