@@ -164,7 +164,7 @@ class MultiLoop:
         self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
 
         self.sceneInd = [-1]*4
-        self.sceneToggle = [False] * 4
+        self.sceneTogs = [False] * 4
         
         self.noBounce = [] #addresses that do not get bounced to other pages 
         #self.noBounce.append("/tempo")
@@ -199,6 +199,7 @@ class MultiLoop:
         
         self.oscServUI.addMsgHandler("/save", self.saveGridtoFile)
         self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
+        self.oscServUI.addMsgHandler("/sceneHit", self.sceneHit)
         
         for k in range(n):
             
@@ -223,6 +224,12 @@ class MultiLoop:
 
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/scene/" + str(j) + "/1", self.scene)
+
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sceneToggle", self.sceneToggle)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sceneClear", self.sceneClear)
+            for j in range(8):
+                self.oscServUI.addMsgHandler("/" + str(k+1) +"/sceneSelect/" + str(j+1) + "/1", self.sceneSelector)
+                print "/" + str(k+1) +"/sceneSelect/" + str(j+1) + "/1"
 
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridseq/" + str(j) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqIndHandler))
@@ -600,18 +607,18 @@ class MultiLoop:
         ind, j = self.gridAddrInd(addr)
         self.sceneInd[si] = ind
         if state.gridzz[ind] == 0:
-            self.pullGrid([[0]*16]*16, "/" str(si+1) + "/sceneGrid")
-            self.pullUpColSub([], "/" str(si+1) + "/sceneCol")
+            self.pullUpGrid([[0]*16]*16, "/" + str(si+1) + "/sceneGrid")
+            self.pullUpColSub([], "/" + str(si+1) + "/sceneCol")
         else:
             grid, key, root, col = self.stringToMiniState(state.gridzz[ind])
-            self.pullGrid(grid, "/" str(si+1) + "/sceneGrid")
-            self.pullUpColSub(col, "/" str(si+1) + "/sceneCol")
+            self.pullUpGrid(grid, "/" + str(si+1) + "/sceneGrid")
+            self.pullUpColSub(col, "/" + str(si+1) + "/sceneCol")
 
 
     def sceneHit(self, addr, tags, stuff, source):
         for i in range(self.num):
             state = self.gridStates[i]
-            if self.sceneToggle[i]:
+            if self.sceneTogs[i]:
                 if self.sceneInd[i] != -1 and state.gridzz[self.sceneInd[i]] != 0:
                     grid, key, root, col = self.stringToMiniState(state.gridzz[self.sceneInd[i]])
                     self.putMiniStateLive(grid, key, root, col, i)
@@ -624,12 +631,12 @@ class MultiLoop:
             #"clear" the sceneSelector control
             self.sendToUI("/" + str(si+1) + "/sceneSelect/" + str(self.sceneInd[si]+1) + "/1", 0)
             self.sceneInd[si] = -1
-        self.pullGrid([[0]*16]*16, "/" str(si+1) + "/sceneGrid")
-        self.pullUpColSub([], "/" str(si+1) + "/sceneCol")
+        self.pullUpGrid([[0]*16]*16, "/" + str(si+1) + "/sceneGrid")
+        self.pullUpColSub([], "/" + str(si+1) + "/sceneCol")
 
     def sceneToggle(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1
-        self.sceneToggle[si] = (stuff[0] == 1)
+        self.sceneTogs[si] = (stuff[0] == 1)
 
 
     ## is the helper function used to take a grid and display it in the specified grid UI element  
