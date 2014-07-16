@@ -110,7 +110,7 @@ class MultiLoop:
         self.miniPages.append(["/seqedit", "/seqtoggle", "/gridseq", "/seqclear", "/stepMode"])
         self.miniPages[2] = self.miniPages[2] + ['/seqtext/' + str(i) for i in range(1, 9)]
         self.miniPages.append(["/miniSave", "/miniLoad", "/custScale", "/scaleApply", "/scene"])
-        self.miniPages.append(["/pullGrid", "/offGrid", "/up", "/down", "/left", "/right", "/col", "/noiseHit", "/undo"])
+        self.miniPages.append(["/pullGrid", "/pushGrid", "/offGrid", "/up", "/down", "/left", "/right", "/col", "/noiseHit", "/undo"])
         
         
         
@@ -219,6 +219,8 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/clear", self.gridClear)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseHit", self.noiseHit)
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/undo", self.undo)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/pullGrid", self.pullGrid)
+            self.oscServUI.addMsgHandler("/" +str(k+1) +"/pushGrid", self.pushGrid)
 
             self.oscServUI.addMsgHandler("/" +str(k+1) +"/sync", self.indexSync)
 
@@ -514,6 +516,7 @@ class MultiLoop:
             colvar = state.columnsub
         else:
             colvar = state.offlineColsub
+            print colvar
 
         if stuff[0] == 1 and ind not in colvar: #do we need 2nd conditional?
             colvar.append(ind)
@@ -585,7 +588,29 @@ class MultiLoop:
             print "grid seq edit is" + str(state.gridseqEdit) 
             grid, scale, root, columnsub = self.stringToMiniState(state.gridzz[ind])  
             self.putMiniStateLive(grid, scale, root, columnsub, si)
-#        
+
+
+    #handler for the pullt-to-offline-grid control
+    def pullGrid(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        state.offlineGrid = self.gridcopy(state.grid)
+        state.offlineColsub = copy.deepcopy(state.columnsub)
+        self.pullUpGrid(state.grid, "/" + str(si+1) + "/offGrid")
+
+    #hanlder for the push-to-live-grid control 
+    def pushGrid(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return 
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        with state.lock:
+            self.putGridLive(state.offlineGrid, si)
+            if len(state.offlineColsub) != 0:
+                state.columnsub = copy.deepcopy(state.offlineColsub)
+                self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col", "/" + str(si+1) + "/colsel")
+
+
 
     ##is the hanlder for the simple scene control 
     def scene(self, addr, tags, stuff, source):
@@ -813,6 +838,7 @@ class MultiLoop:
         if state.offlineEdit:
             state.offlineGrid = [[0 for i in range(16)] for j in range (16)]
             self.pullUpGrid(state.offlineGrid, "/" +str(si+1) + "/offGrid")
+            return
         if state.gridseqEdit:
             state.gridseq[state.gridseqInd] = "blank"
             self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), "b")
@@ -1623,15 +1649,20 @@ class MultiLoop:
         print "\nIND: ", ind, "\n"
         if stuff[0] == 1: 
             state.offlineEdit = (ind == 4) 
-            if state.offlineEdit:
-                state.offlineGrid = self.gridcopy(state.grid)
-                state.offlineColsub = copy.deepcopy(state.columnsub)
-                self.pullUpGrid(state.grid, "/" + str(si+1) + "/offGrid")
+        if ind == 4:
+            if stuff[0] == 1:
+                #TODO: turn colsub gray
+                self.pullUpColSub(state.offlineColsub, "/" + str(si) + "/col")#load offlineColSub
+                print "PULLED UP OFFCOL", state.offlineColsub
+            else:
+                #TODO: turn colsub blue
+                self.pullUpColSub(state.columnsub, "/" + str(si) + "/col")#load normal colsub
+            
         msg = OSC.OSCMessage()
-        print "miniPage address", addr
-        for i in self.miniPages:
-            print
-            print i
+        # print "miniPage address", addr
+        # for i in self.miniPages:
+        #     print
+        #     print i
         for ad in self.miniPages[ind]:
             msg.setAddress("/" + str(si+1) + ad + "/visible")
             msg.append(stuff[0])
@@ -1653,7 +1684,6 @@ def startLANdini():
     subprocess.call("open /Applications/LANdini.app", shell=True)
     
     
-        
         
     
 n = [60, 62, 64, 65]
@@ -1684,4 +1714,4 @@ loop = MultiLoop(4, port)
 #loop.check()
 loop.uiStart()
 loop.playStart()
-loop.loopStart()
+#loop.loopStart()
