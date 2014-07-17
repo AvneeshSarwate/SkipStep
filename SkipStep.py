@@ -512,18 +512,22 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
+        s = ""
         if state.offlineEdit:
-            colvar = state.columnsub
-        else:
             colvar = state.offlineColsub
-            print colvar
+            s = "OFFline"
+        else:
+            colvar = state.columnsub
+            s = "online"
 
         if stuff[0] == 1 and ind not in colvar: #do we need 2nd conditional?
             colvar.append(ind)
-            print "                            added " + str(ind)
+            print s, colvar, "                            added " + str(ind)
         if stuff[0] == 0 and ind in colvar:
             colvar.remove(ind)
-            print "                            removed " + str(ind)
+            print s, colvar, "                            removed " + str(ind)
+        print "OFF COL", state.offlineColsub
+        print "ON COL ", state.columnsub
         colvar.sort()
     
     #i#s the hanlder for the column sub toggle control 
@@ -558,9 +562,10 @@ class MultiLoop:
         if stuff[0] != 0:
             #state.gridzz[ind] = self.gridKeyToString(state.grid, state.scale)#self.gridStates[si].gridcopy()
             if state.offlineEdit:
-                print "OFFLINE SAVE", self.gridDif(state.offlineGrid, state.grid)             
-                state.gridzz[ind] = self.miniStateToString(state.offlineGrid, state.scale, state.root, state.offlineColsub, si)
+                print "OFFLINE SAVE", state.offlineColsub            
+                state.gridzz[ind] = self.miniStateToString(state.offlineGrid, state.scale, state.root, state.offlineColsub, si, colsel=True)
             else:
+                print "online SAVE", state.columnsub
                 state.gridzz[ind] = self.miniStateToString(state.grid, state.scale, state.root, state.columnsub, si)
         else: 
             state.gridzz[ind] = 0 #or -1??
@@ -577,17 +582,18 @@ class MultiLoop:
             print "/" + str(si+1) + "/seqtext/" + str(state.gridseqInd)
             self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), str(ind+1))
             return
-        else:
-            if state.offlineEdit:
-                grid, scale, root, columnsub = self.stringToMiniState(state.gridzz[ind])
-                self.offlineGrid = grid
-                self.offlineColsub = columnsub
-                self.pullUpGrid(grid, "/" + str(si+1) + "/offlineGrid")
-                self.pullUpScale(scale, "/" + str(si+1) + "/custScale")
-                self.pullUpColSub(columnsub, "/" + str(si+1) + "/col")
-            print "grid seq edit is" + str(state.gridseqEdit) 
-            grid, scale, root, columnsub = self.stringToMiniState(state.gridzz[ind])  
-            self.putMiniStateLive(grid, scale, root, columnsub, si)
+        if state.offlineEdit:
+            grid, scale, root, columnsub = self.stringToMiniState(state.gridzz[ind])
+            self.offlineGrid = grid
+            self.offlineColsub = columnsub
+            self.pullUpGrid(grid, "/" + str(si+1) + "/offGrid")
+            #self.pullUpScale(scale, "/" + str(si+1) + "/custScale") do this later
+            self.pullUpColSub(columnsub, "/" + str(si+1) + "/col")
+            return
+        print "grid seq edit is " + str(state.gridseqEdit) 
+        grid, scale, root, columnsub = self.stringToMiniState(state.gridzz[ind])  
+        print "COLUMNS", columnsub
+        self.putMiniStateLive(grid, scale, root, columnsub, si)
 
 
     #handler for the pullt-to-offline-grid control
@@ -598,6 +604,7 @@ class MultiLoop:
         state.offlineGrid = self.gridcopy(state.grid)
         state.offlineColsub = copy.deepcopy(state.columnsub)
         self.pullUpGrid(state.grid, "/" + str(si+1) + "/offGrid")
+        self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load offlineColSub
 
     #hanlder for the push-to-live-grid control 
     def pushGrid(self, addr, tags, stuff, source):
@@ -694,8 +701,8 @@ class MultiLoop:
             else:
                 self.sendToUI(scaleAddr + "/"+ str(i+1) +"/1", 0)  
 
-    def pullUpColSub(self, columnsub, colAddr, sel=""): ##TODO: add this to putMiniStateLive()
-        if sel != "":
+    def pullUpColSub(self, columnsub, colAddr, selAddr=""): ##TODO: add this to putMiniStateLive()
+        if selAddr != "":
             if len(columnsub) == 0:
                 self.sendToUI(selAddr, 0)        
                 #change UI, switch and selecors
@@ -1106,16 +1113,16 @@ class MultiLoop:
         keystr = ",".join(strkey)
         return gridstring + "+" + keystr
     
-    def miniStateToString(self, grid, scale, root, colsub, si):
+    def miniStateToString(self, grid, scale, root, colsub, si, colsel=False): #TODO: fix colsel keyword hack
         state = self.gridStates[si]
         
-        if state.subsets:
-            colsublist = [str(i) for i in state.columnsub]
+        if state.subsets or colsel:
+            colsublist = [str(i) for i in colsub]
         else:
             colsublist = []
         colsubstring = ";".join(colsublist)
         
-        rootstr = str(state.root)
+        rootstr = str(root)
         
         return self.gridKeyToString(grid, scale) + "+" + rootstr + "+" + colsubstring
     
@@ -1652,11 +1659,13 @@ class MultiLoop:
         if ind == 4:
             if stuff[0] == 1:
                 #TODO: turn colsub gray
-                self.pullUpColSub(state.offlineColsub, "/" + str(si) + "/col")#load offlineColSub
+                self.sendToUI("/" + str(si+1) + "/col/color", ["gray"])
+                self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load normal colsub
                 print "PULLED UP OFFCOL", state.offlineColsub
             else:
                 #TODO: turn colsub blue
-                self.pullUpColSub(state.columnsub, "/" + str(si) + "/col")#load normal colsub
+                self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col")#load normal colsub
+                self.sendToUI("/" + str(si+1) + "/col/color", ["blue"])
             
         msg = OSC.OSCMessage()
         # print "miniPage address", addr
