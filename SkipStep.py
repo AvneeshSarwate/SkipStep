@@ -197,67 +197,67 @@ class MultiLoop:
         self.oscServUI.addMsgHandler("/sendGrid", self.sendButtonTest)
         self.oscServSelf.addMsgHandler("/recievedGrid", self.recieveGrid)
         
-        self.oscServUI.addMsgHandler("/save", self.saveGridtoFile)
-        self.oscServUI.addMsgHandler("/load", self.loadGridFromFile)
+        self.oscServUI.addMsgHandler("/save", self.saveSet)
+        self.oscServUI.addMsgHandler("/load", self.loadSet)
         self.oscServUI.addMsgHandler("/sceneHit", self.sceneHit)
         
         for k in range(n):
             
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/miniSave", self.miniStateSave)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/miniLoad", self.miniStateLoad)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/miniSave", self.miniStateSave)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/miniLoad", self.miniStateLoad)
             
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/noisy", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseFlip))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/colsel", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsubflip))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/piano", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianoModeOn))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/refresh", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.refreshHandler))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/scaleApply", self.applyCustomScale)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/up", self.gridShiftHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/down", self.gridShiftHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/left", self.gridShiftHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/right", self.gridShiftHandler)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/arrowToggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.arrowTogHandler))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/clear", self.gridClear)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseHit", self.noiseHit)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/undo", self.undo)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/pullGrid", self.pullGrid)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/pushGrid", self.pushGrid)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/noisy", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseFlip))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/colsel", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsubflip))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/piano", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianoModeOn))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/refresh", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.refreshHandler))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/scaleApply", self.applyCustomScale)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/up", self.gridShiftHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/down", self.gridShiftHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/left", self.gridShiftHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/right", self.gridShiftHandler)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/arrowToggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.arrowTogHandler))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/clear", self.gridClear)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/noiseHit", self.noiseHit)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/undo", self.undo)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/pullGrid", self.pullGrid)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/pushGrid", self.pushGrid)
 
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sync", self.indexSync)
-
-            for j in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/scene/" + str(j) + "/1", self.scene)
-
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sceneToggle", self.sceneToggle)
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/sceneClear", self.sceneClear)
-            for j in range(8):
-                self.oscServUI.addMsgHandler("/" + str(k+1) +"/sceneSelect/" + str(j+1) + "/1", self.sceneSelector)
-                print "/" + str(k+1) +"/sceneSelect/" + str(j+1) + "/1"
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/sync", self.indexSync)
 
             for j in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridseq/" + str(j) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqIndHandler))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqtoggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqToggleHandler))
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqedit", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqEditHandler)) 
-            self.oscServUI.addMsgHandler("/" +str(k+1) +"/seqclear", self.gridSeqClear)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/scene/" + str(j) + "/1", self.scene)
+
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/sceneToggle", self.sceneToggle)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/sceneClear", self.sceneClear)
+            for j in range(8):
+                self.oscServUI.addMsgHandler("/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1", self.sceneSelector)
+                print "/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1"
+
+            for j in range(8):
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridseq/" + str(j) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqIndHandler))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/seqtoggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqToggleHandler))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/seqedit", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqEditHandler)) 
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/seqclear", self.gridSeqClear)
             
             #need to add everything for moving piano mode grid back to main 
             
             for i in range(16):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/step/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.stepjump))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/step/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.stepjump))
                 #print "step jumper " + str(i + 1)
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoKey/" + str(i+1) + "/1", self.pianoKey)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/pianoKey/" + str(i+1) + "/1", self.pianoKey)
                 
             for i in range(16):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/col/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsub))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/col/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsub))
                 #print "step jumper " + str(i + 1)
             
             for i in range(5):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiselev/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseLevHandler))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/noiselev/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseLevHandler))
             
             for i in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridload/" + str(i+1) + "/1", self.gridload)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridload/" + str(i+1) + "/1", self.gridload)
             
             for i in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/gridsave/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.saveGrid))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridsave/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.saveGrid))
                 
 #            for i in range(16):
 #                self.oscServUI.addMsgHandler("/" +str(k+1) +"/custScale/" + str(i+1) + "/1", self.custScale)
@@ -266,32 +266,32 @@ class MultiLoop:
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/custScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].customScale)))
                 
             for i in range(4):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/noiseSel/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseSelector))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/noiseSel/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseSelector))
             
             for i in range(16):
                 for j in range(16):
                     self.gridcallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].grid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].prog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
-                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/grid/"+str(i+1)+"/"+str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridcallbacks[k][i][j]))
+                    self.oscServUI.addMsgHandler("/" +str(k+1) + "/grid/" + str(i+1) + "/" + str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridcallbacks[k][i][j]))
             
             for i in range(16):
                 for j in range(16):
                     self.pianocallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].pianogrid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].pianoprog)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
-                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/pianoGrid/"+str(i+1)+"/"+str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianocallbacks[k][i][j]))
+                    self.oscServUI.addMsgHandler("/" + str(k+1) + "/pianoGrid/" + str(i+1) + "/" + str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianocallbacks[k][i][j]))
             
             for i in range(16):
                 for j in range(16):
                     self.offlinecallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].offlineGrid, addr, stuff, 0)
                     ##print "grid ui listener " + str(i+1) + " " + str(j+1)
-                    self.oscServUI.addMsgHandler("/" +str(k+1) +"/offGrid/"+str(i+1)+"/"+str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.offlinecallbacks[k][i][j]))
+                    self.oscServUI.addMsgHandler("/" + str(k+1) + "/offGrid/" + str(i+1) + "/" + str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.offlinecallbacks[k][i][j]))
             
             for j in range(4):
-                self.oscServUI.addMsgHandler("/" +str(k+1) +"/pageSelector/1/"+str(j+1), self.changeMiniPage)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/pageSelector/1/" + str(j+1), self.changeMiniPage)
             
-            self.oscServUI.addMsgHandler("/getGridScale/" +str(k+1) + "/1", self.getGridToSend)
-            self.oscServUI.addMsgHandler("/applyRecvGrid/" +str(k+1) + "/1", self.applyRecvGrid)
-            self.oscServUI.addMsgHandler("/applyRecvScale/" +str(k+1) + "/1", self.applyRecvScale)
+            self.oscServUI.addMsgHandler("/getGridScale/" + str(k+1) + "/1", self.getGridToSend)
+            self.oscServUI.addMsgHandler("/applyRecvGrid/" + str(k+1) + "/1", self.applyRecvGrid)
+            self.oscServUI.addMsgHandler("/applyRecvScale/" + str(k+1) + "/1", self.applyRecvScale)
             
             self.updateNoteLabels(self.gridStates[k].scale, k)
             
@@ -648,12 +648,16 @@ class MultiLoop:
 
 
     def sceneHit(self, addr, tags, stuff, source):
+        if source[0] == 0: return 
+        print "SCENE HIT"
         for i in range(self.num):
             state = self.gridStates[i]
+            print "SCENE state", i 
             if self.sceneTogs[i]:
                 if self.sceneInd[i] != -1 and state.gridzz[self.sceneInd[i]] != 0:
                     grid, key, root, col = self.stringToMiniState(state.gridzz[self.sceneInd[i]])
                     self.putMiniStateLive(grid, key, root, col, i)
+                    print "SCENE put live", i 
                 else:
                     self.putMiniStateLive([[0]*16]*16, state.key, state.root, [])
 
@@ -1112,6 +1116,17 @@ class MultiLoop:
         strkey = [str(i) for i in key]
         keystr = ",".join(strkey)
         return gridstring + "+" + keystr
+
+    def stringToGridKey(self, string): #rename 
+        gridstring = string.split("+")[0]
+        colstr = gridstring.split(";")
+        strgrid = [i.split(",") for i in colstr]
+        grid = [[round(float(strgrid[i][j])) for i in range(len(strgrid))] for j in range(len(strgrid))]
+        
+        keystr = string.split("+")[1]
+        strkey = keystr.split(",")
+        key = [int(i) for i in strkey]
+        return grid, key
     
     def miniStateToString(self, grid, scale, root, colsub, si, colsel=False): #TODO: fix colsel keyword hack
         state = self.gridStates[si]
@@ -1125,6 +1140,16 @@ class MultiLoop:
         rootstr = str(root)
         
         return self.gridKeyToString(grid, scale) + "+" + rootstr + "+" + colsubstring
+
+    def stringToMiniState(self, string):
+        grid, scale = self.stringToGridKey(string.split("+")[0]+"+"+string.split("+")[1])
+        
+        root = int(string.split("+")[2])
+        if string.split("+")[3].split(";")[0] == "":
+            colsub = []
+        else:
+            colsub = [int(i) for i in string.split("+")[3].split(";")]
+        return grid, scale, root, colsub
     
     def stateToString(self, si):
         state = self.gridStates[si]
@@ -1150,6 +1175,30 @@ class MultiLoop:
                 state.gridzz[i] = miniStrList[i+1]
                 self.sendToUI("/" + str(si+1) + "/gridsave/" + str(i+1) + "/1", 1)
 
+    def setToString(self):
+        stateStrs = []
+        for si in range(self.num):
+            stateStrs.append(self.stateToString(si))
+        return "-".join(stateStrs)
+
+    def stringToSet(self, setString):
+        stateStrs = setString.split("-")
+        for si in range(self.num):
+            self.stringToState(stateStrs[si], si)
+
+    def saveSet(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        f = open("SET_SkipStep.ss", "w")
+        f.write(self.setToString())
+        f.close()
+        print "SET SAVED"
+
+    def loadSet(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        setString = open("SET_SkipStep.ss").read()
+        self.stringToSet(setString)
+        print "SET LOADED"
+
     def saveState(self, si):
         f = open("savefile" + str(si) + ".ss", "w")
         f.write(self.stateToString(si))
@@ -1160,26 +1209,6 @@ class MultiLoop:
         self.stringToState(stateStr, si)
 
     
-    def stringToGridKey(self, string): #rename 
-        gridstring = string.split("+")[0]
-        colstr = gridstring.split(";")
-        strgrid = [i.split(",") for i in colstr]
-        grid = [[round(float(strgrid[i][j])) for i in range(len(strgrid))] for j in range(len(strgrid))]
-        
-        keystr = string.split("+")[1]
-        strkey = keystr.split(",")
-        key = [int(i) for i in strkey]
-        return grid, key
-        
-    def stringToMiniState(self, string):
-        grid, scale = self.stringToGridKey(string.split("+")[0]+"+"+string.split("+")[1])
-        
-        root = int(string.split("+")[2])
-        if string.split("+")[3].split(";")[0] == "":
-            colsub = []
-        else:
-            colsub = [int(i) for i in string.split("+")[3].split(";")]
-        return grid, scale, root, colsub
     
     ## helper function for game of life that counts the number of neighbors (with wraparound) of a cell     
     def neighborCount(self, grid, i, j):
