@@ -168,9 +168,19 @@ class MultiLoop:
         
         self.noBounce = [] #addresses that do not get bounced to other pages 
         #self.noBounce.append("/tempo")
-        for j in range(10):
-            self.noBounce.append("/" + str(k+1) +"/pageSelector/1/"+str(j+1))
-            self.noBounce.append("/"+str(i))
+        # for k in range(self.num):
+        #     self.noBounce.append("/" + str(k+1) + "/sceneClear")
+        #     self.noBounce.append("/" + str(k+1) + "/sceneToggle")
+        #     for j in range(10):
+        #         self.noBounce.append("/" + str(k+1) + "/pageSelector/1/"+str(j+1))
+        #         self.noBounce.append("/" + str(j+1))
+        #         self.noBounce.append("/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1")
+
+        #     for i in range(16):
+        #         for j in range(16):
+        #             self.noBounce.append("/" + str(k+1) + "/offGrid/" + str(i+1) + "/" + str(j+1))
+
+
         
         self.oscServUI.addMsgHandler("/test", self.miniStateSave)
         
@@ -1384,7 +1394,8 @@ class MultiLoop:
         inputGrid = [[]]
         if state.offlineEdit:     ##TODO: should noiseChoice be responsible for managing undo-stack?
             inputGrid = self.gridcopy(state.offlineGrid)
-            state.offlineUndoStack.append(self.gridcopy(state.offlineGrid))
+            state.offlineUndoStack.append(copy.deepcopy(state.offlineGrid))
+            print "OFFLINE NOISE", self.gridSum(inputGrid), len(state.offlineUndoStack)
         else:
             inputGrid = self.gridcopy(state.grid)
             state.undoStack.append(self.gridcopy(state.grid))
@@ -1426,9 +1437,10 @@ class MultiLoop:
         state = self.gridStates[si]
         if stuff[0] == 0: return
         if state.offlineEdit:
-            print "offline undo"
-            if len(state.offlineUndoStack) == 0: return
-            self.offlineGrid = state.offlineUndoStack.pop()
+            if len(state.offlineUndoStack) == 0: retur
+            topstack = state.offlineUndoStack.pop()
+            print "offline undo", self.gridDif(topstack, state.offlineGrid), len(state.offlineUndoStack)
+            state.offlineGrid = topstack
             self.pullUpGrid(state.offlineGrid, "/" + str(si+1) + "/offGrid")
         else:
             if len(state.undoStack) == 0: return
