@@ -582,6 +582,11 @@ def fillPhrase(phr, txt, root):
             phr.append((cmap[txt[x%l]], dic2[txt[x%l-k]]))
     return cmap
 
+# KEWORDS
+#   toggle - should be "on" or "off" (need to enforce this) - if defined, it means chord is from a piano key down/up
+#   channel - if defined, tells what channel to play object(s) on  - can be a single number (when len(args) == 1) or a list (when len(args) > 1)
+# 
+# ONLY BLOCK IN (obj.type == "chord") is relevant to SkipStep 
 def play(*args, **kwargs):    #send object type to reciever 
     #print "                kwargs len",  len(kwargs)
 #    if len(kwargs) > 0:
