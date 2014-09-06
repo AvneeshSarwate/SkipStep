@@ -1,3 +1,6 @@
+/*the “chord” class that encapsulates the information
+of a chord/SkipStep-column coming on osc and being sent out by python
+*/
 public class chord{
     int notes[];
     public void setNotes(int a[]) {
@@ -40,32 +43,35 @@ fun void midOff(int note, int chan){
 }
 
 
-
-
-
 60 => int note;
 
 
-
+/*
+this block sets up the OSC reciever that recieves the chord data
+*/
 // create our OSC receiver
 OscRecv recv;
 // use port 6449
 6449 => recv.port;
 // start listening (launch thread)
 recv.listen();
-
+//sets up the data structures fro
 5 => int maxMultiplay;
 OscEvent nums[maxMultiplay];
 OscEvent objLen[maxMultiplay];
 
+/*
+sets up the data structures for recieving chord data 
+item on the ith channel sends infomration to address
+“objLeni” and “numsi” 
+*/
 for(0 => int i; i < maxMultiplay; i++) {
     recv.event("nums" + i + ", i") @=> nums[i];
 }
 for(0 => int i; i < maxMultiplay; i++) {
     recv.event("objLen" + i + ", i") @=> objLen[i];
 }
-
-// create an address in the receiver, store in new variable
+// create an addresses in the receiver, store in new variable
 recv.event( "/print, f" ) @=> OscEvent oe;
 recv.event("start, s") @=> OscEvent start;
 recv.event("type, s") @=> OscEvent type;
@@ -81,24 +87,22 @@ for(0 => int i; i < nInst; i++) {
     m[i] => g;
 }
 
+//default time variables 
 1::second => dur whole;
 2::second => dur slowest;
 .01::second => dur split;
 
 
 
-// host name and port
-
+// IGNORE
 //50506 => int port; //LANDINI
-// send object
-
-// aim the transmitter
-
-
 //conf.startMsg("/send/GD, s, s, s"); LANDINI
 //"all" => conf.addString; LANDINI
 //"/played" => conf.addString; LANDINI
 
+/*
+this block sets up the tap tempo listener  
+*/
 OscRecv recvTempo;
 // use port 6449
 5678 => recvTempo.port;
@@ -124,9 +128,9 @@ fun void touchTempo(){
     }   
 }
 
-
 spork~ touchTempo();
 <<<"touch tempo sporked">>>;
+
 
 OscSend confLANdini;
 confLANdini.setHost( "127.0.0.1", 50506 );
@@ -154,7 +158,9 @@ fun void timerLANdini(){
 }
 
 
-//for multi loop, send over multiple ports
+/*
+this block sets up the metronome that sends messages to python 
+*/
 OscSend conf;
 "127.0.0.1" => string hostname;
 5174 => int port;
@@ -171,6 +177,8 @@ fun void timer(){
     }
 }
 
+
+//reads in the chord info for a chord to be played (non piano)
 0 => int chordNum;
 fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur whole, int chan) {
     //<<<n>>>;
@@ -197,6 +205,8 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     playChord(m, c, whole, chan);
 }
 
+
+//chord reading function used by readAndToggle()  (this is bad design)
 fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
     //<<<n>>>;
     int notes[n];
@@ -220,6 +230,7 @@ fun chord readOSCChord2(OscEvent start, OscEvent nums, int n) {
     return c;
 }
 
+//read the incoming chord data from a piano key event 
 fun void readAndToggle(OscEvent start, OscEvent nums, int n, int on, int chan){
     <<<"starting to read toggle chord">>>;
     readOSCChord2(start, nums, n) @=> chord c;
@@ -231,14 +242,11 @@ fun void readAndToggle(OscEvent start, OscEvent nums, int n, int on, int chan){
     chordToggle(c, on, chan);
 }
 
+// function that plays/stops a chord based on piano key input
 fun void chordToggle(chord c, int on, int chan) {
     //<<<"oi chord">>>;
     c.size() => int len;
     if(c.notes[0] == -1) {
-        /*.25 * whole => now;
-        <<<"chord rest">>>;
-        conf.startMsg("/played", "s");
-        "played0" => conf.addString;*/
         return;
     }
     
@@ -258,18 +266,9 @@ fun void chordToggle(chord c, int on, int chan) {
             <<<"off", c.notes[i]>>>;
         }
     }   
-    /*.25*whole => now;
-    for(0 => int i; i < len; i++) {
-        midOff(c.notes[i]);
-    }
-    conf.startMsg("/played", "s");
-    "played0" => conf.addString;
-    <<<"function played chord">>>;*/
 }
 
-
-
-
+//plays a chord (sends midi information to the DAW
 fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     //<<<"oi chord">>>;
     c.size() => int len;
@@ -300,12 +299,13 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     //<<<"function played chord">>>;
 }
 
+//stats the metronome 
 spork~ timer();
 
-// infinite event loop
+// infinite event loop that listenes for incoming chord data 
 while ( true )
 {
-    // wait for event to arrive
+    // wait for the start event to arrive
     //oe => now;
     start => now;
     while(start.nextMsg() != 0) {
@@ -315,40 +315,37 @@ while ( true )
         //<<<a>>>;
         objs => now; 
         objs.nextMsg();
-        objs.getInt() => int i;//nobj;
-        //for(0=>int i; i < nobj; i++){ //for multiloop, nobj is looper index, and instead of for loop, directly index by nobj
-            type => now;
-            type.nextMsg();
-            type.getString() => string mtype;
-            //<<<"mtype is", mtype, " channel is ", i>>>;
-            if(mtype == "skip") {
-                <<<"about to skip">>>;
-                continue;
-            }
-            if(mtype == "skip") {
-                <<<"SHOULD NOT SEE THIS">>>;
-                continue;
-            }
-            objLen[i] => now;
-            //<<<"got length", i>>>;
-            objLen[i].nextMsg();
-            objLen[i].getInt() => int n;
-            if(mtype == "chord") {
-                spork~ readOSCChord(start, nums[i], n, m, whole, i);
-            }
-            //<<<"before problematic conditional">>>;
-            if(mtype == "on") {
-                <<<"pre read toggle ON">>>;
-                readAndToggle(start, nums[i], n, 1, i);
-                <<<"             ON">>>;
-            }
-            if(mtype == "off") {
-                <<<"pre read toggle OFF">>>;
-                readAndToggle(start, nums[i], n, 0, i);
-                <<<"             OFF">>>;
-            }
-            //}
-            
+        objs.getInt() => int i;//get the channel to play the chord on 
+        
+        //get the type of the 
+        type => now;
+        type.nextMsg();
+        type.getString() => string mtype;
+        //<<<"mtype is", mtype, " channel is ", i>>>;
+        if(mtype == "skip") {
+            <<<"about to skip">>>;
+            continue;
         }
-        //now that you have phrase length n, make and play arrays
+        objLen[i] => now;
+        //<<<"got length", i>>>;
+        objLen[i].nextMsg();
+        objLen[i].getInt() => int n;
+        
+        //if the chord is a normal chord, read and play
+        if(mtype == "chord") {
+            spork~ readOSCChord(start, nums[i], n, m, whole, i);
+        }
+        
+        //if the chord is from a piano key press, read and toggle it
+        if(mtype == "on") {
+            <<<"pre read toggle ON">>>;
+            readAndToggle(start, nums[i], n, 1, i);
+            <<<"             ON">>>;
+        }
+        if(mtype == "off") {
+            <<<"pre read toggle OFF">>>;
+            readAndToggle(start, nums[i], n, 0, i);
+            <<<"             OFF">>>;
+        }
     }
+}
