@@ -1,3 +1,5 @@
+# sourced from this stack-overflow question: 
+# http://stackoverflow.com/questions/11735821/python-get-localhost-ip
 import os
 import socket
 

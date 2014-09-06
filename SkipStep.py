@@ -12,6 +12,7 @@ import copy
 import subprocess
 import sys
 import IPentry
+import lanutil
 
 # the class that represnts all the data of a single "instrument state"
 class Looper:
@@ -59,9 +60,7 @@ class MultiLoop:
         
         
         #finds the IP of the computer
-        k = subprocess.check_output(["ifconfig | grep \"inet \" | grep -v 127.0.0.1"], shell=True)
-        ip = k.split(" ")[1]
-        selfIP = ip
+        selfIP = lanutil.get_lan_ip()
         print "\n" + "Your computer's IP address is: " + selfIP + "\n enter this into your iPad"
 
         #opens window to enter IP address of iPad, retrieves the entered value 
