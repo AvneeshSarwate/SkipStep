@@ -48,7 +48,7 @@ class Looper:
         self.gridseqFlag = False # boolean for whether or not miniState sequencing is ocurring 
         self.gridseqEdit = False # boolean for whether or not the miniState sequence is in edit mode
         self.offlineEdit = False # boolean for whether or not offline editing is occuring 
-        
+        self.metronomeToggled = True
         
         self.lock = threading.Lock()
 
@@ -110,7 +110,8 @@ class MultiLoop:
         # server that sends the data  
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", port)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
-        self.oscServSelf.addMsgHandler("/played", self.realPlay)
+        for i in range(self.num):
+            self.oscServSelf.addMsgHandler("/played-" + str(i+1), self.realPlay)
         #MultiMetronomoe: replace with lambda functions of self.realPlay(int(addr.split("/")[2]))
 
         # OSC server that recieves messages from the iPad        
@@ -311,69 +312,70 @@ class MultiLoop:
     
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the ChucK metronome is recieved 
-    def realPlay(self, *args): #MultiMetronome: give si as an argument, remove loops
-        chords = []
-        for si in range(self.num):
-            state = self.gridStates[si]
-            with state.lock: 
-                if(state.subsets):
-                    state.progInd %= len(state.columnsub)
-                    playind = state.columnsub[state.progInd]
-                    
-                else:
-                    state.progInd %= 16
-                    playind = state.progInd
-                if state.pianomode:
-                    chords.append(phrase.Chord([-1]))
-                else:
-                    self.sendToUI("/" + str(si+1) + "/step/" + str(playind+1) + "/1", 1)
-                    chords.append(state.prog.c[playind]) # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
-                if state.refreshing and not state.pianomode:
-                    self.refreshColumn(playind, si)
-                state.progInd += state.stepIncrement
-        
+    def realPlay(self, addr, tags, stuff, source, callback): #MultiMetronome: give si as an argument, remove loops
+        colChord = play.Chord()  # placeholder 
+        si = addr.split("-")[1]
+    
+        state = self.gridStates[si]
+        with state.lock: 
+            if(state.subsets):
+                state.progInd %= len(state.columnsub)
+                playind = state.columnsub[state.progInd]
+                
+            else:
+                state.progInd %= 16
+                playind = state.progInd
+            if state.pianomode:
+                colChord = phrase.Chord([-1])
+            else:
+                self.sendToUI("/" + str(si+1) + "/step/" + str(playind+1) + "/1", 1)
+                colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+            if state.refreshing and not state.pianomode:
+                self.refreshColumn(playind, si)
+            state.progInd += state.stepIncrement
+    
         #plays the chords that are defined by each column (phrase.play to be documented later)
-        phrase.play(chords[0], chords[1], chords[2], chords[3])
+        phrase.play(colChord, channel = str(si))
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
         
-        for si in range(self.num):
-            state = self.gridStates[si]
-            if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
-                if state.gridseqFlag and sum(state.gridseq) != -8:
-                    state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
-                    while state.gridseq[state.gridseqInd] == -1: 
-                        state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                        print "       progressing to index", state.gridseqInd
-                    
-                    
-                    print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
-                    self.sendToUI("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1", 1)
-                    
-                    if state.gridseq[state.gridseqInd] == "blank": 
-                        g = [[0 for i in range(16)] for j in range(16)]
-                        scale = state.scale
-                        root = state.root
-                        colsub = []
-                    else:
-                        g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
-                    
-                    if state.noisy:
-                        g = self.noiseChoice(si)
-                        if not state.refreshing:
-                            state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
-                    with state.lock:
-                        self.putMiniStateLive(g, scale, root, colsub, si) 
+        
+        state = self.gridStates[si]
+        if (not state.subsets and (state.progInd == 16))  or (state.subsets and (state.progInd == len(state.columnsub))) or (state.progInd == -1):
+            if state.gridseqFlag and sum(state.gridseq) != -8:
+                state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
+                while state.gridseq[state.gridseqInd] == -1: 
                     state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                    print "done with sequencing update"
-                    
+                    print "       progressing to index", state.gridseqInd
+                
+                
+                print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
+                self.sendToUI("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1", 1)
+                
+                if state.gridseq[state.gridseqInd] == "blank": 
+                    g = [[0 for i in range(16)] for j in range(16)]
+                    scale = state.scale
+                    root = state.root
+                    colsub = []
                 else:
-                    #print "NOT SEQUENCING ", si+1
-                    if state.noisy:
-                        g = self.noiseChoice(si)
-                        with state.lock:
-                            self.putGridLive(g, si)
+                    g, scale, root, colsub = self.stringToMiniState(state.gridzz[state.gridseq[state.gridseqInd]])
+                
+                if state.noisy:
+                    g = self.noiseChoice(si)
+                    if not state.refreshing:
+                        state.gridzz[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
+                with state.lock:
+                    self.putMiniStateLive(g, scale, root, colsub, si) 
+                state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                print "done with sequencing update"
+                
+            else:
+                #print "NOT SEQUENCING ", si+1
+                if state.noisy:
+                    g = self.noiseChoice(si)
+                    with state.lock:
+                        self.putGridLive(g, si)
         
                 
     ## helper function is called to return columns to their saved state when snapshot mode is on 
@@ -1228,7 +1230,14 @@ class MultiLoop:
         print "sent touch message"
         msg = OSC.OSCMessage()
         msg.setAddress("/touch")
-        msg.append("touched")
+
+        metronomeToggleString = ""
+        for i in range(self.num):
+            if self.gridStates[i].metronomeToggled:
+                metronomeToggleString.append("1")
+            else:
+                metronomeToggleString.append("0")
+        msg.append("metronomeToggleString")
         self.touchClient.send(msg)
 
         msg.clear()
