@@ -56,19 +56,19 @@ OscRecv recv;
 // start listening (launch thread)
 recv.listen();
 //sets up the data structures fro
-5 => int maxMultiplay;
-OscEvent nums[maxMultiplay];
-OscEvent objLen[maxMultiplay];
+5 => int numInstruments;
+OscEvent nums[numInstruments];
+OscEvent objLen[numInstruments];
 
 /*
 sets up the data structures for recieving chord data 
 item on the ith channel sends infomration to address
 “objLeni” and “numsi” 
 */
-for(0 => int i; i < maxMultiplay; i++) {
+for(0 => int i; i < numInstruments; i++) {
     recv.event("nums" + i + ", i") @=> nums[i];
 }
-for(0 => int i; i < maxMultiplay; i++) {
+for(0 => int i; i < numInstruments; i++) {
     recv.event("objLen" + i + ", i") @=> objLen[i];
 }
 // create an addresses in the receiver, store in new variable
@@ -87,10 +87,15 @@ for(0 => int i; i < nInst; i++) {
     m[i] => g;
 }
 
-//default time variables 
-1::second => dur whole;
+
+//time constants: slowest time possible and cutoff length
 2::second => dur slowest;
 .01::second => dur split;
+//duration of a measure
+dur measure[numInstruments];
+for(0 => int i; i < numInstruments; i++) {
+    1::second => measure[i]; }
+
 
 
 
@@ -103,60 +108,47 @@ for(0 => int i; i < nInst; i++) {
 /*
 this block sets up the tap tempo listener  
 */
-OscRecv recvTempo;
-// use port 6449
-5678 => recvTempo.port;
-// start listening (launch thread)
-recvTempo.listen();
 
 recv.event("/touch, s") @=> OscEvent touchEv;
 
+    
+fun void modifyTempo(int channel, dur tempo)
+ {
+     tempo @=> measure[channel];
+ }
+    
+48 @=> int ASCII_0;
+49 @=> int ASCII_1;
+    
 fun void touchTempo(){
     now => time newT;
     now => time oldT;
+    dur tempo;
     while(true){
         <<<"                  starting thread">>>;
         touchEv => now;
         <<<"                                   got a touch event">>>;
         while(touchEv.nextMsg() != 0) {
+            touchEv.getString() @=> string channel_vec;
             now => newT;
             if((newT - oldT) < slowest){
-                newT - oldT => whole;
+                newT - oldT => tempo;
             }
             newT => oldT;
+            for (0 => int i;i!=numInstruments;++i)
+            {
+                if (channel_vec.charAt(i) == ASCII_1){
+                    modifyTempo(i,tempo);
+                }
+            }
+
+            
         }
     }   
 }
 
 spork~ touchTempo();
 <<<"touch tempo sporked">>>;
-
-
-OscSend confLANdini;
-confLANdini.setHost( "127.0.0.1", 50506 );
-"all" => confLANdini.addString;
-"/played" => confLANdini.addString;
-"played0" => confLANdini.addString;
-0 => int track;
-now => time old;
-now => time nu;
-fun void timerLANdini(){
-    while(true) {
-        //1 => m[0].noteOn;
-        .25 * whole => now;
-        now => nu;
-        confLANdini.startMsg("/send/GD, s, s, s");
-        "all" => confLANdini.addString;
-        "/played" => confLANdini.addString;
-        "played0" => confLANdini.addString;
-        //<<<"                  step", nu-old, track>>>;
-        nu => old;
-        track++;
-        
-        
-    }
-}
-
 
 /*
 this block sets up the metronome that sends messages to python 
@@ -168,19 +160,21 @@ conf.setHost( hostname, port );
 conf.startMsg("/played, s");
 "played0" => conf.addString;
 
-fun void timer(){
+fun void timer(int i){
     while(true) {
-        .25 * whole => now;
-        conf.startMsg("/played, s");
-        "played0" => conf.addString;
-        //        <<<"                  step">>>;
+        .25 * measure[i] => now;
+        conf.startMsg("/played-" + (i+1) + ", s");
     }
 }
+
+//starts all the metronomes
+for(0 => int i; i < numInstruments; i++) {
+    spork~ timer(i); }
 
 
 //reads in the chord info for a chord to be played (non piano)
 0 => int chordNum;
-fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur whole, int chan) {
+fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur measure, int chan) {
     //<<<n>>>;
     //<<<chordNum + "chordNum">>>;
     chordNum++;
@@ -202,7 +196,7 @@ fun void readOSCChord(OscEvent start, OscEvent nums, int n, Mandolin m[], dur wh
     chord c;
     c.setNotes(notes);
     //<<<"yo chord", chan>>>;
-    playChord(m, c, whole, chan);
+    playChord(m, c, measure, chan);
 }
 
 
@@ -256,7 +250,7 @@ fun void chordToggle(chord c, int on, int chan) {
             return; //better than break?
             break;
         } 
-        //spork ~ miniPlay(Std.mtof(c.notes[i]), whole, m[i]);
+        //spork ~ miniPlay(Std.mtof(c.notes[i]), measure, m[i]);
         if(on == 1){
             midOn(c.notes[i], chan);
             <<<"on", c.notes[i]>>>;
@@ -269,11 +263,11 @@ fun void chordToggle(chord c, int on, int chan) {
 }
 
 //plays a chord (sends midi information to the DAW
-fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
+fun void playChord(Mandolin m[], chord c, dur measure, int chan) {
     //<<<"oi chord">>>;
     c.size() => int len;
     if(c.notes[0] == -1) {
-        .25 * whole => now;
+        .25 * measure => now;
         //<<<"chord rest channel", chan >>>;
         //conf.startMsg("/played", "s");
         //"played0" => conf.addString;
@@ -286,11 +280,11 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
             return; //better than break?
             break;
         } 
-        //spork ~ miniPlay(Std.mtof(c.notes[i]), whole, m[i]);
+        //spork ~ miniPlay(Std.mtof(c.notes[i]), measure, m[i]);
         midOn(c.notes[i], chan);
         //<<<c.notes[i], "chan ", chan>>>;
     }   
-    .25*whole - split=> now;
+    .25*measure - split=> now;
     for(0 => int i; i < len; i++) {
         midOff(c.notes[i], chan);
     }
@@ -298,9 +292,6 @@ fun void playChord(Mandolin m[], chord c, dur whole, int chan) {
     //"played0" => conf.addString;
     //<<<"function played chord">>>;
 }
-
-//stats the metronome 
-spork~ timer();
 
 // infinite event loop that listenes for incoming chord data 
 while ( true )
@@ -333,7 +324,7 @@ while ( true )
         
         //if the chord is a normal chord, read and play
         if(mtype == "chord") {
-            spork~ readOSCChord(start, nums[i], n, m, whole, i);
+            spork~ readOSCChord(start, nums[i], n, m, measure[i], i);
         }
         
         //if the chord is from a piano key press, read and toggle it
