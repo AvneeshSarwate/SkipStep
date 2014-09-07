@@ -312,10 +312,10 @@ class MultiLoop:
     
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the ChucK metronome is recieved 
-    def realPlay(self, addr, tags, stuff, source, callback): #MultiMetronome: give si as an argument, remove loops
-        colChord = play.Chord()  # placeholder 
-        si = addr.split("-")[1]
-    
+    def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
+        colChord = phrase.Chord()  # placeholder 
+        si = int(addr.split("-")[1])-1
+
         state = self.gridStates[si]
         with state.lock: 
             if(state.subsets):
@@ -335,7 +335,7 @@ class MultiLoop:
             state.progInd += state.stepIncrement
     
         #plays the chords that are defined by each column (phrase.play to be documented later)
-        phrase.play(colChord, channel = str(si))
+        phrase.play(colChord, channel = si)
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
@@ -771,7 +771,6 @@ class MultiLoop:
         self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
         #self.chuckThread.start()
         self.audioThread.start()
-        self.realPlay()
     
     ##is used to start the threading in the SkipStep initialization 
     def uiStart(self):
@@ -1227,17 +1226,18 @@ class MultiLoop:
     ## handler  for the tap tempo control, OSCaddr: /si/tempo 
     def tempo(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
-        print "sent touch message"
+        
         msg = OSC.OSCMessage()
         msg.setAddress("/touch")
 
-        metronomeToggleString = ""
+        metronomeToggleString = []
         for i in range(self.num):
             if self.gridStates[i].metronomeToggled:
                 metronomeToggleString.append("1")
             else:
                 metronomeToggleString.append("0")
-        msg.append("metronomeToggleString")
+        msg.append("".join(metronomeToggleString))
+        print "sent touch message", msg
         self.touchClient.send(msg)
 
         msg.clear()
@@ -1534,7 +1534,7 @@ modeGui.title("Select Mode")
 modeGui.mainloop()
 subprocess.call("chuck --kill all", shell=True)
 if res[0] == 0: #solo
-    threading.Thread(target = startSoloBackend).start()
+    #threading.Thread(target = startSoloBackend).start()
     port = 5174
     print res[0]
 if res[0] == 1: #master

@@ -1,0 +1,8 @@
+TASKS
+
+change "/played" handler from metronome 
+	(chuck shoud send "/playedi" message for channel i)
+
+change realPlay to take channel argument (parsed from OSC address)
+
+change realPlay to call phrase.play(chord, channel=i)
