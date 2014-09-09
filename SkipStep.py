@@ -1237,15 +1237,17 @@ class MultiLoop:
             else:
                 metronomeToggleString.append("0")
         msg.append("".join(metronomeToggleString))
-        print "sent touch message", msg
+        print "sent touch message", msg, self.touchClient
         self.touchClient.send(msg)
 
-        msg.clear()
-        msg.setAddress("/send/GD")
-        msg.append("all")
-        msg.append("/touch") #triggers tempo hit on ALL SkipStep.py, which then sends it to chuck back end
-        msg.append("stuff")
-        self.oscLANdiniClient.send(msg)
+        #NOTE: code previously used to touch-tempo over several SkipStep instances over lan
+        #      due to implementation of multi-metronomes, this will no longer work 
+        # msg.clear()
+        # msg.setAddress("/send/GD")
+        # msg.append("all")
+        # msg.append("/touch") #triggers tempo hit on ALL SkipStep.py, which then sends it to chuck back end
+        # msg.append("stuff")
+        # self.oscLANdiniClient.send(msg)
         
     ## handler  for the undo button, OSCaddr: /si/undo
     def undo(self, addr, tags, stuff, source):

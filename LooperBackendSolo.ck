@@ -89,7 +89,7 @@ for(0 => int i; i < nInst; i++) {
 
 
 //time constants: slowest time possible and cutoff length
-2::second => dur slowest;
+1::second => dur slowest;
 .01::second => dur split;
 //duration of a measure
 dur measure[numInstruments];
@@ -133,6 +133,7 @@ fun void modifyTempo(int channel, dur tempo)
          if(touchEv.nextMsg() != 0) {
              touchEv.getString() @=> string channel_vec;
              <<< channel_vec >>>; 
+             newT => oldT;
              now => newT;
              <<< now, newT, oldT>>>;
              if((newT - oldT) < slowest){
@@ -144,11 +145,7 @@ fun void modifyTempo(int channel, dur tempo)
                          modifyTempo(i,tempo);
                      }
                  }
-             }
-             newT => oldT;
-             
-             
-             
+             }        
          }
      }   
  }
