@@ -5,10 +5,10 @@ client = OSC.OSCClient()
 client.connect(("127.0.0.1", 57120))
 
 
-msg = OSC.OSCMessage()
-msg.setAddress("/testMessage")
-msg.append([5, [6,7]])
-client.send(msg)
+# msg = OSC.OSCMessage()
+# msg.setAddress("/testMessage")
+# msg.append([5, [6,7]])
+# client.send(msg)
 
 
 #sends channel, piano status (non, on, off), and list of notes
@@ -24,7 +24,7 @@ def playChord(chord, channel = 0, piano = "normal"):
 
 c = phrase.Chord([60, 63, 67])
 
-playChord(c)
+playChord(c, channel = 3)
 
 
 
