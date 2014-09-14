@@ -1,28 +1,102 @@
 
 
-/*
-var n, beats, oldTap, newTap, tapLim, tempoClocks;
+(
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler;
 n = 4; //set n - number of instruments
 
 /*create n tempo clocks (and associated beat variables?)
 When tap-tempoing:
-either adjust the .tempo of the tempoClocks and reschedule them every .25 beats,
-or leave the tempo of the tempoClocks at 1 and reschedule them every beats[i],
-where beats[i] is changed by the tap tempo
+1. either adjust the .tempo of the tempoClocks and reschedule them every .25 beats,
+2. or leave the tempo of the tempoClocks at 1 and reschedule them every beats[i],
+    where beats[i] is changed by the tap tempo
 */
-tempoClocks = Array.fill(n, TempoClock.new(2.0));
+tempoClocks = Array.fill(n, TempoClock.new(1)); //currently using option 2
+
+//------------
 
 //create old/new time variables for touch tempo
 oldTap = 0;
 newTap = 0;
-beats = Array.fill(n, {0}); //create n beats
+tapLim = 2;
+beats = Array.fill(n, {0.25}); //create n beats
+
+//------------
+
+//set up tempoClocks to send metronome hits via OSC
+netAd = NetAddr("localhost", 5174);
+oscMetronomeHit = {|i| nedAd.send("/played-"+i, i);};
+(0..(n-1)).do({|i| tempClock[i].schedule(0,
+	{oscMetronomeHit.value(i); beats[i]/*0.25*/})});
+
+//------------
+
+//set up playChord hanlder
+midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
+
+playHandler = {|msg, time, addr, recvPort|
+	if (msg[2] == 'normal',
+		{
+			Task({
+				//msg.postln;
+				msg[3..].do({|i| midiOut.noteOn(msg[1], i)});/*hit noteOn messages*/
+				//GENERALIZE: beat[msg[1]] or tempClocks[msg[1].tempo
+				beats[msg[1]].wait; /*wait for beat*/
+				msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*hit noteOff messages*/
+			}).play;
+		},
+		{
+			//msg[2].postln;
+			if (msg[2] == 'on',
+				{msg[3..].do({|i| midiOut.noteOn(msg[1], i)}); /*noteon messages*/},
+				{msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*noteoff messages*/}
+			)
+		}
+	)
+};
+
+OSCFunc(playHandler, "/playChord");
+
+//------------
+
+//set up tap tempo handler
+//make sure time argument is in seconds
+tapFunc = {|msg, time, addr, recvPort|
+	//msg[1] is a boolean vector indicating which instruments the tap occured for
+	oldTap = newTap;
+	newTap = time; //should it be SystemClock.beat instead?
+	if(newTap - oldTap < tapLim,
+		//{beat = newTap - oldTap;} //generalize wrt which instruments were tapped
+		(0..n-1).do({|i|
+			if(msg[1].asString[i] == $1,
+		        //directly set .tempo of TempoClocks here? -> convert dur to "beat"
+				{beats[i] = newTap - oldTap};
+		)}); //generalized version
+	)
+};
+
+OSCFunc(tapTempoHandler, "/touch");
+
+)
 
 
 
 
 
 
-*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+//------------------- templates and testing - final version above ------------
 
 //FIRST DATA OF OSC MESSAGE WILL ALWAYS BE INSTRUMENT INDEX (when appropriate)
 
