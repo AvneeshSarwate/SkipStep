@@ -24,13 +24,15 @@ beats = Array.fill(n, {0.25}); //create n beats
 
 //set up tempoClocks to send metronome hits via OSC
 netAd = NetAddr("localhost", 5174);
-oscMetronomeHit = {|i| nedAd.send("/played-"+i, i);};
-(0..(n-1)).do({|i| tempClock[i].schedule(0,
-	{oscMetronomeHit.value(i); beats[i]/*0.25*/})});
+oscMetronomeHit = {|i| netAd.sendMsg("/played-"+i, i);};
+(0..(n-1)).do(
+	{|i| tempoClocks[i].sched(0, {oscMetronomeHit.value(i); beats[i]/*0.25*/})}
+);
 
 //------------
 
 //set up playChord hanlder
+MIDIClient.init;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 
 playHandler = {|msg, time, addr, recvPort|
@@ -60,7 +62,7 @@ OSCFunc(playHandler, "/playChord");
 
 //set up tap tempo handler
 //make sure time argument is in seconds
-tapFunc = {|msg, time, addr, recvPort|
+tapTempoHandler = {|msg, time, addr, recvPort|
 	//msg[1] is a boolean vector indicating which instruments the tap occured for
 	oldTap = newTap;
 	newTap = time; //should it be SystemClock.beat instead?
