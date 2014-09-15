@@ -30,6 +30,7 @@ oscMetronomeHit = {|i| netAd.sendMsg("/played-"++i, i);};
 //--------------------------------set up playChord hanlder--------------------------------
 MIDIClient.init;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
+midiOut.latency = 0;
 
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',

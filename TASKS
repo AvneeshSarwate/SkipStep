@@ -1,5 +1,4 @@
 TASKS
 
-- inspect/fix latency between superCollider and Ableton
 - add transformation function application over subsets
 - inspect/fix bug with refresh mode over grid sequencing 
