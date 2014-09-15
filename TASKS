@@ -1,5 +1,5 @@
 TASKS
 
-1. add playChord() from superColliderTest.py and test it
-2. add transformation function application over subsets
-3. inspect/fix bug with refresh mode over grid sequencing 
+- inspect/fix latency between superCollider and Ableton
+- add transformation function application over subsets
+- inspect/fix bug with refresh mode over grid sequencing 

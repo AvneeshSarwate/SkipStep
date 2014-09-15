@@ -1,10 +1,8 @@
-
-
 (
 var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler;
 n = 4; //set n - number of instruments
 
-/*create n tempo clocks (and associated beat variables?)
+/*----------------create n tempo clocks (and associated beat variables?)----------------
 When tap-tempoing:
 1. either adjust the .tempo of the tempoClocks and reschedule them every .25 beats,
 2. or leave the tempo of the tempoClocks at 1 and reschedule them every beats[i]*0.25,
@@ -12,17 +10,15 @@ When tap-tempoing:
 */
 tempoClocks = Array.fill(n, TempoClock.new(1)); //currently using option 2
 
-//------------
 
-//create old/new time variables for touch tempo
+//----------------create old/new time variables for touch tempo -------------------
 oldTap = 0;
 newTap = 0;
 tapLim = 2;
 beats = Array.fill(n, {0.25}); //create n beats
 
-//------------
 
-//set up tempoClocks to send metronome hits via OSC
+//------------------set up tempoClocks to send metronome hits via OSC ---------------------
 netAd = NetAddr("localhost", 5174);
 oscMetronomeHit = {|i| netAd.sendMsg("/played-"++i, i);};
 (0..(n-1)).do(
@@ -30,9 +26,8 @@ oscMetronomeHit = {|i| netAd.sendMsg("/played-"++i, i);};
 	//i+1 in .value() is a hack to get around some small bug
 );
 
-//------------
 
-//set up playChord hanlder
+//--------------------------------set up playChord hanlder--------------------------------
 MIDIClient.init;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 
@@ -48,7 +43,7 @@ playHandler = {|msg, time, addr, recvPort|
 			}).play;
 		},
 		{
-			//msg[2].postln;
+			"piano".postln;
 			if (msg[2] == 'on',
 				{msg[3..].do({|i| midiOut.noteOn(msg[1], i)}); /*noteon messages*/},
 				{msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*noteoff messages*/}
@@ -59,9 +54,8 @@ playHandler = {|msg, time, addr, recvPort|
 
 OSCFunc(playHandler, "/playChord");
 
-//------------
 
-//set up tap tempo handler
+//--------------------------------set up tap tempo handler--------------------------------
 //make sure time argument is in seconds
 tapTempoHandler = {|msg, time, addr, recvPort|
 	//msg[1] is a boolean vector indicating which instruments the tap occured for

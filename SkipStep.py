@@ -134,8 +134,8 @@ class MultiLoop:
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
 
         # OSC client for sending tap-tempo messages to Supercollider
-        self.touchClient = OSC.OSCClient()
-        self.touchClient.connect( ('127.0.0.1', 57120) )
+        self.superColliderClient = OSC.OSCClient()
+        self.superColliderClient.connect( ('127.0.0.1', 57120) ) #default superCollider port
 
         # initializes which controls are visible/invisible upon starting, and initializing the note labels 
         for si in range(n):
@@ -308,6 +308,15 @@ class MultiLoop:
         oscClient.connect((iPadIP, 9000))
         print "test 2"
         self.iPadClients.append(oscClient)
+
+    def playChord(self, chord, channel = 0, piano = "normal"):
+        msg = OSC.OSCMessage()
+        msg.setAddress("/playChord")
+        msg.append(channel)
+        msg.append(piano)
+        for i in chord.n:
+            msg.append(i)
+        self.superColliderClient.send(msg)
     
     
     ##the function that handles everything that needs to happen during the "step" of a metronome
@@ -336,7 +345,8 @@ class MultiLoop:
             state.progInd += state.stepIncrement
     
         #plays the chords that are defined by each column (phrase.play to be documented later)
-        #phrase.play(colChord, channel = si)
+        print colChord, si
+        self.playChord(colChord, channel = si)
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
@@ -691,18 +701,11 @@ class MultiLoop:
         state = self.gridStates[si]
         i, j = self.gridAddrInd(addr)
         print i
-        playargs = []
-        for m in range(si):
-            k = phrase.Chord([-1])
-            playargs.append(k)
-        print "len playargs ", len(playargs)
         if(stuff[0] == 1):
-            playargs.append(state.prog.c[i])
             state.pianoKeyDown[i] = copy.deepcopy(state.prog.c[i])
-            phrase.play(playargs, toggle="on", list="yes") # turns "on" the chord(s) of pressed keys 
+            self.playChord(state.pianoKeyDown[i], piano="on", channel=si) # turns "on" the chord(s) of pressed keys 
         else:
-            playargs.append(state.pianoKeyDown[i])
-            phrase.play(playargs, toggle="off", list="yes") # turns "off" the chords(s) of released keys
+            self.playChord(state.pianoKeyDown[i], piano="off", channel=si) # turns "off" the chords(s) of released keys
             if state.refreshing:
                 self.refreshColumn(i, si)
 
@@ -1237,9 +1240,9 @@ class MultiLoop:
                 metronomeToggleString.append("1")
             else:
                 metronomeToggleString.append("0")
-        msg.append(.join(metronomeToggleString))
-        print "sent touch message", msg, self.touchClient
-        self.touchClient.send(msg)
+        msg.append("".join(metronomeToggleString))
+        print "sent touch message", msg, self.superColliderClient
+        self.superColliderClient.send(msg)
 
         #NOTE: code previously used to touch-tempo over several SkipStep instances over lan
         #      due to implementation of multi-metronomes, this will no longer work 
