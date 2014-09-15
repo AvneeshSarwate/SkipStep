@@ -1,8 +1,5 @@
 TASKS
 
-change "/played" handler from metronome 
-	(chuck shoud send "/playedi" message for channel i)
-
-change realPlay to take channel argument (parsed from OSC address)
-
-change realPlay to call phrase.play(chord, channel=i)
+1. add playChord() from superColliderTest.py and test it
+2. add transformation function application over subsets
+3. inspect/fix bug with refresh mode over grid sequencing 
