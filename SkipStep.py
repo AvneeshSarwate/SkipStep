@@ -133,9 +133,9 @@ class MultiLoop:
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
 
-        # OSC client for sending tap-tempo messages to ChucK
+        # OSC client for sending tap-tempo messages to Supercollider
         self.touchClient = OSC.OSCClient()
-        self.touchClient.connect( ('127.0.0.1', 6449) )
+        self.touchClient.connect( ('127.0.0.1', 57120) )
 
         # initializes which controls are visible/invisible upon starting, and initializing the note labels 
         for si in range(n):
@@ -315,6 +315,7 @@ class MultiLoop:
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
         colChord = phrase.Chord()  # placeholder 
         si = int(addr.split("-")[1])-1
+        print "                 played", si
 
         state = self.gridStates[si]
         with state.lock: 
@@ -335,7 +336,7 @@ class MultiLoop:
             state.progInd += state.stepIncrement
     
         #plays the chords that are defined by each column (phrase.play to be documented later)
-        phrase.play(colChord, channel = si)
+        #phrase.play(colChord, channel = si)
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
@@ -1236,7 +1237,7 @@ class MultiLoop:
                 metronomeToggleString.append("1")
             else:
                 metronomeToggleString.append("0")
-        msg.append("".join(metronomeToggleString))
+        msg.append(.join(metronomeToggleString))
         print "sent touch message", msg, self.touchClient
         self.touchClient.send(msg)
 

@@ -7,7 +7,7 @@ n = 4; //set n - number of instruments
 /*create n tempo clocks (and associated beat variables?)
 When tap-tempoing:
 1. either adjust the .tempo of the tempoClocks and reschedule them every .25 beats,
-2. or leave the tempo of the tempoClocks at 1 and reschedule them every beats[i],
+2. or leave the tempo of the tempoClocks at 1 and reschedule them every beats[i]*0.25,
     where beats[i] is changed by the tap tempo
 */
 tempoClocks = Array.fill(n, TempoClock.new(1)); //currently using option 2
@@ -24,9 +24,10 @@ beats = Array.fill(n, {0.25}); //create n beats
 
 //set up tempoClocks to send metronome hits via OSC
 netAd = NetAddr("localhost", 5174);
-oscMetronomeHit = {|i| netAd.sendMsg("/played-"+i, i);};
+oscMetronomeHit = {|i| netAd.sendMsg("/played-"++i, i);};
 (0..(n-1)).do(
-	{|i| tempoClocks[i].sched(0, {oscMetronomeHit.value(i); beats[i]/*0.25*/})}
+	{|i| tempoClocks[i].sched(0, {oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})}
+	//i+1 in .value() is a hack to get around some small bug
 );
 
 //------------
@@ -66,13 +67,18 @@ tapTempoHandler = {|msg, time, addr, recvPort|
 	//msg[1] is a boolean vector indicating which instruments the tap occured for
 	oldTap = newTap;
 	newTap = time; //should it be SystemClock.beat instead?
+	("time"+time).postln;
 	if(newTap - oldTap < tapLim,
 		//{beat = newTap - oldTap;} //generalize wrt which instruments were tapped
-		(0..n-1).do({|i|
-			if(msg[1].asString[i] == $1,
-		        //directly set .tempo of TempoClocks here? -> convert dur to "beat"
-				{beats[i] = newTap - oldTap};
-		)}); //generalized version
+		{
+			("duration"+(newTap-oldTap)).postln;
+			(0..n-1).do({|i|
+				if(msg[1].asString[i] == $1,
+					//directly set .tempo of TempoClocks here? -> convert dur to "beat"
+					{beats[i] = newTap - oldTap};
+				)}
+			);
+		} //generalized version
 	)
 };
 
@@ -150,13 +156,17 @@ tapFunc = {|msg, time, addr, recvPort|
 	//msg[1] is a boolean vector indicating which instruments the tap occured for
 	oldTap = newTap;
 	newTap = time; //should it be SystemClock.beat instead?
+	("time"+time).postln;
 	if(newTap - oldTap < tapLim,
-		{beat = newTap - oldTap;} //generalize wrt which instruments were tapped
-		/*(0..n-1).do({|i|
-			if(msg[1].asString[i] == $1,
-		        //directly set .tempo of TempoClocks here, recalculate duration to "beat"
-				{beats[i] = newTap - oldTap};
-		)};*/ //generalized version
+		{
+			("duration"+(newTap-oldTap)).postln;
+			(0..n-1).do({|i|
+				if(msg[1].asString[i] == $1,
+					//directly set .tempo of TempoClocks here, recalculate duration to "beat"
+					{beats[i] = newTap - oldTap};
+				)}
+			)
+		}; //generalized version
 	)
 };
 )
