@@ -1,4 +1,40 @@
 TASKS
-
+- miniPage refactoring
 - add transformation function application over subsets
 - inspect/fix bug with refresh mode over grid sequencing 
+
+
+* denotes new features
+^ see footnote
+
+OFFLINE MODE
+     no longer a mini-page, it will be selected via a toggle on the right
+
+STANDARD page
+     same as now
+
+RHYTHM page
+       step jumper
+       step synchronizer
+       subset selector
+       subset toggle 
+       tap tempo (is universal if toggle not set
+       * solo tap tempo toggle (subset tap tempo is opt-in)
+       * tempo sync (will require backend modification to resync hit timings)
+       * quick tempo change buttons (x2, x3, /2, /3 etc)        
+       *^ "scale to fit" tempo change
+
+GRID SEQUENCE Page
+     same as now
+     (maybe add algs stuff after resolving algs/gridseq)
+
+ALGS page
+     alg selector
+     intensity selector
+     auto apply toggle
+     refresh toggle
+     * subset selector
+     * toggle selector
+     movement arrows
+     undo button
+
