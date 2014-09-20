@@ -1,6 +1,7 @@
 TASKS
-- miniPage refactoring
+- miniPage refactoring (coded, not tested)
 - add transformation function application over subsets
+- add multi metronome features
 - inspect/fix bug with refresh mode over grid sequencing 
 
 
@@ -34,7 +35,9 @@ ALGS page
      auto apply toggle
      refresh toggle
      * subset selector
-     * toggle selector
+     * subset toggle
      movement arrows
      undo button
+     grid load
+     grid save
 

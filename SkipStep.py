@@ -105,6 +105,12 @@ class MultiLoop:
         self.miniPages.append(["/miniSave", "/miniLoad", "/custScale", "/scaleApply", "/scene"])
         self.miniPages.append(["/pullGrid", "/pushGrid", "/offGrid", "/up", "/down", "/left", "/right", "/col", "/noiseHit", "/undo"])
 
+        # uiPageAddrs = open("newPages.txt").read().split('\n')
+        # self.miniPages = []
+        # self.miniPages.append(0) #miniPages is 1 indexed to match TouchOSC ui
+        # for i in range(1, self.n+1):
+        #     self.miniPages.append(uiPageAddrs[i-1].split(" "))
+
         # sets up OSC server that sends melodic information to ChucK
         self.audioThread = 0 # thread that is created from the server
         # server that sends the data  
