@@ -138,7 +138,7 @@ class MultiLoop:
         # OSC client for sending messages to landini for networked performance 
         self.oscLANdiniClient = OSC.OSCClient()
         self.oscLANdiniClient.connect(("127.0.0.1", 50506))
-
+ 
         # OSC client for sending tap-tempo messages to Supercollider
         self.superColliderClient = OSC.OSCClient()
         self.superColliderClient.connect( ('127.0.0.1', 57120) ) #default superCollider port
