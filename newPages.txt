@@ -1,9 +1,9 @@
 /step /col /colsel /noisy /noiselev /noiseSel /noiseHit /refresh /piano /gridload /gridsave /load /save /undo /clear /up /down /left /right /arrowToggle /sync /tempo
 
-/step /col /colsel /sync /tempo 
+/step /col /colsel /tempo /syncToggleType /syncToggleInst /syncHit
 
-/seqedit /seqtoggle /gridseq /seqclear /stepMode /gridload /gridsave *(/funcsub/ /funcsubtog /seqtext/1 /seqtext/2 /seqtext/3 /seqtext/4 /seqtext/5 /seqtext/6 /seqtext/7 /seqtext/8 
+/seqedit /seqtoggle /gridseq /seqclear /stepMode /gridload /gridsave /funcsub/ /funcsubtog /seqtext/1 /seqtext/2 /seqtext/3 /seqtext/4 /seqtext/5 /seqtext/6 /seqtext/7 /seqtext/8 
 
-/noisy /noiselev /noiseSel /noiseHit /refresh /undo /up /down /left /right /arrowToggle /custScale /scaleApply /gridload /gridsave
+/noisy /noiselev /noiseSel /noiseHit /refresh /undo /up /down /left /right /arrowToggle /custScale /scaleApply /gridload /gridsave /funcSub /funcSubToggle
 
  

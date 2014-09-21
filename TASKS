@@ -1,9 +1,8 @@
 TASKS
-- miniPage refactoring (coded, not tested)
+- miniPage refactoring
 - add transformation function application over subsets
-- add multi metronome features
 - inspect/fix bug with refresh mode over grid sequencing 
- 
+
 
 * denotes new features
 ^ see footnote
