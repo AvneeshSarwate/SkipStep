@@ -2,7 +2,7 @@ import OSC
 import phrase
 
 client = OSC.OSCClient()
-client.connect(("127.0.0.1", 57120))
+client.connect(("127.0.0.1", 57120)) #default port for supercollider 
 
 
 # msg = OSC.OSCMessage()

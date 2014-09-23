@@ -35,6 +35,10 @@ ALGS page
      refresh toggle
      * subset selector
      * subset toggle
+     * vertical subset (alg will only add new notes to selected rows)
+	place it under row labels (they are see thru)
+	place its toggle where the tap-tempo button is
+     * vertical subset toggle
      movement arrows
      undo button
      grid load
