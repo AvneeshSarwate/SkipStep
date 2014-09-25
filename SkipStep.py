@@ -92,24 +92,45 @@ class MultiLoop:
         #helper object for updating note labels 
         self.notenames = ["C", "C#/Db", "D", "D#/Eb", "E", "F", "F#/Gb", "G", "G#/Ab", "A", "A#/Bb", "B"]
         
-        #organizes what controls are on what miniPages
-        self.pageAddrs = open("page1.txt").read().split(" ")
-        self.miniPages = []
-        self.miniPages.append(["/noisy", "/noiselev", "/noiseSel", "/refresh", "/clear", "/gridload", "/gridsave"])
-        self.miniPages.append([])
-        for i in self.pageAddrs:
-            if i not in self.miniPages[0]: 
-                self.miniPages[1].append(i)
-        self.miniPages.append(["/seqedit", "/seqtoggle", "/gridseq", "/seqclear", "/stepMode"])
-        self.miniPages[2] = self.miniPages[2] + ['/seqtext/' + str(i) for i in range(1, 9)]
-        self.miniPages.append(["/miniSave", "/miniLoad", "/custScale", "/scaleApply", "/scene"])
-        self.miniPages.append(["/pullGrid", "/pushGrid", "/offGrid", "/up", "/down", "/left", "/right", "/col", "/noiseHit", "/undo"])
-
-        # uiPageAddrs = open("newPages.txt").read().split('\n')
+        # OLD - organizes what controls are on what miniPages 
+        # self.pageAddrs = open("page1.txt").read().split(" ")
         # self.miniPages = []
-        # self.miniPages.append(0) #miniPages is 1 indexed to match TouchOSC ui
-        # for i in range(1, self.n+1):
-        #     self.miniPages.append(uiPageAddrs[i-1].split(" "))
+        # self.miniPages.append(["/noisy", "/noiselev", "/noiseSel", "/refresh", "/clear", "/gridload", "/gridsave"])
+        # self.miniPages.append([])
+        # for i in self.pageAddrs:
+        #     if i not in self.miniPages[0]: 
+        #         self.miniPages[1].append(i)
+        # self.miniPages.append(["/seqedit", "/seqtoggle", "/gridseq", "/seqclear", "/stepMode"])
+        # self.miniPages[2] = self.miniPages[2] + ['/seqtext/' + str(i) for i in range(1, 9)]
+        # self.miniPages.append(["/miniSave", "/miniLoad", "/custScale", "/scaleApply", "/scene"])
+        # self.miniPages.append(["/pullGrid", "/pushGrid", "/offGrid", "/up", "/down", "/left", "/right", "/col", "/noiseHit", "/undo"])
+
+        # OLD - initializes which controls are visible/invisible upon starting, and initializing the note labels 
+        # for si in range(n):
+        #     for i in range(2, len(self.miniPages)):
+        #         for ad in (self.miniPages[i] + ["/pianoKey"]):
+        #             self.sendToUI("/" + str(si+1) + ad + "/visible", 0)
+        #     self.sendToUI("/" + str(si+1) + "/pageSelector/1/" +str(len(self.miniPages)), 1) #used to be /pageSelector/1/3
+        #     self.sendToUI("/" + str(si+1) + "pianoKey/visible", 0)
+        #     self.sendToUI("/" + str(si+1) + "offGrid/visible", 0)
+        #     self.updateNoteLabels(self.gridStates[si].scale, si)
+
+        #organizes what controls are on what miniPages - NEW
+        uiPageAddrs = open("newPages.txt").read().split('\n')
+        self.miniPages = []
+        self.miniPages.append(0) #miniPages is 1 indexed to match TouchOSC ui
+        for i in range(1, self.n+1):
+            self.miniPages.append(["/" + str(i) + ad for ad in uiPageAddrs[i-1].split(" "))
+
+        #hides the controls that are not on page 1
+        for i in range(1, n):
+            for ad in self.miniPages[i]:
+                self.sendToUI(ad + "/visible", 0)
+
+        #initializes the note labels 
+        self.updateNoteLabels(self.gridStates[si].scale, si)
+
+
 
         # sets up OSC server that sends melodic information to ChucK
         self.audioThread = 0 # thread that is created from the server
@@ -143,15 +164,6 @@ class MultiLoop:
         self.superColliderClient = OSC.OSCClient()
         self.superColliderClient.connect( ('127.0.0.1', 57120) ) #default superCollider port
 
-        # initializes which controls are visible/invisible upon starting, and initializing the note labels 
-        for si in range(n):
-            for i in range(2, len(self.miniPages)):
-                for ad in (self.miniPages[i] + ["/pianoKey"]):
-                    self.sendToUI("/" + str(si+1) + ad + "/visible", 0)
-            self.sendToUI("/" + str(si+1) + "/pageSelector/1/" +str(len(self.miniPages)), 1) #used to be /pageSelector/1/3
-            self.sendToUI("/" + str(si+1) + "pianoKey/visible", 0)
-            self.sendToUI("/" + str(si+1) + "offGrid/visible", 0)
-            self.updateNoteLabels(self.gridStates[si].scale, si)
 
         #TODO: fill this in 
         self.noBounce = [] #addresses that do not get bounced to other pages 
@@ -214,6 +226,8 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/pushGrid", self.pushGrid)
 
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/sync", self.indexSync)
+
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/offlineToggle", self.offlineToggle)
 
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/scene/" + str(j) + "/1", self.scene)
@@ -1495,22 +1509,37 @@ class MultiLoop:
             self.sendToUI("/"+str(si+1)+"/notelabel/" + str(i+1), self.notenames[notes[i]%12])
        
 
+    ## hanlder function for toggling offline editing on and off 
+    def offlineToggle(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1
+        state = self.gridStates[si]
+        state.offlineEdit = stuff[0] == 1
+        self.sendToUI("/" + str(si+1) + "/offGrid/visible", stuff[0])
+        if stuff[0] == 1:
+            self.sendToUI("/" + str(si+1) + "/col/color", "gray")
+            self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load normal colsub
+            print "PULLED UP OFFCOL", state.offlineColsub
+        else:
+            self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col")#load normal colsub
+            self.sendToUI("/" + str(si+1) + "/col/color", "blue")
+
+
     ## handler  function for the minipage selector control, OSCaddr: /si/pageSelector/1/i 
     def changeMiniPage(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1
         state = self.gridStates[si]
         ind = 5 - int(addr.split("/")[4]) #used to be 4 - ...
         print "\nIND: ", ind, "\n"
-        if stuff[0] == 1: 
-            state.offlineEdit = (ind == 4) 
+        # if stuff[0] == 1: 
+        #     state.offlineEdit = (ind == 4) 
         if ind == 4:
-            if stuff[0] == 1:
-                self.sendToUI("/" + str(si+1) + "/col/color", ["gray"])
-                self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load normal colsub
-                print "PULLED UP OFFCOL", state.offlineColsub
-            else:
-                self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col")#load normal colsub
-                self.sendToUI("/" + str(si+1) + "/col/color", ["blue"])
+            # if stuff[0] == 1:
+            #     self.sendToUI("/" + str(si+1) + "/col/color", "gray")
+            #     self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load normal colsub
+            #     print "PULLED UP OFFCOL", state.offlineColsub
+            # else:
+            #     self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col")#load normal colsub
+            #     self.sendToUI("/" + str(si+1) + "/col/color", "blue")
             
         msg = OSC.OSCMessage()
         for ad in self.miniPages[ind]:

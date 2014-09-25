@@ -1,6 +1,12 @@
 TASKS
-- miniPage refactoring
-- add transformation function application over subsets
+- test new UI refactor
+- implement new features for which there is now UI
+	transformation function application over subsets
+	multi metronome
+- miniPage refactoring (cleaning up names)
+	match OSC address names to functions
+	organize __init__() section handler assignment of functions on
+		the same miniPage are adjacent 
 - inspect/fix bug with refresh mode over grid sequencing 
 
 
@@ -18,9 +24,11 @@ RHYTHM page
        step synchronizer
        subset selector
        subset toggle 
-       tap tempo (is universal if toggle not set
-       * solo tap tempo toggle (subset tap tempo is opt-in)
-       * tempo sync (will require backend modification to resync hit timings)
+       tap tempo (is universal if instrument selector not set)
+       * tap-tempo/sync instrument selector (4 way toggle called /syncToggleInst)
+       * sync toggle (toggles syncing for tempo, next hit time, loop position)
+       * sync hit (applied the syncs chosen above)
+       * loop sync (sets all loop indexes to 1 and syncs the hit on 1)
        * quick tempo change buttons (x2, x3, /2, /3 etc)        
        *^ "scale to fit" tempo change
 
@@ -43,4 +51,6 @@ ALGS page
      undo button
      grid load
      grid save
+
+
 
