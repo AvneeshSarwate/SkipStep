@@ -85,6 +85,7 @@ class MultiLoop:
         self.copyScale = [] # the data from the grid being prepped to send over the network
         self.recievedScale = [] # the data of the grid recieved from over the network
         self.num = n # the number of "instruments" used in SkipStep
+        self.numMiniPages = 4 # the number of miniPages in the interface
         self.gridStates = [] # the array of Looper instances for each "instrument"
         for i in range(n):
             self.gridStates.append(Looper())
@@ -114,21 +115,6 @@ class MultiLoop:
         #     self.sendToUI("/" + str(si+1) + "pianoKey/visible", 0)
         #     self.sendToUI("/" + str(si+1) + "offGrid/visible", 0)
         #     self.updateNoteLabels(self.gridStates[si].scale, si)
-
-        #organizes what controls are on what miniPages - NEW
-        uiPageAddrs = open("newPages.txt").read().split('\n')
-        self.miniPages = []
-        self.miniPages.append(0) #miniPages is 1 indexed to match TouchOSC ui
-        for i in range(1, self.n+1):
-            self.miniPages.append(["/" + str(i) + ad for ad in uiPageAddrs[i-1].split(" "))
-
-        #hides the controls that are not on page 1
-        for i in range(1, n):
-            for ad in self.miniPages[i]:
-                self.sendToUI(ad + "/visible", 0)
-
-        #initializes the note labels 
-        self.updateNoteLabels(self.gridStates[si].scale, si)
 
 
 
@@ -163,6 +149,30 @@ class MultiLoop:
         # OSC client for sending tap-tempo messages to Supercollider
         self.superColliderClient = OSC.OSCClient()
         self.superColliderClient.connect( ('127.0.0.1', 57120) ) #default superCollider port
+
+
+        #organizes what controls are on what miniPages - NEW
+        uiPageAddrs = open("newPages.txt").read().split('\n\n')
+        self.miniPages = []
+        self.miniPages.append(0) #miniPages is 1 indexed to match TouchOSC ui
+        for i in range(1, self.num+1):
+            self.miniPages.append([ad for ad in uiPageAddrs[i-1].split(" ")])
+
+            #initializes the note labels 
+            self.updateNoteLabels(self.gridStates[i-1].scale, i-1)
+
+        for i in self.miniPages:
+            print i 
+
+        #hides the controls that are not on page 1
+        for si in range(self.num):
+            for i in range(2, self.numMiniPages+1):
+                for ad in self.miniPages[i] + ["/pianoKey", "/scene"]:
+                    print "/" + str(i+1) + ad + "/visible"
+                    self.sendToUI("/" + str(si+1) + ad + "/visible", 0.0)
+            for ad in self.miniPages[1]:
+                print "/" + str(i+1) + ad + "/visible"
+                self.sendToUI("/" + str(si+1) + ad + "/visible", 1.0)
 
 
         #TODO: fill this in 
@@ -230,13 +240,13 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/offlineToggle", self.offlineToggle)
 
             for j in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/scene/" + str(j) + "/1", self.scene)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/scene/" + str(j) + "/1", self.simpleScene)
 
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/sceneToggle", self.sceneToggle)
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/sceneClear", self.sceneClear)
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1", self.sceneSelector)
-                print "/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1"
+                #print "/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1"
 
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridseq/" + str(j) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqIndHandler))
@@ -295,6 +305,7 @@ class MultiLoop:
         msg = OSC.OSCMessage()
         msg.setAddress(addr)
         for i in args: msg.append(i)
+        print msg 
         for cli in self.iPadClients: cli.send(msg)
 
 
@@ -575,7 +586,7 @@ class MultiLoop:
 
 
     ##is the handler  for the simple scene control, OSCaddr: /si/scene/i/1 
-    def scene(self, addr, tags, stuff, source):
+    def simpleScene(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         ind, j = self.gridAddrInd(addr)
         for i in range(1, self.num+1):
@@ -1505,7 +1516,7 @@ class MultiLoop:
         notes = self.scaleNotes(self.gridStates[si].root, scale)
         print "in label update"
         for i in range(16):
-            print self.notenames[notes[i]%12]
+            #print self.notenames[notes[i]%12]
             self.sendToUI("/"+str(si+1)+"/notelabel/" + str(i+1), self.notenames[notes[i]%12])
        
 
@@ -1532,19 +1543,20 @@ class MultiLoop:
         print "\nIND: ", ind, "\n"
         # if stuff[0] == 1: 
         #     state.offlineEdit = (ind == 4) 
-        if ind == 4:
-            # if stuff[0] == 1:
-            #     self.sendToUI("/" + str(si+1) + "/col/color", "gray")
-            #     self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load normal colsub
-            #     print "PULLED UP OFFCOL", state.offlineColsub
-            # else:
-            #     self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col")#load normal colsub
-            #     self.sendToUI("/" + str(si+1) + "/col/color", "blue")
+        # if ind == 4:
+        #     if stuff[0] == 1:
+        #         self.sendToUI("/" + str(si+1) + "/col/color", "gray")
+        #         self.pullUpColSub(state.offlineColsub, "/" + str(si+1) + "/col")#load normal colsub
+        #         print "PULLED UP OFFCOL", state.offlineColsub
+        #     else:
+        #         self.pullUpColSub(state.columnsub, "/" + str(si+1) + "/col")#load normal colsub
+        #         self.sendToUI("/" + str(si+1) + "/col/color", "blue")
             
         msg = OSC.OSCMessage()
         for ad in self.miniPages[ind]:
             msg.setAddress("/" + str(si+1) + ad + "/visible")
             msg.append(stuff[0])
+            print msg
             for cli in self.iPadClients: 
                 if cli.address()[0] == source[0]:
                     cli.send(msg) #self.oscClientUI.send(msg)
