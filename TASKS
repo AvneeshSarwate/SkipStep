@@ -4,15 +4,13 @@ TASKS
 	rhythm is the same duration as that ofthe target instrument. It will 
 	then calculate the next hit of the current instrument s.t. it results
 	in the first hits of the two loops occurring at the same time
-- finish and test multi-metronome features 
-	backend for features fully written
-	UI handler functions need to be written and hooked up 
+- finish implementing tempoFit and test multi-metronome features 
 - handle race conditions for tempo syncing
 - refactoring (mainly cleaning up names)
 	match OSC address names to functions
 	organize __init__() section handler assignment of functions on
 		the same miniPage are adjacent 
-- inspect/fix bug with refresh mode over grid sequencing 
+- inspect/fix bug/desing-flaw with refresh mode over grid sequencing 
 
 
 * denotes new features

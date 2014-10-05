@@ -93,7 +93,7 @@ tempoChangeHander = {|msg, time, addr, recvPort|
 	);
 };
 
-//TODO: add this function as a handler
+OSCFunc(tempoChangeHandler, "/tempoChange");
 
 
 //--------------------------------set up tempo sync handler--------------------------------
@@ -121,7 +121,7 @@ tempoSyncHandler = = {|msg, time, addr, recvPort|
 	);
 };
 
-//TODO: add this function as a handler
+OSCFunc(tempoSyncHandler, "/tempoSync");
 
 
 )

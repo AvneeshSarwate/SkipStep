@@ -191,6 +191,7 @@ class MultiLoop:
         self.pianocallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         self.offlinecallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         
+        # TODO: change to use a function that is universal tap tempo 
         self.oscServUI.addMsgHandler("/tempo", self.tempo)
         
         self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
@@ -243,6 +244,22 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/sync", self.indexSync)
 
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/offlineToggle", self.offlineToggle)
+
+
+            #syncHit
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncHit", self.syncHit)
+            #subsetTapTempo
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/subsetTap", self.tempo)
+            #syncToggle
+            for j in range(3): # TODO: don't hardcode this
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleType/" + str(j+1) + "/1", self.syncTypeToggle)
+            #instToggle
+            for j in range(self.num): # TODO: don't hardcode this
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleType/" + str(j+1) + "/1", self.syncTypeToggle)
+            #tempoChange 
+            for j in range(self.num): # TODO: don't hardcode this
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/tempoChange/" + str(j+1) + "/1", self.tempoChange)
+            
 
             for j in range(8):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/scene/" + str(j) + "/1", self.simpleScene)
@@ -436,7 +453,7 @@ class MultiLoop:
                 state.grid[k][i] = state.refgrid[k][i]
         state.prog.c[k] = self.gridStates[si].refprog.c[k]
     
-    ##is the handler  for the snapshot mode control, OSCaddr: /si/refresh
+    ## is the handler  for the snapshot mode control, OSCaddr: /si/refresh
     def refreshHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
@@ -449,7 +466,7 @@ class MultiLoop:
             state.refreshing = False
             print "                           refresh off"   
 
-    # handler function for the index synchronizer control, OSCaddr: /si/sync
+    ## handler function for the index synchronizer control, OSCaddr: /si/sync
     def indexSync(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         si = int(addr.split("/")[1]) - 1
@@ -458,8 +475,8 @@ class MultiLoop:
         for i in range(self.num):
             state.progInd = syncInd
 
-    # handler for syncing indexes of instruments
-    # TODO: have this triggered in SuperColliderTempoSync handler:
+    ## helper for syncing indexes of instruments
+    # TODO: have this triggered in SuperCollider tempoSyncHandler:
     #       after handling tempo-sync, and next-hit-sync,
     #       SuperCollider sends a message that is caught here
     #       this could potentially solve sync race conditions 
@@ -472,7 +489,7 @@ class MultiLoop:
         for i in state.rhythmInstSubsets:
             state.progInd = syncInd
 
-    # TODO: finish
+    ## handler for the tempo synchronizing trigger button 
     def syncHit(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         si = int(addr.split("/")[1]) - 1
@@ -486,13 +503,62 @@ class MultiLoop:
             else:
                 inst.append("0")
         for i in range(3): # TODO: don't hardcode this
-            if i in state.sync:
+            if i in state.syncTypes:
                 syncs.append("1")
             else:
                 syncs.append("0")
-        #send message (inst, syncs, si)
+        
+        msg = OSC.OSCMessage()
+        msg.setAddress("/tempoSync")
+        msg.append(inst)
+        msg.append(syncs)
+        msg.append(si)
+        self.superColliderClient.send(msg)
 
+        if 2 in state.syncTypes: # TODO: don't hardcode this
+            indexSyncSub(addr, tags, stuff, source)
 
+    ## Handler for the syncType selector control 
+    def syncTypeToggle(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
+        if stuff[0] == 1 and not ind in state.syncTypes:
+            state.syncTypes.append(ind)
+        if stuff[0] == 0 and ind in state.syncTypes:
+            state.syncTypes.remove(ind)
+
+    ## handler for the instrument subset selector for rhythmic features
+    def rhythmInstSelect(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
+        if stuff[0] == 1 and not ind in state.rhythmInstSubsets:
+            state.rhythmInstSubsets.append(ind)
+        if stuff[0] == 0 and ind in state.rhythmInstSubsets:
+            state.rhythmInstSubsets.remove(ind) 
+
+    ## TODO: is this even necessary?
+    ## you can get everything to sync to the same start index by using the normal sync
+    ## when the "reference" instrument has  index < len(shortest rhythm)
+    def loopSync(self, addr, tags, stuff, source):
+        return
+
+    def tempoChange(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
+        inst = ""
+        timeChange = [1.0/3, 1.0/2, 2.0, 3.0]
+        for i in range(self.num):
+            if i in state.rhythmInstSubsets:
+                inst.append("1")
+            else:
+                inst.append("0")
+        msg = OSC.OSCMessage
+        msg.setAddress("/tempoChange")
+        msg.append(inst)
+        msg.append(timeChange[ind])
     
 
 
@@ -1343,15 +1409,18 @@ class MultiLoop:
 
 
     ## handler  for the tap tempo control, OSCaddr: /si/tempo 
+    ## TODO: reassign this to the subsetTap UI control, have a separate function for universal tap tempo
     def tempo(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
-        
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+
         msg = OSC.OSCMessage()
         msg.setAddress("/touch")
 
         metronomeToggleString = []
         for i in range(self.num):
-            if self.gridStates[i].metronomeToggled:
+            if state.rhythmInstSubsets:
                 metronomeToggleString.append("1")
             else:
                 metronomeToggleString.append("0")
