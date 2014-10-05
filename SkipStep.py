@@ -31,9 +31,11 @@ class Looper:
         self.root = 48 # the "root note" of the grid
         self.scale = phrase.modes["maj5"] # the scale that is being used to translate the grid into notes
         self.noisy = False # boolean for whether automatic varation is turned on
-        self.columnsub = [] # the data for what columns have been selected with the online column subset control
-        self.offlineColsub = [] # the data for what columns have been selected with the OFFLINE column subset control
+        self.columnsub = [] # the data for what columns have been selected with the online looping column subset control
+        self.offlineColsub = [] # the data for what columns have been selected with the OFFLINE looping column subset control
         self.subsets = False # boolean for whether or not looping is ocurring over column subsets 
+        self.algColumnSub = [] # the data for what columns have been selected with the algorithmic column subset control
+        self.algSubsets = False # boolean for whether or not algorithms are occuring over column subsets 
         self.gridzz = [0 for i in range(8)] # the object which stores the data of the "saved" miniStates
         self.noiselev = 2 # the "intensity" of the random variation as indicated by the intensity control
         self.refreshing = False # boolean for whether or not refresh mode is on
@@ -167,7 +169,7 @@ class MultiLoop:
         #hides the controls that are not on page 1
         for si in range(self.num):
             for i in range(2, self.numMiniPages+1):
-                for ad in self.miniPages[i] + ["/pianoKey", "/scene"]:
+                for ad in self.miniPages[i] + ["/pianoKey", "/scene", "/offGrid"]:
                     print "/" + str(i+1) + ad + "/visible"
                     self.sendToUI("/" + str(si+1) + ad + "/visible", 0.0)
             for ad in self.miniPages[1]:
@@ -221,6 +223,7 @@ class MultiLoop:
             
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/noisy", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseFlip))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/colsel", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsubflip))
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/funcSubToggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.algColsubFlip))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/piano", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianoModeOn))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/refresh", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.refreshHandler))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/scaleApply", self.applyCustomScale)
@@ -261,6 +264,9 @@ class MultiLoop:
                 
             for i in range(16):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/col/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsub))
+
+            for i in range(16):
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/funcSub/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.algColsubHandler))
             
             for i in range(5):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/noiselev/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseLevHandler))
@@ -348,7 +354,6 @@ class MultiLoop:
         for i in chord.n:
             msg.append(i)
         self.superColliderClient.send(msg)
-    
     
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the ChucK metronome is recieved 
@@ -515,6 +520,23 @@ class MultiLoop:
             state.progInd = 0 if stuff[0] == 1 else state.columnsub[state.progInd]
             print "                      colsub ", str(state.subsets), "progind" + str(state.progInd)
         
+    def algColsubHandler(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
+        colvar = state.algColumnSub
+        if stuff[0] == 1 and ind not in colvar: #do we need 2nd conditional?
+            colvar.append(ind)
+        if stuff[0] == 0 and ind in colvar:
+            colvar.remove(ind)
+        colvar.sort()
+
+    def algColsubFlip(self, addr, tags, stuff, source):
+        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        state = self.gridStates[si]
+        state.algSubsets = (stuff[0] == 1)
+
+
     # helper function used to copy a grid       
     def gridcopy(self, *args):
         if len(args) == 0:
@@ -552,8 +574,8 @@ class MultiLoop:
             return
         if state.offlineEdit:
             grid, scale, root, columnsub = self.stringToMiniState(state.gridzz[ind])
-            self.offlineGrid = grid
-            self.offlineColsub = columnsub
+            state.offlineGrid = grid
+            state.offlineColsub = columnsub
             self.pullUpGrid(grid, "/" + str(si+1) + "/offGrid")
             self.pullUpColSub(columnsub, "/" + str(si+1) + "/col")
             return
@@ -883,6 +905,8 @@ class MultiLoop:
             if state.offlineEdit:
                 print "offline shift", direction
                 g = self.gridShift(state.offlineGrid, direction)
+                if state.algSubsets:
+                    g = self.columnOverlay(state.offlineGrid, g, state.algColumnSub)
 
                 print self.gridDif(g, state.offlineGrid)
 
@@ -892,6 +916,8 @@ class MultiLoop:
             else: 
                 print "shift", direction
                 g = self.gridShift(state.grid, direction)
+                if state.algSubsets:
+                    g = self.columnOverlay(state.grid, g, state.algColumnSub)
                 print self.gridDif(g, state.grid)
                 with state.lock:
                     state.grid = g
@@ -1255,9 +1281,26 @@ class MultiLoop:
             
         if state.noiseInd == 4:
             g = self.simplify(inputGrid, state.noiselev/2)
-#             
+
+        if state.algSubsets:
+            g = self.columnOverlay(inputGrid, g, state.algColumnSub)
+
         return g
     
+
+    ## function that takes two grids and a subset of column indexes, and then for each
+    ## index in the subset, replaces the first grid's column with the second
+    ## RETURNS A NEW GRID - doesn't change the original grids
+    def columnOverlay(self, baseGrid, overlayGrid, columnSet):
+        g = [[0 for i in range(16)] for j in range(16)]
+        for i in range(16):
+            if i in columnSet:
+                g[i] = copy.deepcopy(overlayGrid[i])
+            else:
+                g[i] = copy.deepcopy(baseGrid[i])
+        return g 
+
+
     ## handler  for the tap tempo control, OSCaddr: /si/tempo 
     def tempo(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
@@ -1290,7 +1333,7 @@ class MultiLoop:
         state = self.gridStates[si]
         if stuff[0] == 0: return
         if state.offlineEdit:
-            if len(state.offlineUndoStack) == 0: retur
+            if len(state.offlineUndoStack) == 0: return
             topstack = state.offlineUndoStack.pop()
             print "offline undo", self.gridDif(topstack, state.offlineGrid), len(state.offlineUndoStack)
             state.offlineGrid = topstack
