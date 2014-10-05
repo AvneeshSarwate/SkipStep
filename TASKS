@@ -1,9 +1,10 @@
 TASKS
-- test new UI refactor
-- implement new features for which there is now UI
-	transformation function application over subsets
-	multi metronome
-- miniPage refactoring (cleaning up names)
+- decide how tempoFit should work as a feature
+- finish and test multi-metronome features 
+	backend for features fully written
+	UI handler functions need to be written and hooked up 
+- handle race conditions for tempo syncing
+- refactoring (mainly cleaning up names)
 	match OSC address names to functions
 	organize __init__() section handler assignment of functions on
 		the same miniPage are adjacent 

@@ -50,7 +50,9 @@ class Looper:
         self.gridseqFlag = False # boolean for whether or not miniState sequencing is ocurring 
         self.gridseqEdit = False # boolean for whether or not the miniState sequence is in edit mode
         self.offlineEdit = False # boolean for whether or not offline editing is occuring 
-        self.metronomeToggled = True
+        self.metronomeToggled = True 
+        self.rhythmInstSubsets = [] # set of indexes for the instruments will be affected by rhythm controls
+        self.syncTypes = [] # set of indexes for what rhythmic synchronizations will be applied. order: [tempo, nexthit, index]
         
         self.lock = threading.Lock()
 
@@ -315,9 +317,9 @@ class MultiLoop:
         for cli in self.iPadClients: cli.send(msg)
 
 
-    ##wrapper function that allows for UI synchronization in "google docs mode"
-    ##the function takes the input OSCmessage, calls the handler for the message
-    ##and then sends the input message back out to the UI on all other iPads to update them 
+    ## wrapper function that allows for UI synchronization in "google docs mode"
+    ## the function takes the input OSCmessage, calls the handler for the message
+    ## and then sends the input message back out to the UI on all other iPads to update them 
     def bounceBack(self, addr, tags, stuff, source, callback):
         #TODO: DONE send stuff to addr (don't send it to where it came from (check source)
         if addr in self.noBounce:
@@ -451,10 +453,49 @@ class MultiLoop:
     def indexSync(self, addr, tags, stuff, source):
         if stuff[0] == 0: return
         si = int(addr.split("/")[1]) - 1
-        syncInd = self.gridStates[si].progInd
+        state = self.gridStates[si]
+        syncInd = state.progInd
         for i in range(self.num):
-            self.gridStates[i].progInd = syncInd
+            state.progInd = syncInd
+
+    # handler for syncing indexes of instruments
+    # TODO: have this triggered in SuperColliderTempoSync handler:
+    #       after handling tempo-sync, and next-hit-sync,
+    #       SuperCollider sends a message that is caught here
+    #       this could potentially solve sync race conditions 
+    def indexSyncSub(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        si = int(addr.split("/")[1]) - 1
+        state = self.gridStates[si]
+        syncInd = state.progInd
+
+        for i in state.rhythmInstSubsets:
+            state.progInd = syncInd
+
+    # TODO: finish
+    def syncHit(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        si = int(addr.split("/")[1]) - 1
+        state = self.gridStates[si]
+
+        inst = ""
+        syncs = ""
+        for i in range(self.num):
+            if i in state.rhythmInstSubsets:
+                inst.append("1")
+            else:
+                inst.append("0")
+        for i in range(3): # TODO: don't hardcode this
+            if i in state.sync:
+                syncs.append("1")
+            else:
+                syncs.append("0")
+        #send message (inst, syncs, si)
+
+
     
+
+
     ##is the handler for the stepjump control, OSCaddr: /si/step/i/1 
     def stepjump(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on

@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits;
 n = 4; //set n - number of instruments
 
 /*----------------create n tempo clocks (and associated beat variables?)----------------
@@ -16,6 +16,7 @@ oldTap = 0;
 newTap = 0;
 tapLim = 2;
 beats = Array.fill(n, {0.25}); //create n beats
+lastHits = Array.fill(n, {0});
 
 
 //------------------set up tempoClocks to send metronome hits via OSC ---------------------
@@ -58,6 +59,7 @@ OSCFunc(playHandler, "/playChord");
 
 //--------------------------------set up tap tempo handler--------------------------------
 //make sure time argument is in seconds
+//msg[1] is a symbol-type binary vector indicating which instruments to change the beat for
 tapTempoHandler = {|msg, time, addr, recvPort|
 	//msg[1] is a boolean vector indicating which instruments the tap occured for
 	oldTap = newTap;
@@ -79,7 +81,51 @@ tapTempoHandler = {|msg, time, addr, recvPort|
 
 OSCFunc(tapTempoHandler, "/touch");
 
+
+//--------------------------------set up tempo change handler--------------------------------
+//msg[1] is a symbol-type binary vector indicating which instruments to change the beat for
+//msg[2] is the factor to multiply the beat(s) by
+tempoChangeHander = {|msg, time, addr, recvPort|
+	(0..n-1).do({|i|
+		if(msg[1].asString[i] == $1,
+			beats[i] = beats[i] * msg[2];
+		)}
+	);
+};
+
+//TODO: add this function as a handler
+
+
+//--------------------------------set up tempo sync handler--------------------------------
+//msg[1] is a symbol-type binary vector indicating which instruments to change the beat for
+//msg[2] is a symbol-type binary vector indicating whether to sync (1) tempo, and (2) next hit
+//msg[3] is the index of the instrument to sync to
+tempoSyncHandler = = {|msg, time, addr, recvPort|
+	(0..n-1).do({|i|
+		if(msg[1].asString[i] == $1,
+			if(msg[2].asString[0] == $1,
+				{
+					//tempo sync
+					beats[i] = beats[msg[3]];
+
+			});
+			if(msg[2].asString[1] == $1,
+				{
+					//next hit sync
+					tempoClocks[i].clear();
+					tempoClocks[i].sched(beats[i] - (SystemClock.beats - lastHits[msg[3]]),
+						{oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})
+
+			});
+		)}
+	);
+};
+
+//TODO: add this function as a handler
+
+
 )
+
 
 
 
