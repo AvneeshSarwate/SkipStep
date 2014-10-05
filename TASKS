@@ -1,5 +1,9 @@
 TASKS
 - decide how tempoFit should work as a feature
+	tempoFit will take the current instrument and adjust its tempo so the
+	rhythm is the same duration as that ofthe target instrument. It will 
+	then calculate the next hit of the current instrument s.t. it results
+	in the first hits of the two loops occurring at the same time
 - finish and test multi-metronome features 
 	backend for features fully written
 	UI handler functions need to be written and hooked up 
