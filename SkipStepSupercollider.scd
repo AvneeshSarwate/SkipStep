@@ -15,7 +15,7 @@ tempoClocks = Array.fill(n, TempoClock.new(1)); //currently using option 2
 oldTap = 0;
 newTap = 0;
 tapLim = 2;
-beats = Array.fill(n, {0.25}); //create n beats
+beats = Array.fill(n, {0.7}); //create n beats
 lastHits = Array.fill(n, {0});
 
 
@@ -40,7 +40,7 @@ playHandler = {|msg, time, addr, recvPort|
 				//msg.postln;
 				msg[3..].do({|i| midiOut.noteOn(msg[1], i)});/*hit noteOn messages*/
 				//GENERALIZE: beat[msg[1]] or tempClocks[msg[1].tempo
-				beats[msg[1]].wait; /*wait for beat*/
+				(0.25*beats[msg[1]]).wait; /*wait for beat*/
 				msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*hit noteOff messages*/
 			}).play;
 		},
@@ -85,10 +85,14 @@ OSCFunc(tapTempoHandler, "/touch");
 //--------------------------------set up tempo change handler--------------------------------
 //msg[1] is a symbol-type binary vector indicating which instruments to change the beat for
 //msg[2] is the factor to multiply the beat(s) by
-tempoChangeHander = {|msg, time, addr, recvPort|
+tempoChangeHandler = {|msg, time, addr, recvPort|
 	(0..n-1).do({|i|
 		if(msg[1].asString[i] == $1,
-			beats[i] = beats[i] * msg[2];
+			{
+				msg[1].asString.postln;
+				i.postln;
+				beats[i] = beats[i] * msg[2];
+			}
 		)}
 	);
 };
@@ -100,7 +104,7 @@ OSCFunc(tempoChangeHandler, "/tempoChange");
 //msg[1] is a symbol-type binary vector indicating which instruments to change the beat for
 //msg[2] is a symbol-type binary vector indicating whether to sync (1) tempo, and (2) next hit
 //msg[3] is the index of the instrument to sync to
-tempoSyncHandler = = {|msg, time, addr, recvPort|
+tempoSyncHandler = {|msg, time, addr, recvPort|
 	(0..n-1).do({|i|
 		if(msg[1].asString[i] == $1,
 			if(msg[2].asString[0] == $1,
@@ -115,7 +119,6 @@ tempoSyncHandler = = {|msg, time, addr, recvPort|
 					tempoClocks[i].clear();
 					tempoClocks[i].sched(beats[i] - (SystemClock.beats - lastHits[msg[3]]),
 						{oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})
-
 			});
 		)}
 	);
@@ -226,8 +229,8 @@ temp.sched(0, f1);
 (
 var num = 4;
 (0..(num-1)).do({|i|
-	if('1111'.asString[i] == $1,
-		{("yes"+i).postln;},
+	if('1101'.asString[i] == $1,
+		{("yes"+i).postln;"dork".post},
 		{("no"+i).postln;}
 )});
 )

@@ -255,7 +255,7 @@ class MultiLoop:
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleType/" + str(j+1) + "/1", self.syncTypeToggle)
             #instToggle
             for j in range(self.num): # TODO: don't hardcode this
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleType/" + str(j+1) + "/1", self.syncTypeToggle)
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleInst/" + str(j+1) + "/1", self.syncInstChoice)
             #tempoChange 
             for j in range(self.num): # TODO: don't hardcode this
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/tempoChange/" + str(j+1) + "/1", self.tempoChange)
@@ -330,7 +330,7 @@ class MultiLoop:
         msg = OSC.OSCMessage()
         msg.setAddress(addr)
         for i in args: msg.append(i)
-        print msg 
+        #print msg 
         for cli in self.iPadClients: cli.send(msg)
 
 
@@ -379,7 +379,7 @@ class MultiLoop:
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
         colChord = phrase.Chord()  # placeholder 
         si = int(addr.split("-")[1])-1
-        print "                 played", si
+        #print "                 played", si
 
         state = self.gridStates[si]
         with state.lock: 
@@ -400,7 +400,7 @@ class MultiLoop:
             state.progInd += state.stepIncrement
     
         #plays the chords that are defined by each column (phrase.play to be documented later)
-        print colChord, si
+        #print colChord, si
         self.playChord(colChord, channel = si)
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
@@ -473,7 +473,8 @@ class MultiLoop:
         state = self.gridStates[si]
         syncInd = state.progInd
         for i in range(self.num):
-            state.progInd = syncInd
+            print i, "synced to", si 
+            self.gridStates[i].progInd = syncInd
 
     ## helper for syncing indexes of instruments
     # TODO: have this triggered in SuperCollider tempoSyncHandler:
@@ -485,9 +486,9 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1
         state = self.gridStates[si]
         syncInd = state.progInd
-
+        print state.rhythmInstSubsets
         for i in state.rhythmInstSubsets:
-            state.progInd = syncInd
+            self.gridStates[i].progInd = syncInd
 
     ## handler for the tempo synchronizing trigger button 
     def syncHit(self, addr, tags, stuff, source):
@@ -495,8 +496,8 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1
         state = self.gridStates[si]
 
-        inst = ""
-        syncs = ""
+        inst = []
+        syncs = []
         for i in range(self.num):
             if i in state.rhythmInstSubsets:
                 inst.append("1")
@@ -510,13 +511,14 @@ class MultiLoop:
         
         msg = OSC.OSCMessage()
         msg.setAddress("/tempoSync")
-        msg.append(inst)
-        msg.append(syncs)
+        msg.append("".join(inst))
+        msg.append("".join(syncs))
         msg.append(si)
         self.superColliderClient.send(msg)
 
         if 2 in state.syncTypes: # TODO: don't hardcode this
-            indexSyncSub(addr, tags, stuff, source)
+            print 'INDEX SYNC'
+            self.indexSyncSub(addr, tags, stuff, source)
 
     ## Handler for the syncType selector control 
     def syncTypeToggle(self, addr, tags, stuff, source):
@@ -529,7 +531,7 @@ class MultiLoop:
             state.syncTypes.remove(ind)
 
     ## handler for the instrument subset selector for rhythmic features
-    def rhythmInstSelect(self, addr, tags, stuff, source):
+    def syncInstChoice(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
@@ -545,20 +547,23 @@ class MultiLoop:
         return
 
     def tempoChange(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return 
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
-        inst = ""
-        timeChange = [1.0/3, 1.0/2, 2.0, 3.0]
+        inst = []
+        timeChange = [3.0, 2.0, 1.0/2, 1.0/3]
         for i in range(self.num):
             if i in state.rhythmInstSubsets:
                 inst.append("1")
             else:
                 inst.append("0")
-        msg = OSC.OSCMessage
+        msg = OSC.OSCMessage()
         msg.setAddress("/tempoChange")
-        msg.append(inst)
+        msg.append("".join(inst))
         msg.append(timeChange[ind])
+        print msg 
+        self.superColliderClient.send(msg)
     
 
 
@@ -1420,12 +1425,12 @@ class MultiLoop:
 
         metronomeToggleString = []
         for i in range(self.num):
-            if state.rhythmInstSubsets:
+            if i in state.rhythmInstSubsets:
                 metronomeToggleString.append("1")
             else:
                 metronomeToggleString.append("0")
         msg.append("".join(metronomeToggleString))
-        print "sent touch message", msg, self.superColliderClient
+        print "sent touch message", state.rhythmInstSubsets, metronomeToggleString, msg, self.superColliderClient
         self.superColliderClient.send(msg)
 
         #NOTE: code previously used to touch-tempo over several SkipStep instances over lan
