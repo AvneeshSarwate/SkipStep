@@ -1,12 +1,14 @@
 TASKS
 - decide how tempoFit should work as a feature
 	tempoFit will take the current instrument and adjust its tempo so the
-	rhythm is the same duration as that ofthe target instrument. It will 
+	rhythm is the same duration as that of the target instrument. It will 
 	then calculate the next hit of the current instrument s.t. it results
 	in the first hits of the two loops occurring at the same time
 - finish implementing tempoFit and test multi-metronome features 
 	next-hit-sync not working, the rest besides tempoFit work 
 - handle race conditions for tempo syncing
+- make step jumping immediately play the touched note 
+	(use same mechanism as next-hit-sync to resync it to metronome)
 - refactoring (mainly cleaning up names)
 	match OSC address names to functions
 	organize __init__() section handler assignment of functions on
