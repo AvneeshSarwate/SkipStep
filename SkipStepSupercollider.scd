@@ -21,10 +21,14 @@ lastHits = Array.fill(n, {0});
 
 //------------------set up tempoClocks to send metronome hits via OSC ---------------------
 netAd = NetAddr("localhost", 5174);
-oscMetronomeHit = {|i| netAd.sendMsg("/played-"++i, i);};
+oscMetronomeHit = {
+	|i| lastHits[i-1] = SystemClock.beats;
+	netAd.sendMsg("/played-"++i, i);
+};
 (0..(n-1)).do(
-	{|i| tempoClocks[i].sched(0, {oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})}
-	//i+1 in .value() is a hack to get around some small bug
+	{|i| tempoClocks[i].sched(0, {
+		oscMetronomeHit.value(i+1); //i+1 in .value() is a hack to get around a small unknown bug
+		beats[i]*0.25/*0.25*/})}
 );
 
 
@@ -37,15 +41,12 @@ playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
 		{
 			Task({
-				//msg.postln;
 				msg[3..].do({|i| midiOut.noteOn(msg[1], i)});/*hit noteOn messages*/
-				//GENERALIZE: beat[msg[1]] or tempClocks[msg[1].tempo
 				(0.25*beats[msg[1]]).wait; /*wait for beat*/
 				msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*hit noteOff messages*/
 			}).play;
 		},
 		{
-			"piano".postln;
 			if (msg[2] == 'on',
 				{msg[3..].do({|i| midiOut.noteOn(msg[1], i)}); /*noteon messages*/},
 				{msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*noteoff messages*/}
@@ -64,18 +65,14 @@ tapTempoHandler = {|msg, time, addr, recvPort|
 	//msg[1] is a boolean vector indicating which instruments the tap occured for
 	oldTap = newTap;
 	newTap = time; //should it be SystemClock.beat instead?
-	("time"+time).postln;
 	if(newTap - oldTap < tapLim,
-		//{beat = newTap - oldTap;} //generalize wrt which instruments were tapped
 		{
-			("duration"+(newTap-oldTap)).postln;
 			(0..n-1).do({|i|
 				if(msg[1].asString[i] == $1,
-					//directly set .tempo of TempoClocks here? -> convert dur to "beat"
 					{beats[i] = newTap - oldTap};
 				)}
 			);
-		} //generalized version
+		}
 	)
 };
 
@@ -89,8 +86,6 @@ tempoChangeHandler = {|msg, time, addr, recvPort|
 	(0..n-1).do({|i|
 		if(msg[1].asString[i] == $1,
 			{
-				msg[1].asString.postln;
-				i.postln;
 				beats[i] = beats[i] * msg[2];
 			}
 		)}
@@ -107,29 +102,31 @@ OSCFunc(tempoChangeHandler, "/tempoChange");
 tempoSyncHandler = {|msg, time, addr, recvPort|
 	(0..n-1).do({|i|
 		if(msg[1].asString[i] == $1,
-			if(msg[2].asString[0] == $1,
-				{
-					//tempo sync
-					beats[i] = beats[msg[3]];
+			{
+				if(msg[2].asString[0] == $1,
+					{
+						//tempo sync
+						beats[i] = beats[msg[3]];
 
-			});
-			if(msg[2].asString[1] == $1,
-				{
-					//next hit sync
-					tempoClocks[i].clear();
-					tempoClocks[i].sched(beats[i] - (SystemClock.beats - lastHits[msg[3]]),
-						{oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})
-			});
+				});
+				if(msg[2].asString[1] == $1,
+					{
+						//next hit sync
+						tempoClocks[i].clear();
+						("pause" + ((beats[msg[3]]*0.25) - (SystemClock.beats - lastHits[msg[3]]))).postln;
+						beats[msg[3]].postln;
+					(SystemClock.beats - lastHits[msg[3]]).postln;
+						tempoClocks[i].sched((beats[msg[3]]*0.25) - (SystemClock.beats - lastHits[msg[3]]),
+							{oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})
+				});
+			}
 		)}
 	);
 };
 
 OSCFunc(tempoSyncHandler, "/tempoSync");
 
-
 )
-
-
 
 
 
