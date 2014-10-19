@@ -42,8 +42,9 @@ playHandler = {|msg, time, addr, recvPort|
 		{
 			Task({
 				msg[3..].do({|i| midiOut.noteOn(msg[1], i)});/*hit noteOn messages*/
-				(0.25*beats[msg[1]]).wait; /*wait for beat*/
+				(0.25*beats[msg[1]]-0.005).wait; /*wait for beat*/
 				msg[3..].do({|i| midiOut.noteOff(msg[1], i)}); /*hit noteOff messages*/
+				0.005.wait; //articulation
 			}).play;
 		},
 		{
