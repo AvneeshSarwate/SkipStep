@@ -1,34 +1,66 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel;
-ccP = {|x| (x%3) == 2};
-ccX = {|x| (x%3) == 0};
-ccY = {|x| (x%3) == 1};
-noteToInd = {|x| x - 37};
-noteToXY = {|x| [noteToInd.value(x)%4, floor(noteToInd.value(x)/4)]};
-ccToInd = {|x| floor((x-23)/3)};
-ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]};
-activeChord = SortedList.new();
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap;
+ccP = {|x| (x%3) == 2}; //check if cc is pressure value
+ccX = {|x| (x%3) == 0}; //check if cc is x position
+ccY = {|x| (x%3) == 1}; //check if cc is y position
+noteToInd = {|x| x - 36}; //convert note to pad index
+noteToXY = {|x| [noteToInd.value(x)%4, floor(noteToInd.value(x)/4)]}; //convert note to pad xy (bottom left 0,0)
+ccToInd = {|x| floor((x-23)/3)}; //convert cc number to pad index
+ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]}; //convert cc number to pad xy
 
-channel = 3;
+activeChord = SortedList.new(); //the base chord from which inversions will be made
+
+//function that maps a chord to its inversion
+chordMap = {|chord, ind|
+	var len = chord.size();
+	if (ind < 8,
+		{//maps bottom two rows of pads in Quneo to chord inversions
+			(ind..ind+len-1).postln;
+			(all {: floor((x-2)/len), x <- (ind..ind+len-1)}).postln;
+			all {: (floor((x-2)/len)*12) + chord[(x-2)%len], x <- (ind..ind+len-1)};
+		},
+		{//maps top two rows of pads in Quneo to adjacent notes in chord inversions
+			(ind-8..ind-8+1).postln;
+			(all {: floor((x-3)/len), x <- (ind-8..ind-8+1)}).postln;
+			all {: (floor((x-3)/len)*12) + chord[(x-3)%len], x <- (ind-8..ind-8+1)};
+	})
+};
+
+channel = 3; //hard coded,
 
 MIDIIn.connectAll;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
 
+//id numbers used in MIDIFunc hardcoded, found using MIDIClient.prlist
+
+//functions for noteOn/Off messages from piano
 pianoOn = MIDIFunc.noteOn({|vel, note, chan, port| activeChord.add(note); activeChord.postln}, nil, nil, 23048651);
-pianoOff = MIDIFunc.noteOff({|vel, note, chan, port| activeChord.remove(note); activeChord.postln}, nil, nil, 23048651);
+pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
+	activeChord.remove(note);
+	midiOut.noteOff(channel, note, vel); //so there are no "hanging" notes when you release a piano note before a pad
+	activeChord.postln},
+	nil, nil, 23048651);
+
+//functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
-	var newChord = activeChord; //replace this with mapping functoin
+	var newChord = chordMap.value(activeChord, noteToInd.value(note));
 	newChord.do({|i| midiOut.noteOn(channel, i, vel)});
 	vel.postln;
 };
 padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
+
 b = {|vel, note, chan, port|
-	var newChord = activeChord; //replace this with mapping function
+	var newChord = chordMap.value(activeChord, noteToInd.value(note));
 	newChord.do({|i| midiOut.noteOff(channel, i, vel)});
-};
+}; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 
+)
+
+
+
+//-------------------------------SCRATCH CODE BELOW----------------------------------------------------
 
 // MIDIClient.init;
 // MIDIIn.connect(0, MIDIClient.sources[1]);
@@ -38,8 +70,6 @@ padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 // 		{[port, chan, note, a, vel].postln;
 // 		ccToXY.value(note).postln};
 // )};
-)
-
 (
 a = SortedList.new();
 a.add(30);
@@ -48,19 +78,41 @@ a[1].postln;
 a.postln;
 a.remove(30);
 a.postln;
+a.size()
 )
 
 (
-j = [1, 2, 3];
-j.do({|i| (2+i).postln});
-nil;
+j = (1..8);
 )
 
+floor(-1/5)
 
 (
 MIDIIn.connectAll;
 a = MIDIFunc.noteOn({|port, chan, note, vel| [port, chan, note, vel].postln; "quneo".postln;}, nil, nil, 23048651);
 
+
+)
+
+
+
+(
+var chordMap, activeChord;
+activeChord = [55, 58, 62, 66];
+chordMap = {|chord, ind|
+	var len = chord.size();
+	if (ind < 8,
+		{
+			(ind..ind+len-1).postln;
+			(all {: floor((x-2)/len), x <- (ind..ind+len-1)}).postln;
+			all {: (floor((x-2)/len)*12) + chord[(x-2)%len], x <- (ind..ind+len-1)};
+		},
+		{
+			all {: (floor((x-3)/len)*12) + chord[(x-3)%len], x <- (ind-8..ind-8+1)};
+	})
+};
+
+chordMap.value(activeChord, 10);
 
 )
 
