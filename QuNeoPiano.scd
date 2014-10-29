@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -8,6 +8,7 @@ noteToXY = {|x| [noteToInd.value(x)%4, floor(noteToInd.value(x)/4)]}; //convert 
 ccToInd = {|x| floor((x-23)/3)}; //convert cc number to pad index
 ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]}; //convert cc number to pad xy
 
+semaphore = Semaphore(1);
 activeChord = SortedList.new(); //the base chord from which inversions will be made
 
 //function that maps a chord to its inversion
@@ -27,6 +28,9 @@ chordMap = {|chord, ind|
 };
 
 channel = 3; //hard coded,
+bendSignalCenter = 8192;
+bendScale = 100;
+padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
 
 MIDIIn.connectAll;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
@@ -35,17 +39,27 @@ midiOut.latency = 0;
 //id numbers used in MIDIFunc hardcoded, found using MIDIClient.prlist
 
 //functions for noteOn/Off messages from piano
-pianoOn = MIDIFunc.noteOn({|vel, note, chan, port| activeChord.add(note); activeChord.postln}, nil, nil, 23048651);
+pianoOn = MIDIFunc.noteOn({|vel, note, chan, port| activeChord.add(note);}, nil, nil, 23048651);
+
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	activeChord.remove(note);
-	midiOut.noteOff(channel, note, vel); //so there are no "hanging" notes when you release a piano note before a pad
-	activeChord.postln},
+	midiOut.noteOff(channel, note, vel);}, //so there are no "hanging" notes when you release a piano note before a pad
 	nil, nil, 23048651);
 
 //functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
 	var newChord = chordMap.value(activeChord, noteToInd.value(note));
 	newChord.do({|i| midiOut.noteOn(channel, i, vel)});
+	semaphore.wait;
+	padDownCount = padDownCount + 1;
+	if(padDownCount == 1,  //if several pads pressed at once, first pad determines vibrato
+		{
+			bendCenterSet = true;
+			"BEND CENTER SETABLE".postln;
+			vibratoInd = noteToInd.value(note);
+		}
+	);
+	semaphore.signal;
 	vel.postln;
 };
 padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
@@ -53,8 +67,30 @@ padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
 b = {|vel, note, chan, port|
 	var newChord = chordMap.value(activeChord, noteToInd.value(note));
 	newChord.do({|i| midiOut.noteOff(channel, i, vel)});
+	semaphore.wait;
+	padDownCount = padDownCount - 1;
+	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
+
+c = {|vel, note, chan, port|
+	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
+		{
+			semaphore.wait;
+			if(bendCenterSet,
+				{
+					bendCenter = vel;
+					bendCenterSet = false;
+					format("bendCenter %", bendCenter).postln;
+				}
+			);
+			semaphore.signal;
+			//make this a function of the physical movement rather than directly linear
+			format("center: %, cc: %, dif: %", bendCenter, vel, (vel - bendCenter)).postln;
+			midiOut.bend(channel, bendSignalCenter + (bendScale * (vel - bendCenter)));
+	});
+};
+ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
 
@@ -85,6 +121,10 @@ a.size()
 j = (1..8);
 )
 
+(
+j = 5;
+j = j+ 1
+)
 floor(-1/5)
 
 (
