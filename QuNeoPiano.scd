@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -10,6 +10,7 @@ ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]}; //convert cc n
 
 semaphore = Semaphore(1);
 activeChord = SortedList.new(); //the base chord from which inversions will be made
+onNotes = Set.new(); //collection that prevents pads with shared notes from turning off shared notes
 
 //function that maps a chord to its inversion
 chordMap = {|chord, ind|
@@ -27,10 +28,21 @@ chordMap = {|chord, ind|
 	})
 };
 
-channel = 3; //hard coded,
+
+channel = 4; //hard coded,
 bendSignalCenter = 8192;
-bendScale = 100;
 padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
+xCounter = 0;
+bendCenter = 63;
+xBuffer = List.new();
+
+//x-axis/vibrato stabilization parameters (tweakable)
+bendScale = 50;
+xAvgLen = 3;
+xHitDelay = 9;
+nonVibratoWindow = 13;
+vibratoExp = 1.1;
+
 
 MIDIIn.connectAll;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
@@ -39,58 +51,92 @@ midiOut.latency = 0;
 //id numbers used in MIDIFunc hardcoded, found using MIDIClient.prlist
 
 //functions for noteOn/Off messages from piano
-pianoOn = MIDIFunc.noteOn({|vel, note, chan, port| activeChord.add(note);}, nil, nil, 23048651);
+pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
+	semaphore.wait;
+	activeChord.add(note);
+	semaphore.signal;}, nil, nil, 23048651);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
+	semaphore.wait;
 	activeChord.remove(note);
-	midiOut.noteOff(channel, note, vel);}, //so there are no "hanging" notes when you release a piano note before a pad
+	midiOut.noteOff(channel, note, vel);
+	activeChord.postln;
+	semaphore.signal;}, //so there are no "hanging" notes when you release a piano note before a pad
 	nil, nil, 23048651);
 
 //functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
-	var newChord = chordMap.value(activeChord, noteToInd.value(note));
-	newChord.do({|i| midiOut.noteOn(channel, i, vel)});
+	var newChord;
 	semaphore.wait;
-	padDownCount = padDownCount + 1;
-	if(padDownCount == 1,  //if several pads pressed at once, first pad determines vibrato
+	if(activeChord.size != 0,
 		{
-			bendCenterSet = true;
-			"BEND CENTER SETABLE".postln;
-			vibratoInd = noteToInd.value(note);
-		}
-	);
+			newChord = chordMap.value(activeChord, noteToInd.value(note));
+			newChord.do({|i| midiOut.noteOn(channel, i, vel)});
+			onNotes = onNotes | newChord.as(Set);
+			padDownCount = padDownCount + 1;
+			if(1 == 1,  //if several pads pressed at once, LAST pad determines vibrato (used to be first pad - padCounter==1
+				{
+					xCounter = 0;
+					midiOut.bend(channel, bendSignalCenter);
+					bendCenterSet = true;
+					"BEND CENTER SETABLE".postln;
+					vibratoInd = noteToInd.value(note);
+				}
+			);
+	});
 	semaphore.signal;
 	vel.postln;
 };
 padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
 
 b = {|vel, note, chan, port|
-	var newChord = chordMap.value(activeChord, noteToInd.value(note));
-	newChord.do({|i| midiOut.noteOff(channel, i, vel)});
+	var newChord;
 	semaphore.wait;
+	if(activeChord.size != 0, {
+		newChord = chordMap.value(activeChord, noteToInd.value(note));
+		if(newChord.as(Set) == onNotes,
+			{newChord.do({|i| midiOut.noteOff(channel, i, vel)});},
+			{(newChord.as(Set) - onNotes).do({|i| midiOut.noteOff(channel, i, vel)});}
+		);
+		(newChord.as(Set) - onNotes).postln;
+		onNotes = onNotes - newChord.as(Set);
+	});
 	padDownCount = padDownCount - 1;
+	if (padDownCount == 0, {
+		xCounter = 0;
+		midiOut.bend(channel, bendSignalCenter);
+	});
 	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 
-c = {|vel, note, chan, port|
-	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
-		{
-			semaphore.wait;
-			if(bendCenterSet,
-				{
-					bendCenter = vel;
-					bendCenterSet = false;
-					format("bendCenter %", bendCenter).postln;
-				}
-			);
-			semaphore.signal;
-			//make this a function of the physical movement rather than directly linear
-			format("center: %, cc: %, dif: %", bendCenter, vel, (vel - bendCenter)).postln;
-			midiOut.bend(channel, bendSignalCenter + (bendScale * (vel - bendCenter)));
-	});
-};
-ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
+// c = {|vel, note, chan, port|
+// 	var avg;
+// 	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
+// 		{
+// 			semaphore.wait;
+// 			xCounter = xCounter + 1;
+// 			xBuffer.addFirst(vel);
+// 			if(xBuffer.size == (xAvgLen+1), {xBuffer.pop});
+// 			if(bendCenterSet && (xCounter > xHitDelay),
+// 				{
+// 					bendCenter = vel;
+// 					bendCenterSet = false;
+// 					format("bendCenter %", bendCenter).postln;
+// 				}
+// 			);
+// 			semaphore.signal;
+// 			avg = ((xBuffer.sum / xBuffer.size) - bendCenter);
+// 			//make this a function of the physical movement rather than directly linear
+// 			if(xCounter > xHitDelay && (abs(avg) > nonVibratoWindow), {
+// 				format("ind: %, center: %, cc: %, hist: %, dif: %",
+// 				vibratoInd, bendCenter, vel, xBuffer.size, avg).postln;
+// 				midiOut.bend(channel,
+// 				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
+// 			});
+// 	});
+// };
+// ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
 
@@ -108,13 +154,25 @@ ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 // )};
 (
 a = SortedList.new();
-a.add(30);
-a.add(5);
-a[1].postln;
+a.addFirst(30);
+a.addFirst(5);
+a.addFirst(2);
 a.postln;
-a.remove(30);
+a.pop;
 a.postln;
-a.size()
+a.pop;
+a.postln;
+a.add(66);
+a.add(77);
+a.postln;
+a.pop;
+a.postln
+// a.pop;
+// a.postln;
+// a.add(25);
+// a.postln;
+// a.pop;
+// a.postln;
 )
 
 (
@@ -156,6 +214,9 @@ chordMap.value(activeChord, 10);
 
 )
 
+(
+Set[1,2,3] == Set[2-1, 3-1, 4-1]
+)
 
 (
 var ccToPadXY, ccToInd, indToXY, ccToXY;
