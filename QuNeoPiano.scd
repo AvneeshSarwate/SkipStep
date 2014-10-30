@@ -110,33 +110,33 @@ b = {|vel, note, chan, port|
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 
-// c = {|vel, note, chan, port|
-// 	var avg;
-// 	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
-// 		{
-// 			semaphore.wait;
-// 			xCounter = xCounter + 1;
-// 			xBuffer.addFirst(vel);
-// 			if(xBuffer.size == (xAvgLen+1), {xBuffer.pop});
-// 			if(bendCenterSet && (xCounter > xHitDelay),
-// 				{
-// 					bendCenter = vel;
-// 					bendCenterSet = false;
-// 					format("bendCenter %", bendCenter).postln;
-// 				}
-// 			);
-// 			semaphore.signal;
-// 			avg = ((xBuffer.sum / xBuffer.size) - bendCenter);
-// 			//make this a function of the physical movement rather than directly linear
-// 			if(xCounter > xHitDelay && (abs(avg) > nonVibratoWindow), {
-// 				format("ind: %, center: %, cc: %, hist: %, dif: %",
-// 				vibratoInd, bendCenter, vel, xBuffer.size, avg).postln;
-// 				midiOut.bend(channel,
-// 				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
-// 			});
-// 	});
-// };
-// ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
+c = {|vel, note, chan, port|
+	var avg;
+	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
+		{
+			semaphore.wait;
+			xCounter = xCounter + 1;
+			xBuffer.addFirst(vel);
+			if(xBuffer.size == (xAvgLen+1), {xBuffer.pop});
+			if(bendCenterSet && (xCounter > xHitDelay),
+				{
+					bendCenter = vel;
+					bendCenterSet = false;
+					format("bendCenter %", bendCenter).postln;
+				}
+			);
+			semaphore.signal;
+			avg = ((xBuffer.sum / xBuffer.size) - bendCenter);
+			//make this a function of the physical movement rather than directly linear
+			if(xCounter > xHitDelay && (abs(avg) > nonVibratoWindow), {
+				format("ind: %, center: %, cc: %, hist: %, dif: %",
+				vibratoInd, bendCenter, vel, xBuffer.size, avg).postln;
+				midiOut.bend(channel,
+				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
+			});
+	});
+};
+ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
 
