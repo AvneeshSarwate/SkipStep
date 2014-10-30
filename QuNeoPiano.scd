@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -8,33 +8,35 @@ noteToXY = {|x| [noteToInd.value(x)%4, floor(noteToInd.value(x)/4)]}; //convert 
 ccToInd = {|x| floor((x-23)/3)}; //convert cc number to pad index
 ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]}; //convert cc number to pad xy
 
-semaphore = Semaphore(1);
+semaphore = Semaphore(1); //lock for thread safety
 activeChord = SortedList.new(); //the base chord from which inversions will be made
 onNotes = Set.new(); //collection that prevents pads with shared notes from turning off shared notes
+xBuffer = List.new(); //buffer of x values for running average
+padsDown = Set.new(); //set of what pads are down for help calculating what notes to turn off
 
 //function that maps a chord to its inversion
 chordMap = {|chord, ind|
 	var len = chord.size();
 	if (ind < 8,
 		{//maps bottom two rows of pads in Quneo to chord inversions
-			(ind..ind+len-1).postln;
-			(all {: floor((x-2)/len), x <- (ind..ind+len-1)}).postln;
+			//(ind..ind+len-1).postln;
+			//(all {: floor((x-2)/len), x <- (ind..ind+len-1)}).postln;
 			all {: (floor((x-2)/len)*12) + chord[(x-2)%len], x <- (ind..ind+len-1)};
 		},
 		{//maps top two rows of pads in Quneo to adjacent notes in chord inversions
-			(ind-8..ind-8+1).postln;
-			(all {: floor((x-3)/len), x <- (ind-8..ind-8+1)}).postln;
+			//(ind-8..ind-8+1).postln;
+			//(all {: floor((x-3)/len), x <- (ind-8..ind-8+1)}).postln;
 			all {: (floor((x-3)/len)*12) + chord[(x-3)%len], x <- (ind-8..ind-8+1)};
 	})
 };
 
 
+//constants and default values
 channel = 4; //hard coded,
 bendSignalCenter = 8192;
 padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
 xCounter = 0;
 bendCenter = 63;
-xBuffer = List.new();
 
 //x-axis/vibrato stabilization parameters (tweakable)
 bendScale = 50;
@@ -57,9 +59,20 @@ pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
 	semaphore.signal;}, nil, nil, 23048651);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
+	var newInd, newChord;
 	semaphore.wait;
+	padsDown.do({|ind|
+		var oldInd;
+		newChord = chordMap.value(activeChord, ind);
+		oldInd = activeChord.indexOf(note);
+		if(ind < 8,
+			{newInd = (oldInd - ind) % newChord.size},
+			{} //TODO: some function to map oldInd to newInd for diads
+	);});
+
 	activeChord.remove(note);
-	midiOut.noteOff(channel, note, vel);
+	onNotes.remove(note); //TODO: replace note with newChord[newInd]
+	midiOut.noteOff(channel, note, vel); //TODO: replace note with newChord[newInd]
 	activeChord.postln;
 	semaphore.signal;}, //so there are no "hanging" notes when you release a piano note before a pad
 	nil, nil, 23048651);
@@ -68,6 +81,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 a = {|vel, note, chan, port|
 	var newChord;
 	semaphore.wait;
+	padsDown.add(noteToInd.value(note));
 	if(activeChord.size != 0,
 		{
 			newChord = chordMap.value(activeChord, noteToInd.value(note));
@@ -79,23 +93,25 @@ a = {|vel, note, chan, port|
 					xCounter = 0;
 					midiOut.bend(channel, bendSignalCenter);
 					bendCenterSet = true;
-					"BEND CENTER SETABLE".postln;
+					//"BEND CENTER SETABLE".postln;
 					vibratoInd = noteToInd.value(note);
 				}
 			);
 	});
 	semaphore.signal;
-	vel.postln;
+	//vel.postln;
 };
 padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
 
 b = {|vel, note, chan, port|
 	var newChord;
 	semaphore.wait;
+	padsDown.remove(noteToInd.value(note));
 	if(activeChord.size != 0, {
 		newChord = chordMap.value(activeChord, noteToInd.value(note));
 		if(newChord.as(Set) == onNotes,
 			{newChord.do({|i| midiOut.noteOff(channel, i, vel)});},
+			//TODO: line below is incorrect - no notes get turned off because newChord is subset of onNotes
 			{(newChord.as(Set) - onNotes).do({|i| midiOut.noteOff(channel, i, vel)});}
 		);
 		(newChord.as(Set) - onNotes).postln;
@@ -110,6 +126,7 @@ b = {|vel, note, chan, port|
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 
+//vibrato handling function
 c = {|vel, note, chan, port|
 	var avg;
 	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
@@ -122,15 +139,15 @@ c = {|vel, note, chan, port|
 				{
 					bendCenter = vel;
 					bendCenterSet = false;
-					format("bendCenter %", bendCenter).postln;
+					//format("bendCenter %", bendCenter).postln;
 				}
 			);
 			semaphore.signal;
 			avg = ((xBuffer.sum / xBuffer.size) - bendCenter);
 			//make this a function of the physical movement rather than directly linear
 			if(xCounter > xHitDelay && (abs(avg) > nonVibratoWindow), {
-				format("ind: %, center: %, cc: %, hist: %, dif: %",
-				vibratoInd, bendCenter, vel, xBuffer.size, avg).postln;
+				//format("ind: %, center: %, cc: %, hist: %, dif: %",
+				//vibratoInd, bendCenter, vel, xBuffer.size, avg).postln;
 				midiOut.bend(channel,
 				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
 			});
@@ -210,7 +227,7 @@ chordMap = {|chord, ind|
 	})
 };
 
-chordMap.value(activeChord, 10);
+chordMap.value(activeChord, 5);
 
 )
 
