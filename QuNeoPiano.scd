@@ -71,6 +71,11 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	);});
 
 	activeChord.remove(note);
+	//TODO: padsDown.Do uses a function of activeChord and index to calculate which note to turn off.
+	//Would changing the active chord here make it so that padsDown.Do would not be able to correctly
+	//calculate which note to turn off because the activeChord used to calculate the new index has changed.
+	//EX padsDown.Do:: f(oldIndex, g(activeChord, ind)) -> newIndex THUS changing active chord changes pads.Down
+	//Should probably have each pad save what its "on" notes are and what piano key each "on" note maps to
 	onNotes.remove(note); //TODO: replace note with newChord[newInd]
 	midiOut.noteOff(channel, note, vel); //TODO: replace note with newChord[newInd]
 	activeChord.postln;
