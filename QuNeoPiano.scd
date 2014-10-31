@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -13,6 +13,7 @@ activeChord = SortedList.new(); //the base chord from which inversions will be m
 onNotes = Set.new(); //collection that prevents pads with shared notes from turning off shared notes
 xBuffer = List.new(); //buffer of x values for running average
 padsDown = Set.new(); //set of what pads are down for help calculating what notes to turn off
+padMap = Dictionary.new; //maps padInd -> [Dict, Dict] where first is piano -> inversion, second is inversion -> piano
 
 //function that maps a chord to its inversion
 chordMap = {|chord, ind|
@@ -59,16 +60,11 @@ pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
 	semaphore.signal;}, nil, nil, 23048651);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
-	var newInd, newChord;
+	var newInd, oldInd, newChord;
 	semaphore.wait;
-	padsDown.do({|ind|
-		var oldInd;
-		newChord = chordMap.value(activeChord, ind);
-		oldInd = activeChord.indexOf(note);
-		if(ind < 8,
-			{newInd = (oldInd - ind) % newChord.size},
-			{} //TODO: some function to map oldInd to newInd for diads
-	);});
+	padMap.values.do({|map|
+		midiOut.noteOff(channel, map.get(note));
+	});
 
 	activeChord.remove(note);
 	//TODO: padsDown.Do uses a function of activeChord and index to calculate which note to turn off.
@@ -76,20 +72,26 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	//calculate which note to turn off because the activeChord used to calculate the new index has changed.
 	//EX padsDown.Do:: f(oldIndex, g(activeChord, ind)) -> newIndex THUS changing active chord changes pads.Down
 	//Should probably have each pad save what its "on" notes are and what piano key each "on" note maps to
-	onNotes.remove(note); //TODO: replace note with newChord[newInd]
-	midiOut.noteOff(channel, note, vel); //TODO: replace note with newChord[newInd]
+
 	activeChord.postln;
 	semaphore.signal;}, //so there are no "hanging" notes when you release a piano note before a pad
 	nil, nil, 23048651);
 
 //functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
-	var newChord;
+	var newChord, padInd, noteMap1, noteMap2;
+	padInd = noteToInd.value(note);
+	noteMap = Dictionary.new();
 	semaphore.wait;
 	padsDown.add(noteToInd.value(note));
 	if(activeChord.size != 0,
 		{
-			newChord = chordMap.value(activeChord, noteToInd.value(note));
+			newChord = chordMap.value(activeChord, padInd);
+			(0..newChord.size-1).do({|i|
+				noteMap1.put(activeChord[(padInd+i)%newChord.size], newChord[i]);
+				noteMap2.put(newChord[i], activeChord[(padInd+i)%newChord.size]); //not needed?
+			});
+			padMap.add(padInd, [noteMap1, noteMap2]);
 			newChord.do({|i| midiOut.noteOn(channel, i, vel)});
 			onNotes = onNotes | newChord.as(Set);
 			padDownCount = padDownCount + 1;
@@ -109,19 +111,18 @@ a = {|vel, note, chan, port|
 padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
 
 b = {|vel, note, chan, port|
-	var newChord;
+	var newChord, padInd, noteOffSet;
+	padInd = noteToInd.value(note);
 	semaphore.wait;
-	padsDown.remove(noteToInd.value(note));
-	if(activeChord.size != 0, {
-		newChord = chordMap.value(activeChord, noteToInd.value(note));
-		if(newChord.as(Set) == onNotes,
-			{newChord.do({|i| midiOut.noteOff(channel, i, vel)});},
-			//TODO: line below is incorrect - no notes get turned off because newChord is subset of onNotes
-			{(newChord.as(Set) - onNotes).do({|i| midiOut.noteOff(channel, i, vel)});}
-		);
-		(newChord.as(Set) - onNotes).postln;
-		onNotes = onNotes - newChord.as(Set);
+	if(activeChord.size != 0,
+		{
+			noteOffSet = padMap.get(padInd)[0].values;
+			(padMap.keys - Set[padInd]).do({|ind|
+				noteOffSet = noteOffSet - padMap.get(ind)[0].values;
+			});
+			noteOffSet.do({|i| midiOut.noteOff(channel, i)});
 	});
+	padMap.remove(padInd);
 	padDownCount = padDownCount - 1;
 	if (padDownCount == 0, {
 		xCounter = 0;
@@ -162,6 +163,8 @@ ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
 
+(
+
 
 
 //-------------------------------SCRATCH CODE BELOW----------------------------------------------------
@@ -197,13 +200,15 @@ a.postln
 // a.postln;
 )
 
+
+
+
 (
 j = (1..8);
 )
 
 (
-j = 5;
-j = j+ 1
+(0..5)
 )
 floor(-1/5)
 
