@@ -57,13 +57,14 @@ midiOut.latency = 0;
 pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
 	semaphore.wait;
 	activeChord.add(note);
+	activeChord.postln;
 	semaphore.signal;}, nil, nil, 23048651);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	var newInd, oldInd, newChord;
 	semaphore.wait;
 	padMap.values.do({|map|
-		midiOut.noteOff(channel, map.get(note));
+		midiOut.noteOff(channel, map.at(note));
 	});
 
 	activeChord.remove(note);
@@ -79,7 +80,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 
 //functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
-	var newChord, padInd, noteMap1, noteMap2;
+	var newChord, padInd, noteMap;
 	padInd = noteToInd.value(note);
 	noteMap = Dictionary.new();
 	semaphore.wait;
@@ -88,12 +89,13 @@ a = {|vel, note, chan, port|
 		{
 			newChord = chordMap.value(activeChord, padInd);
 			(0..newChord.size-1).do({|i|
-				noteMap1.put(activeChord[(padInd+i)%newChord.size], newChord[i]);
-				noteMap2.put(newChord[i], activeChord[(padInd+i)%newChord.size]); //not needed?
+				noteMap.put(activeChord[(padInd+i)%newChord.size], newChord[i]);
+				//noteMap2.put(newChord[i], activeChord[(padInd+i)%newChord.size]); //not needed?
 			});
-			padMap.add(padInd, [noteMap1, noteMap2]);
+			padMap.put(padInd, noteMap);
 			newChord.do({|i| midiOut.noteOn(channel, i, vel)});
 			onNotes = onNotes | newChord.as(Set);
+			onNotes.postln;
 			padDownCount = padDownCount + 1;
 			if(1 == 1,  //if several pads pressed at once, LAST pad determines vibrato (used to be first pad - padCounter==1
 				{
@@ -114,15 +116,19 @@ b = {|vel, note, chan, port|
 	var newChord, padInd, noteOffSet;
 	padInd = noteToInd.value(note);
 	semaphore.wait;
-	if(activeChord.size != 0,
+	if(activeChord.size != 0 && onNotes.size != 0,
 		{
-			noteOffSet = padMap.get(padInd)[0].values;
+			noteOffSet = padMap.at(padInd).values.asSet;
 			(padMap.keys - Set[padInd]).do({|ind|
-				noteOffSet = noteOffSet - padMap.get(ind)[0].values;
+				noteOffSet = noteOffSet - padMap.at(ind).values.asSet;
+				format("notes on at %: %", ind, padMap.at(ind).values).postln;
 			});
+			format("note off set %", noteOffSet).postln;
 			noteOffSet.do({|i| midiOut.noteOff(channel, i)});
+			onNotes = onNotes - noteOffSet;
+			onNotes.postln;
 	});
-	padMap.remove(padInd);
+	padMap.removeAt(padInd);
 	padDownCount = padDownCount - 1;
 	if (padDownCount == 0, {
 		xCounter = 0;
