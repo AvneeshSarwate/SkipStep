@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -8,6 +8,7 @@ noteToXY = {|x| [noteToInd.value(x)%4, floor(noteToInd.value(x)/4)]}; //convert 
 ccToInd = {|x| floor((x-23)/3)}; //convert cc number to pad index
 ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]}; //convert cc number to pad xy
 
+//objects
 semaphore = Semaphore(1); //lock for thread safety
 activeChord = SortedList.new(); //the base chord from which inversions will be made
 onNotes = Set.new(); //collection that prevents pads with shared notes from turning off shared notes
@@ -16,6 +17,7 @@ padsDown = Set.new(); //set of what pads are down for help calculating what note
 padMap = Dictionary.new; //maps padInd -> [Dict, Dict] where first is piano -> inversion, second is inversion -> piano
 
 //function that maps a chord to its inversion
+//TODO: edge case when chord only has 1 note
 chordMap = {|chord, ind|
 	var len = chord.size();
 	if (ind < 8,
@@ -38,6 +40,7 @@ bendSignalCenter = 8192;
 padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
 xCounter = 0;
 bendCenter = 63;
+hitVel = 0;
 
 //x-axis/vibrato stabilization parameters (tweakable)
 bendScale = 50;
@@ -57,13 +60,13 @@ midiOut.latency = 0;
 pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
 	semaphore.wait;
 	activeChord.add(note);
-	activeChord.postln;
+	//activeChord.postln;
 	semaphore.signal;}, nil, nil, 23048651);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	var newInd, oldInd, newChord;
 	semaphore.wait;
-	padMap.values.do({|map|
+	padMap.values.do({|map| //not necessary now that each pad remembers its own "on" notes
 		if(map.includesKey(note), {midiOut.noteOff(channel, map.at(note))});
 		//format("removing % key from %", note, map).postln;
 	});
@@ -75,7 +78,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	//EX padsDown.Do:: f(oldIndex, g(activeChord, ind)) -> newIndex THUS changing active chord changes pads.Down
 	//Should probably have each pad save what its "on" notes are and what piano key each "on" note maps to
 
-	activeChord.postln;
+	//activeChord.postln;
 	semaphore.signal;}, //so there are no "hanging" notes when you release a piano note before a pad
 	nil, nil, 23048651);
 
@@ -83,6 +86,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 a = {|vel, note, chan, port|
 	var newChord, padInd, noteMap;
 	padInd = noteToInd.value(note);
+	hitVel = vel;
 	noteMap = Dictionary.new();
 	semaphore.wait;
 	padsDown.add(noteToInd.value(note));
@@ -96,7 +100,7 @@ a = {|vel, note, chan, port|
 			padMap.put(padInd, noteMap);
 			newChord.do({|i| midiOut.noteOn(channel, i, vel)});
 			onNotes = onNotes | newChord.as(Set);
-			onNotes.postln;
+			//onNotes.postln;
 			padDownCount = padDownCount + 1;
 			if(1 == 1,  //if several pads pressed at once, LAST pad determines vibrato (used to be first pad - padCounter==1
 				{
@@ -117,17 +121,17 @@ b = {|vel, note, chan, port|
 	var newChord, padInd, noteOffSet;
 	padInd = noteToInd.value(note);
 	semaphore.wait;
-	if(activeChord.size != 0 && onNotes.size != 0,
+	if((activeChord.size != 0) && (onNotes.size != 0),
 		{
 			noteOffSet = padMap.at(padInd).values.asSet;
 			(padMap.keys - Set[padInd]).do({|ind|
 				noteOffSet = noteOffSet - padMap.at(ind).values.asSet;
-				format("notes on at %: %", ind, padMap.at(ind).values).postln;
+				//format("notes on at %: %", ind, padMap.at(ind).values).postln;
 			});
-			format("note off set %", noteOffSet).postln;
+			//format("note off set %", noteOffSet).postln;
 			noteOffSet.do({|i| midiOut.noteOff(channel, i)});
 			onNotes = onNotes - noteOffSet;
-			onNotes.postln;
+			//onNotes.postln;
 	});
 	padMap.removeAt(padInd);
 	padDownCount = padDownCount - 1;
@@ -165,12 +169,17 @@ c = {|vel, note, chan, port|
 				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
 			});
 	});
+	if (ccY.value(note),
+		{
+			vel.postln;
+	});
 };
 ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
 
-(
+
+
 
 
 
@@ -211,13 +220,16 @@ a.postln
 
 
 (
-j = (1..8);
+var ac = SortedList.new();
+ac.size;
 )
 
 (
 (0..5)
 )
 floor(-1/5)
+
+false && false
 
 (
 MIDIIn.connectAll;

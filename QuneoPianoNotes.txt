@@ -1,0 +1,46 @@
+
+isFirstYCC - list of flags indicating if the next cc is the first one after the noteOn message for that pad
+
+rolling - list of flags indicating if that pad is rolling the chord
+
+padDiv(k) - a function that defines the division of the pad for rolling chords
+
+yBuffers - list of buffers of the last 3 y values for each pad 
+
+rollStates - list of indexes of the current roll position of pads
+
+findRollState(yBuff, padDiv(k)) - 
+calculates the rollState based on the history and the paddiv
+
+
+
+PSEUDOCODE FOR ROLLING
+
+padOn:
+	isFirstYCC[ind] = true
+
+padOff:
+	rolling[ind] = false
+	xBuffer.clear()
+
+cchandler: 
+if y cc:
+	yBuffer.add(yVal) (((and pop if len > 3)))
+	if isFirstYCC[ind]:
+		if  !(15 < y < 112):
+			rolling[ind] = true
+			if y < 15: rollState[ind] = 0
+			if y > 112: rollState[ind] = padDiv(k)[endIndex]
+			midiOut.noteOn(padMap.get(ind).values.sort[rollState[ind]])
+		else:
+			normal play logic for chord for that pad (lines 95-104)
+		isFirstYCC[ind] = false
+	else:
+		if rolling[ind]:
+			if findRollState(yBuff[ind], padDiv(padMap.size)) != rollState[ind]
+				rollState[ind] = 
+					findRollState(yBuff[ind], padDiv(padMap.size))
+				midiOut.noteOn(padMap.get(ind).values.sort[rollState[ind]])
+		
+			
+	
