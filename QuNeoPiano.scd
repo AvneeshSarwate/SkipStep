@@ -64,7 +64,8 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	var newInd, oldInd, newChord;
 	semaphore.wait;
 	padMap.values.do({|map|
-		midiOut.noteOff(channel, map.at(note));
+		if(map.includesKey(note), {midiOut.noteOff(channel, map.at(note))});
+		//format("removing % key from %", note, map).postln;
 	});
 
 	activeChord.remove(note);
@@ -224,7 +225,10 @@ a = MIDIFunc.noteOn({|port, chan, note, vel| [port, chan, note, vel].postln; "qu
 
 
 )
-
+(
+j = (1: 5);
+j.includes(5).postln;
+)
 
 
 (
