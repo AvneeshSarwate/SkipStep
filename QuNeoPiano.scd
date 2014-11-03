@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -15,6 +15,21 @@ onNotes = Set.new(); //collection that prevents pads with shared notes from turn
 xBuffer = List.new(); //buffer of x values for running average
 padsDown = Set.new(); //set of what pads are down for help calculating what notes to turn off
 padMap = Dictionary.new; //maps padInd -> [Dict, Dict] where first is piano -> inversion, second is inversion -> piano
+yBuffers = all {: List.new(), x <- (1..16)}; //list of buffers of the last 3 y values for each pad
+rollStates = all {: 0, x<-(1..16)}; //list of indexes of the current roll position of pads
+isFirstYCC = all {: false, x<-(1..16)}; //list of flags indicating if the next cc is the first one after the noteOn message for that pad
+isRolling = all {: false, x<-(1..16)}; //list of flags indicating if that pad is currently rolling the chord
+
+//constants and default values
+channel = 4; //hard coded,
+bendSignalCenter = 8192;
+padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
+xCounter = 0;
+bendCenter = 63;
+hitVel = 0;
+yLow = 15;
+yHigh = 112; //127 - 15
+yAvgLen = 3;
 
 //function that maps a chord to its inversion
 //TODO: edge case when chord only has 1 note
@@ -33,14 +48,30 @@ chordMap = {|chord, ind|
 	})
 };
 
+//given a particular chord size, this returns a list that indicates the positions
+//on the pad's y axis that correspond to particular notes of the chord
+padDiv = {|num|
+	var segmentSize = floor(127/(num+1));
+	all {: segmentSize * i, i <-(1..num)}.asList;
+};
 
-//constants and default values
-channel = 4; //hard coded,
-bendSignalCenter = 8192;
-padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
-xCounter = 0;
-bendCenter = 63;
-hitVel = 0;
+//given a buffer of y values and the result of padDiv, this
+findRollState = {|yBuff, divList|
+	var rollInd, segList, avg;
+	segList = List.new();
+	avg = yBuff.sum/yBuff.size;
+	divList.addFirst(0);
+	divList.add(127);
+	(1..(divList.size-2)).do({|ind|
+		segList.add([divList[ind]-5, divList[ind]+5]);
+		segList.add([divList[ind]+5, divList[ind+1]-5]);
+	});
+	segList.addFirst([0, divList[1]-5]);
+	(0..segList.size-1).do({|ind|
+		if( (segList[ind][0] < avg) && (avg < segList[ind][1]), {rollInd = ind});
+	});
+	rollInd
+};
 
 //x-axis/vibrato stabilization parameters (tweakable)
 bendScale = 50;
@@ -89,6 +120,7 @@ a = {|vel, note, chan, port|
 	hitVel = vel;
 	noteMap = Dictionary.new();
 	semaphore.wait;
+	isFirstYCC[ind] = true;
 	padsDown.add(noteToInd.value(note));
 	if(activeChord.size != 0,
 		{
@@ -139,14 +171,16 @@ b = {|vel, note, chan, port|
 		xCounter = 0;
 		midiOut.bend(channel, bendSignalCenter);
 	});
+	yBuffer[padInd] = List.new();
 	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 
 //vibrato handling function
 c = {|vel, note, chan, port|
-	var avg;
-	if (ccX.value(note) && vibratoInd == ccToInd.value(note),
+	var avg, padInd;
+	padInd = ccToInd.value(note);
+	if (ccX.value(note) && vibratoInd == padInd,
 		{
 			semaphore.wait;
 			xCounter = xCounter + 1;
@@ -171,14 +205,14 @@ c = {|vel, note, chan, port|
 	});
 	if (ccY.value(note),
 		{
+			yBuffer.addFirst(vel);
+			if(yBuffer.size == (yAvgLen+1), {yBuffer.pop});
 			vel.postln;
 	});
 };
 ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
-
-
 
 
 
@@ -193,6 +227,57 @@ ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 // 		{[port, chan, note, a, vel].postln;
 // 		ccToXY.value(note).postln};
 // )};
+
+
+(
+var padDiv, findRollState;
+//given a particular chord size, this returns a list that indicates the positions
+//on the pad's y axis that correspond to particular notes of the chord
+padDiv = {|num|
+	var segmentSize = floor(127/(num+1));
+	all {: segmentSize * i, i <-(1..num)}.asList;
+};
+
+//given a buffer of y values and the result of padDiv, this
+findRollState = {|yBuff, divList|
+	var rollInd, segList, avg;
+	segList = List.new();
+	avg = yBuff.sum/yBuff.size;
+	divList.addFirst(0);
+	divList.add(127);
+	(1..(divList.size-2)).do({|ind|
+		segList.add([divList[ind]-5, divList[ind]+5]);
+		segList.add([divList[ind]+5, divList[ind+1]-5]);
+	});
+	segList.addFirst([0, divList[1]-5]);
+	(0..segList.size-1).do({|ind|
+		if( (segList[ind][0] < avg) && (avg < segList[ind][1]), {rollInd = ind});
+	});
+	rollInd
+};
+
+padDiv.value(3).postln;
+findRollState.value([81, 82, 84], padDiv.value(3));
+
+)
+
+
+
+
+(
+a = {|num|
+	var segmentSize = floor(127/(num+1));
+	all {: segmentSize * i, i <-(1..num)};
+};
+a.value(6);
+)
+
+(
+var divList = [1, 2, 4];
+divList.addFirst(0);
+divList.add(127);
+)
+
 (
 a = SortedList.new();
 a.addFirst(30);
