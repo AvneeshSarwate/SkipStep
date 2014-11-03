@@ -67,8 +67,9 @@ findRollState = {|yBuff, divList|
 		segList.add([divList[ind]+5, divList[ind+1]-5]);
 	});
 	segList.addFirst([0, divList[1]-5]);
+	segList[segList.size-1][1] = 127;
 	(0..segList.size-1).do({|ind|
-		if( (segList[ind][0] < avg) && (avg < segList[ind][1]), {rollInd = ind});
+		if( (segList[ind][0] < avg) && (avg <= segList[ind][1]), {rollInd = ind});
 	});
 	rollInd
 };
@@ -176,6 +177,7 @@ b = {|vel, note, chan, port|
 		midiOut.bend(channel, bendSignalCenter);
 	});
 	yBuffers[padInd] = List.new();
+	isRolling[padInd] = false;
 	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
