@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -28,7 +28,7 @@ xCounter = 0;
 bendCenter = 63;
 hitVel = 0;
 yLow = 15;
-yHigh = 112; //127 - 15
+yHigh = 112; //127 - 15 - TODO: will need to tweak this and yLow if people want to play chords larger than 5
 yAvgLen = 3;
 
 //function that maps a chord to its inversion
@@ -119,8 +119,12 @@ a = {|vel, note, chan, port|
 	padInd = noteToInd.value(note);
 	hitVel = vel;
 	noteMap = Dictionary.new();
+
 	semaphore.wait;
-	isFirstYCC[ind] = true;
+	isFirstYCC[padInd] = true;
+	semaphore.signal;
+
+	semaphore.wait;
 	padsDown.add(noteToInd.value(note));
 	if(activeChord.size != 0,
 		{
@@ -171,7 +175,7 @@ b = {|vel, note, chan, port|
 		xCounter = 0;
 		midiOut.bend(channel, bendSignalCenter);
 	});
-	yBuffer[padInd] = List.new();
+	yBuffers[padInd] = List.new();
 	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
@@ -205,14 +209,55 @@ c = {|vel, note, chan, port|
 	});
 	if (ccY.value(note),
 		{
-			yBuffer.addFirst(vel);
-			if(yBuffer.size == (yAvgLen+1), {yBuffer.pop});
-			vel.postln;
+			yBuffers[padInd].addFirst(vel);
+			if(yBuffers[padInd].size == (yAvgLen+1), {yBuffers[padInd].pop});
+			//vel.postln;
+			semaphore.wait;
+			if(isFirstYCC[padInd],
+				{
+					format("FIRST %, padInd:%", vel, padInd).postln;
+					if((vel < yLow) || (yHigh < vel),
+						{
+							// format("args - yBuf:%   padDiv:%", yBuffers[padInd], padDiv.value(3)).postln;
+							isRolling[padInd] = true;
+							// rollStates[padInd] = findRollState.value(yBuffers[padInd], padDiv.value(3));
+						},
+						{
+
+						}
+					);
+					isFirstYCC[padInd] = false;
+				},
+				{
+					if(isRolling[padInd],
+						{
+							// "rolling".postln;
+							// format("args - yBuf:%   padDiv:%", yBuffers[padInd], padDiv.value(3)).postln;
+							rollStates[padInd] = findRollState.value(yBuffers[padInd], padDiv.value(3));
+							rollStates[padInd].postln;
+					});
+				}
+			);
+			semaphore.signal;
 	});
 };
 ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -255,8 +300,8 @@ findRollState = {|yBuff, divList|
 	rollInd
 };
 
-padDiv.value(3).postln;
-findRollState.value([81, 82, 84], padDiv.value(3));
+padDiv.value(6).postln;
+findRollState.value([81, 82, 84], padDiv.value(5));
 
 )
 

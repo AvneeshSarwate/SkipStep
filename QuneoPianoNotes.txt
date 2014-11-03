@@ -31,7 +31,6 @@ if y cc:
 			rolling[ind] = true
 			if y < 15: rollState[ind] = 0
 			if y > 112: rollState[ind] = padDiv(k)[endIndex]
-			midiOut.noteOn(padMap.get(ind).values.sort[rollState[ind]])
 		else:
 			normal play logic for chord for that pad (lines 95-104)
 		isFirstYCC[ind] = false
@@ -40,7 +39,8 @@ if y cc:
 			if findRollState(yBuff[ind], padDiv(padMap.size)) != rollState[ind]
 				rollState[ind] = 
 					findRollState(yBuff[ind], padDiv(padMap.size))
-				midiOut.noteOn(padMap.get(ind).values.sort[rollState[ind]])
+				if rollState[ind] %2 ==1 
+					midiOut.noteOn(padMap.get(ind).values.sort[rollState[ind]])
 		
 			
 	
