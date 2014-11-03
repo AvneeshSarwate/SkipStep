@@ -216,7 +216,6 @@ ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 
 
-
 //-------------------------------SCRATCH CODE BELOW----------------------------------------------------
 
 // MIDIClient.init;
