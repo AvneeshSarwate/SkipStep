@@ -1,12 +1,12 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling, yErrorDelay, yErrorCount, yCountDelay;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
 noteToInd = {|x| x - 36}; //convert note to pad index
-noteToXY = {|x| [noteToInd.value(x)%4, floor(noteToInd.value(x)/4)]}; //convert note to pad xy (bottom left 0,0)
+noteToXY = {|x| [noteToInd.(x)%4, floor(noteToInd.(x)/4)]}; //convert note to pad xy (bottom left 0,0)
 ccToInd = {|x| floor((x-23)/3)}; //convert cc number to pad index
-ccToXY = {|x| [(ccToInd.value(x)%4), floor(ccToInd.value(x)/4)]}; //convert cc number to pad xy
+ccToXY = {|x| [(ccToInd.(x)%4), floor(ccToInd.(x)/4)]}; //convert cc number to pad xy
 
 //objects
 semaphore = Semaphore(1); //lock for thread safety
@@ -30,6 +30,15 @@ hitVel = 0;
 yLow = 15;
 yHigh = 112; //127 - 15 - TODO: will need to tweak this and yLow if people want to play chords larger than 5
 yAvgLen = 3;
+yErrorDelay = 9; //HARDWARE BUG? when a value of 0 or 127 is hit on the y control, it jumps to the center and returns over the course of 9 samples.
+yErrorCount = all {: 0, x<-(1..16)};
+
+//x-axis/vibrato stabilization parameters (tweakable)
+bendScale = 50;
+xAvgLen = 3;
+xHitDelay = 9;
+nonVibratoWindow = 13;
+vibratoExp = 1.1;
 
 //function that maps a chord to its inversion
 //TODO: edge case when chord only has 1 note
@@ -74,13 +83,11 @@ findRollState = {|yBuff, divList|
 	rollInd
 };
 
-//x-axis/vibrato stabilization parameters (tweakable)
-bendScale = 50;
-xAvgLen = 3;
-xHitDelay = 9;
-nonVibratoWindow = 13;
-vibratoExp = 1.1;
-
+yCountDelay = {|padInd| //returns true if you should delay till the next yCC value
+	var ybuf = yBuffers[padInd];
+	yErrorCount[padInd] = yErrorCount[padInd] + 1;
+	(((ybuf.size == 2) && (abs(ybuf[0]-ybuf[1]) > 10)) || (yErrorCount[padInd] < 9));
+};
 
 MIDIIn.connectAll;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
@@ -117,7 +124,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 //functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
 	var newChord, padInd, noteMap;
-	padInd = noteToInd.value(note);
+	padInd = noteToInd.(note);
 	hitVel = vel;
 	noteMap = Dictionary.new();
 
@@ -126,10 +133,10 @@ a = {|vel, note, chan, port|
 	semaphore.signal;
 
 	semaphore.wait;
-	padsDown.add(noteToInd.value(note));
+	padsDown.add(noteToInd.(note));
 	if(activeChord.size != 0,
 		{
-			newChord = chordMap.value(activeChord, padInd);
+			newChord = chordMap.(activeChord, padInd);
 			(0..newChord.size-1).do({|i|
 				noteMap.put(activeChord[(padInd+i)%newChord.size], newChord[i]);
 				//noteMap2.put(newChord[i], activeChord[(padInd+i)%newChord.size]); //not needed?
@@ -145,7 +152,7 @@ a = {|vel, note, chan, port|
 					midiOut.bend(channel, bendSignalCenter);
 					bendCenterSet = true;
 					//"BEND CENTER SETABLE".postln;
-					vibratoInd = noteToInd.value(note);
+					vibratoInd = noteToInd.(note);
 				}
 			);
 	});
@@ -156,7 +163,7 @@ padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
 
 b = {|vel, note, chan, port|
 	var newChord, padInd, noteOffSet;
-	padInd = noteToInd.value(note);
+	padInd = noteToInd.(note);
 	semaphore.wait;
 	if((activeChord.size != 0) && (onNotes.size != 0),
 		{
@@ -185,8 +192,8 @@ padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 //vibrato handling function
 c = {|vel, note, chan, port|
 	var avg, padInd;
-	padInd = ccToInd.value(note);
-	if (ccX.value(note) && vibratoInd == padInd,
+	padInd = ccToInd.(note);
+	if (ccX.(note) && vibratoInd == padInd,
 		{
 			semaphore.wait;
 			xCounter = xCounter + 1;
@@ -209,13 +216,13 @@ c = {|vel, note, chan, port|
 				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
 			});
 	});
-	if (ccY.value(note),
+	if (ccY.(note),
 		{
 			yBuffers[padInd].addFirst(vel);
 			if(yBuffers[padInd].size == (yAvgLen+1), {yBuffers[padInd].pop});
-			//vel.postln;
+			format("       %", vel).postln;
 			semaphore.wait;
-			if(isFirstYCC[padInd],
+			if(yBuffers[padInd].size == 1, //isFirstYCC[padInd], HARDWARE BUG? - noteOn happens AFTER first ycc message
 				{
 					format("FIRST %, padInd:%", vel, padInd).postln;
 					if((vel < yLow) || (yHigh < vel),
@@ -225,17 +232,17 @@ c = {|vel, note, chan, port|
 							// rollStates[padInd] = findRollState.value(yBuffers[padInd], padDiv.value(3));
 						},
 						{
-
+							//padHit chord playing logic
 						}
 					);
 					isFirstYCC[padInd] = false;
 				},
 				{
-					if(isRolling[padInd],
+					if((isRolling[padInd]  && yCountDelay.(padInd).not),
 						{
 							// "rolling".postln;
 							// format("args - yBuf:%   padDiv:%", yBuffers[padInd], padDiv.value(3)).postln;
-							rollStates[padInd] = findRollState.value(yBuffers[padInd], padDiv.value(3));
+							rollStates[padInd] = findRollState.(yBuffers[padInd], padDiv.(3));
 							rollStates[padInd].postln;
 					});
 				}
@@ -246,10 +253,6 @@ c = {|vel, note, chan, port|
 ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
-
-
-
-
 
 
 
@@ -431,4 +434,4 @@ padHit 1. apply inversion 2. play inversion with velocity from hit
 
 
 
-*/
+*/}
