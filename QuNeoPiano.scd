@@ -134,7 +134,7 @@ a = {|vel, note, chan, port|
 
 	semaphore.wait;
 	padsDown.add(noteToInd.(note));
-	if(activeChord.size != 0,
+	if((activeChord.size != 0),
 		{
 			newChord = chordMap.(activeChord, padInd);
 			(0..newChord.size-1).do({|i|
@@ -142,19 +142,17 @@ a = {|vel, note, chan, port|
 				//noteMap2.put(newChord[i], activeChord[(padInd+i)%newChord.size]); //not needed?
 			});
 			padMap.put(padInd, noteMap);
-			newChord.do({|i| midiOut.noteOn(channel, i, vel)});
+			if(isRolling[padInd].not, {newChord.do({|i| midiOut.noteOn(channel, i, vel)})});
 			onNotes = onNotes | newChord.as(Set);
 			//onNotes.postln;
 			padDownCount = padDownCount + 1;
-			if(1 == 1,  //if several pads pressed at once, LAST pad determines vibrato (used to be first pad - padCounter==1
-				{
-					xCounter = 0;
-					midiOut.bend(channel, bendSignalCenter);
-					bendCenterSet = true;
-					//"BEND CENTER SETABLE".postln;
-					vibratoInd = noteToInd.(note);
-				}
-			);
+			//if several pads pressed at once, LAST pad determines vibrato (used to be first pad - padCounter==1
+
+			xCounter = 0;
+			midiOut.bend(channel, bendSignalCenter);
+			bendCenterSet = true;
+			//"BEND CENTER SETABLE".postln;
+			vibratoInd = noteToInd.(note);
 	});
 	semaphore.signal;
 	//vel.postln;
@@ -179,10 +177,6 @@ b = {|vel, note, chan, port|
 	});
 	padMap.removeAt(padInd);
 	padDownCount = padDownCount - 1;
-	if (padDownCount == 0, {
-		xCounter = 0;
-		midiOut.bend(channel, bendSignalCenter);
-	});
 	yBuffers[padInd] = List.new();
 	isRolling[padInd] = false;
 	semaphore.signal;
@@ -191,7 +185,7 @@ padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 
 //vibrato handling function
 c = {|vel, note, chan, port|
-	var avg, padInd;
+	var avg, padInd, newRollState;
 	padInd = ccToInd.(note);
 	if (ccX.(note) && vibratoInd == padInd,
 		{
@@ -213,37 +207,39 @@ c = {|vel, note, chan, port|
 				//format("ind: %, center: %, cc: %, hist: %, dif: %",
 				//vibratoInd, bendCenter, vel, xBuffer.size, avg).postln;
 				midiOut.bend(channel,
-				bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
+					bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
 			});
 	});
 	if (ccY.(note),
 		{
 			yBuffers[padInd].addFirst(vel);
 			if(yBuffers[padInd].size == (yAvgLen+1), {yBuffers[padInd].pop});
-			format("       %", vel).postln;
+			//format("       %", vel).postln;
 			semaphore.wait;
 			if(yBuffers[padInd].size == 1, //isFirstYCC[padInd], HARDWARE BUG? - noteOn happens AFTER first ycc message
 				{
 					format("FIRST %, padInd:%", vel, padInd).postln;
 					if((vel < yLow) || (yHigh < vel),
 						{
-							// format("args - yBuf:%   padDiv:%", yBuffers[padInd], padDiv.value(3)).postln;
+							// format("args - yBuf:%   padDiv:%", yBuffers[padInd], padDiv.value(padMap.at(padInd).size)).postln;
 							isRolling[padInd] = true;
-							// rollStates[padInd] = findRollState.value(yBuffers[padInd], padDiv.value(3));
-						},
-						{
-							//padHit chord playing logic
-						}
-					);
+							rollStates[padInd] = findRollState.(yBuffers[padInd], padDiv.(padMap.at(padInd).size));
+					});
 					isFirstYCC[padInd] = false;
 				},
 				{
 					if((isRolling[padInd]  && yCountDelay.(padInd).not),
 						{
-							// "rolling".postln;
 							// format("args - yBuf:%   padDiv:%", yBuffers[padInd], padDiv.value(3)).postln;
-							rollStates[padInd] = findRollState.(yBuffers[padInd], padDiv.(3));
-							rollStates[padInd].postln;
+							newRollState = findRollState.(yBuffers[padInd], padDiv.(padMap.at(padInd).size));
+							//DONOW if rollState[padInd] is odd, play inversion[floor(rollState[ind]/2])]
+							if((newRollState%2 == 1) && (padMap.at(padInd) != nil) && (rollStates[padInd] != newRollState),
+								{
+									rollStates[padInd] = newRollState;
+									rollStates[padInd].postln;
+									// midiOut.noteOn(channel, padMap.at(padInd).values.sort[floor(rollStates[padInd]/2)]);
+									// padMap.at(padInd).values.sort[floor(rollStates[padInd]/2)].postln;
+							});
 					});
 				}
 			);
@@ -253,7 +249,6 @@ c = {|vel, note, chan, port|
 ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
-
 
 
 
@@ -304,9 +299,9 @@ findRollState = {|yBuff, divList|
 	});
 	rollInd
 };
-
-padDiv.value(6).postln;
-findRollState.value([81, 82, 84], padDiv.value(5));
+n = 2;
+padDiv.value(n).postln;
+findRollState.value([81, 82, 84], padDiv.value(n));
 
 )
 
@@ -350,7 +345,11 @@ a.postln
 // a.postln;
 )
 
-
+(
+d = Dictionary.new;
+d.put(1, 5);
+d.at(1)
+)
 
 
 (
