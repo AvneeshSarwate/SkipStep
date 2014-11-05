@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling, yErrorDelay, yErrorCount, yCountDelay;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling, yErrorDelay, yErrorCount, yCountDelay, padPressures;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -19,6 +19,7 @@ yBuffers = all {: List.new(), x <- (1..16)}; //list of buffers of the last 3 y v
 rollStates = all {: 0, x<-(1..16)}; //list of indexes of the current roll position of pads
 isFirstYCC = all {: false, x<-(1..16)}; //list of flags indicating if the next cc is the first one after the noteOn message for that pad
 isRolling = all {: false, x<-(1..16)}; //list of flags indicating if that pad is currently rolling the chord
+padPressures = all {: false, x<-(1..16)}; //current pressure of the pressed down pad
 
 //constants and default values
 channel = 4; //hard coded,
@@ -142,7 +143,11 @@ a = {|vel, note, chan, port|
 				//noteMap2.put(newChord[i], activeChord[(padInd+i)%newChord.size]); //not needed?
 			});
 			padMap.put(padInd, noteMap);
-			if(isRolling[padInd].not, {newChord.do({|i| midiOut.noteOn(channel, i, vel)})});
+			if(isRolling[padInd].not,
+				{
+					newChord.do({|i| midiOut.noteOn(channel, i, vel)});
+					"PAD CHORD PLAY".postln;
+			});
 			onNotes = onNotes | newChord.as(Set);
 			//onNotes.postln;
 			padDownCount = padDownCount + 1;
@@ -237,13 +242,22 @@ c = {|vel, note, chan, port|
 								{
 									rollStates[padInd] = newRollState;
 									rollStates[padInd].postln;
-									// midiOut.noteOn(channel, padMap.at(padInd).values.sort[floor(rollStates[padInd]/2)]);
-									// padMap.at(padInd).values.sort[floor(rollStates[padInd]/2)].postln;
+									midiOut.noteOn(
+										channel,
+										padMap.at(padInd).values.sort[floor(rollStates[padInd]/2)],
+										padPressures[padInd]
+									);
+									padMap.at(padInd).values.sort[floor(rollStates[padInd]/2)].postln;
 							});
 					});
 				}
 			);
 			semaphore.signal;
+	});
+	if (ccP.(note), {
+		semaphore.wait;
+		padPressures[padInd] = vel;
+		semaphore.signal;
 	});
 };
 ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
