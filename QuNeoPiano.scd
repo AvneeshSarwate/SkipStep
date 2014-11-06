@@ -1,5 +1,5 @@
 (
-var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling, yErrorDelay, yErrorCount, yCountDelay, padPressures;
+var ccP, ccX, ccY, padX, padXY, ccToInd, ccToXY, noteToInd, noteToXY, activeChord, pianoOn, pianoOff, padOn, padOff, midiOut, channel, chordMap, bendCenter, bendCenterSet, bendSignalCenter, bendScale, semaphore, ccHandler, padDownCount, vibratoInd, xCounter, xBuffer, xAvgLen, xHitDelay, nonVibratoWindow, vibratoExp, onNotes, padsDown, padMap, hitVel, yBuffers, rollStates, yLow, yHigh, findRollState, padDiv, isFirstYCC, yCounter, yAvgLen, isRolling, yErrorDelay, yErrorCount, yCountDelay, padPressures, pianoAudioToggle, isPadCC, isPadNote, isBankNote, bankToInd, bankDown, bankChords, pianoToggleNote;
 ccP = {|x| (x%3) == 2}; //check if cc is pressure value
 ccX = {|x| (x%3) == 0}; //check if cc is x position
 ccY = {|x| (x%3) == 1}; //check if cc is y position
@@ -7,6 +7,10 @@ noteToInd = {|x| x - 36}; //convert note to pad index
 noteToXY = {|x| [noteToInd.(x)%4, floor(noteToInd.(x)/4)]}; //convert note to pad xy (bottom left 0,0)
 ccToInd = {|x| floor((x-23)/3)}; //convert cc number to pad index
 ccToXY = {|x| [(ccToInd.(x)%4), floor(ccToInd.(x)/4)]}; //convert cc number to pad xy
+isPadCC = {|x| (ccToInd.(x) >=0) && (ccToInd.(x) < 16)};
+isPadNote = {|x| (noteToInd.(x) >=0) && (noteToInd.(x) < 16)};
+isBankNote = {|x| (x > 10) && (x < 19)};
+bankToInd = {|x| x-11};
 
 //objects
 semaphore = Semaphore(1); //lock for thread safety
@@ -19,10 +23,13 @@ yBuffers = all {: List.new(), x <- (1..16)}; //list of buffers of the last 3 y v
 rollStates = all {: 0, x<-(1..16)}; //list of indexes of the current roll position of pads
 isFirstYCC = all {: false, x<-(1..16)}; //list of flags indicating if the next cc is the first one after the noteOn message for that pad
 isRolling = all {: false, x<-(1..16)}; //list of flags indicating if that pad is currently rolling the chord
-padPressures = all {: false, x<-(1..16)}; //current pressure of the pressed down pad
+padPressures = all {: 0, x<-(1..16)}; //current pressure of the pressed down pad
+bankDown = all {:false, x<-(1..8)};
+bankChords = all {:SortedList.new, x<-(1..8)};
 
 //constants and default values
 channel = 4; //hard coded,
+pianoAudioToggle = false;
 bendSignalCenter = 8192;
 padDownCount = 0; //update this, and when it returns to zero, set bend position back to bendSignalCenter
 xCounter = 0;
@@ -33,6 +40,7 @@ yHigh = 112; //127 - 15 - TODO: will need to tweak this and yLow if people want 
 yAvgLen = 3;
 yErrorDelay = 9; //HARDWARE BUG? when a value of 0 or 127 is hit on the y control, it jumps to the center and returns over the course of 9 samples.
 yErrorCount = all {: 0, x<-(1..16)};
+pianoToggleNote = 19;
 
 //x-axis/vibrato stabilization parameters (tweakable)
 bendScale = 50;
@@ -101,6 +109,7 @@ pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
 	semaphore.wait;
 	activeChord.add(note);
 	//activeChord.postln;
+	if(pianoAudioToggle, {midiOut.noteOn(channel, note, vel);});
 	semaphore.signal;}, nil, nil, 23048651);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
@@ -117,7 +126,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	//calculate which note to turn off because the activeChord used to calculate the new index has changed.
 	//EX padsDown.Do:: f(oldIndex, g(activeChord, ind)) -> newIndex THUS changing active chord changes pads.Down
 	//Should probably have each pad save what its "on" notes are and what piano key each "on" note maps to
-
+	if(pianoAudioToggle, {midiOut.noteOff(channel, note, vel);});
 	//activeChord.postln;
 	semaphore.signal;}, //so there are no "hanging" notes when you release a piano note before a pad
 	nil, nil, 23048651);
@@ -130,13 +139,25 @@ a = {|vel, note, chan, port|
 	noteMap = Dictionary.new();
 
 	semaphore.wait;
-	isFirstYCC[padInd] = true;
-	semaphore.signal;
+	if(isBankNote.(note), {
+		if(activeChord.size == 0,
+			{
+				if(bankChords[bankToInd.(note)].size != 0,
+					{bankChords[bankToInd.(note)].do({|bNote| activeChord.add(bNote)})});
 
-	semaphore.wait;
-	padsDown.add(noteToInd.(note));
-	if((activeChord.size != 0),
+			},
+			{
+				bankChords[bankToInd.(note)] = activeChord.copy; //TODO: check that this doesn't need to be deepCopy
+			}
+		);
+		bankDown[bankToInd.(note)] = true;
+		//TODO: if pianoAudioToggle, play chord
+	});
+	if((activeChord.size != 0) && isPadNote.(note),
 		{
+			isFirstYCC[padInd] = true;
+			padsDown.add(noteToInd.(note));
+
 			newChord = chordMap.(activeChord, padInd);
 			(0..newChord.size-1).do({|i|
 				noteMap.put(activeChord[(padInd+i)%newChord.size], newChord[i]);
@@ -158,7 +179,9 @@ a = {|vel, note, chan, port|
 			bendCenterSet = true;
 			//"BEND CENTER SETABLE".postln;
 			vibratoInd = noteToInd.(note);
-	});
+		},
+	);
+	if(note == pianoToggleNote, {pianoAudioToggle = pianoAudioToggle.not;});
 	semaphore.signal;
 	//vel.postln;
 };
@@ -168,7 +191,20 @@ b = {|vel, note, chan, port|
 	var newChord, padInd, noteOffSet;
 	padInd = noteToInd.(note);
 	semaphore.wait;
-	if((activeChord.size != 0) && (onNotes.size != 0),
+	if(isBankNote.(note), {
+		if(activeChord.size == 0,
+			{
+
+			},
+			{
+
+			}
+		);
+		bankChords[bankToInd.(note)].do({|bNote| activeChord.remove(bNote)});
+		bankDown[bankToInd.(note)] = false;
+		//TODO: if pianoAudioToggle, turn off chord
+	});
+	if(isPadNote.(note) /*&& (activeChord.size != 0)*/ && (onNotes.size != 0),
 		{
 			noteOffSet = padMap.at(padInd).values.asSet;
 			(padMap.keys - Set[padInd]).do({|ind|
@@ -179,11 +215,11 @@ b = {|vel, note, chan, port|
 			noteOffSet.do({|i| midiOut.noteOff(channel, i)});
 			onNotes = onNotes - noteOffSet;
 			//onNotes.postln;
+			padMap.removeAt(padInd);
+			padDownCount = padDownCount - 1;
+			yBuffers[padInd] = List.new();
+			isRolling[padInd] = false;
 	});
-	padMap.removeAt(padInd);
-	padDownCount = padDownCount - 1;
-	yBuffers[padInd] = List.new();
-	isRolling[padInd] = false;
 	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
 padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
@@ -192,7 +228,7 @@ padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
 c = {|vel, note, chan, port|
 	var avg, padInd, newRollState;
 	padInd = ccToInd.(note);
-	if (ccX.(note) && vibratoInd == padInd,
+	if (isPadCC.(note) && ccX.(note) && vibratoInd == padInd,
 		{
 			semaphore.wait;
 			xCounter = xCounter + 1;
@@ -215,7 +251,7 @@ c = {|vel, note, chan, port|
 					bendSignalCenter + (bendScale * sign(avg) * ((abs(avg)-nonVibratoWindow)**vibratoExp)));
 			});
 	});
-	if (ccY.(note),
+	if (isPadCC.(note) && ccY.(note),
 		{
 			yBuffers[padInd].addFirst(vel);
 			if(yBuffers[padInd].size == (yAvgLen+1), {yBuffers[padInd].pop});
@@ -254,7 +290,7 @@ c = {|vel, note, chan, port|
 			);
 			semaphore.signal;
 	});
-	if (ccP.(note), {
+	if (isPadCC.(note) && ccP.(note), {
 		semaphore.wait;
 		padPressures[padInd] = vel;
 		semaphore.signal;
@@ -264,187 +300,26 @@ ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 )
 
-
-
-
-
-
-
-
-
-
+//TODO: make it such that piano and bank chords don't turn off each other's notes when playing together
 
 
 //-------------------------------SCRATCH CODE BELOW----------------------------------------------------
 
-// MIDIClient.init;
-// MIDIIn.connect(0, MIDIClient.sources[1]);
-// MIDIIn.noteOn = { |port, chan, note, vel| a = vel; [port, chan, note, vel].postln };
-// MIDIIn.control = { |port, chan, note, vel|
-// 	if (ccX.value(note),
-// 		{[port, chan, note, a, vel].postln;
-// 		ccToXY.value(note).postln};
-// )};
-
-
-(
-var padDiv, findRollState;
-//given a particular chord size, this returns a list that indicates the positions
-//on the pad's y axis that correspond to particular notes of the chord
-padDiv = {|num|
-	var segmentSize = floor(127/(num+1));
-	all {: segmentSize * i, i <-(1..num)}.asList;
-};
-
-//given a buffer of y values and the result of padDiv, this
-findRollState = {|yBuff, divList|
-	var rollInd, segList, avg;
-	segList = List.new();
-	avg = yBuff.sum/yBuff.size;
-	divList.addFirst(0);
-	divList.add(127);
-	(1..(divList.size-2)).do({|ind|
-		segList.add([divList[ind]-5, divList[ind]+5]);
-		segList.add([divList[ind]+5, divList[ind+1]-5]);
-	});
-	segList.addFirst([0, divList[1]-5]);
-	(0..segList.size-1).do({|ind|
-		if( (segList[ind][0] < avg) && (avg < segList[ind][1]), {rollInd = ind});
-	});
-	rollInd
-};
-n = 2;
-padDiv.value(n).postln;
-findRollState.value([81, 82, 84], padDiv.value(n));
-
-)
 
 
 
 
-(
-a = {|num|
-	var segmentSize = floor(127/(num+1));
-	all {: segmentSize * i, i <-(1..num)};
-};
-a.value(6);
-)
-
-(
-var divList = [1, 2, 4];
-divList.addFirst(0);
-divList.add(127);
-)
-
-(
-a = SortedList.new();
-a.addFirst(30);
-a.addFirst(5);
-a.addFirst(2);
-a.postln;
-a.pop;
-a.postln;
-a.pop;
-a.postln;
-a.add(66);
-a.add(77);
-a.postln;
-a.pop;
-a.postln
-// a.pop;
-// a.postln;
-// a.add(25);
-// a.postln;
-// a.pop;
-// a.postln;
-)
-
-(
-d = Dictionary.new;
-d.put(1, 5);
-d.at(1)
-)
-
-
-(
-var ac = SortedList.new();
-ac.size;
-)
-
-(
-(0..5)
-)
-floor(-1/5)
-
-false && false
-
-(
-MIDIIn.connectAll;
-a = MIDIFunc.noteOn({|port, chan, note, vel| [port, chan, note, vel].postln; "quneo".postln;}, nil, nil, 23048651);
-
-
-)
-(
-j = (1: 5);
-j.includes(5).postln;
-)
-
-
-(
-var chordMap, activeChord;
-activeChord = [55, 58, 62, 66];
-chordMap = {|chord, ind|
-	var len = chord.size();
-	if (ind < 8,
-		{
-			(ind..ind+len-1).postln;
-			(all {: floor((x-2)/len), x <- (ind..ind+len-1)}).postln;
-			all {: (floor((x-2)/len)*12) + chord[(x-2)%len], x <- (ind..ind+len-1)};
-		},
-		{
-			all {: (floor((x-3)/len)*12) + chord[(x-3)%len], x <- (ind-8..ind-8+1)};
-	})
-};
-
-chordMap.value(activeChord, 5);
-
-)
-
-(
-Set[1,2,3] == Set[2-1, 3-1, 4-1]
-)
-
-(
-var ccToPadXY, ccToInd, indToXY, ccToXY;
-ccToInd = {|x| floor((x-23)/3)};
-indToXY = {|x| a = [(ccToInd.value(x)%4),
-	floor(ccToInd.value(x)/4)]};
-ccToPadXY = {|x| indToXY.value(ccToInd.value(x))};
-g = 56;
-
-ccToInd.value(g).postln;
-(ccToInd.value(g)%4).postln;
-floor(ccToInd.value(g)/4).postln;
-
-[(ccToInd.value(g)%4), floor(ccToInd.value(g)/4)].postln;
-ccToXY = {|x| [(ccToInd.value(g)%4), floor(ccToInd.value(g)/4)]};
-ccToXY.value(g);
-ccToPadXY.value(g);
-)
-
-MIDIClient.sources
-MIDIClient.prList
-
-/*
-objects:
-    activeChord: an ordered list of notes
-    mappings: a set of pad/inversion mappings, with a different mapping for each size of activeChord (3, 4, 5)
-          f: int -> {|noteList| *stuff* newNoteList}
-
-piano noteOn/noteOff - add/remote note from activeChord
-padHit 1. apply inversion 2. play inversion with velocity from hit
 
 
 
 
-*/}
+
+
+
+
+
+
+
+
+
+
