@@ -90,6 +90,7 @@ class MultiLoop:
         self.num = n # the number of "instruments" used in SkipStep
         self.numMiniPages = 4 # the number of miniPages in the interface
         self.gridStates = [] # the array of Looper instances for each "instrument"
+        self.doubleMap = {} # the dictionary that maps the addresses of the double-view grids to their corresponding miniState grids
         for i in range(n):
             self.gridStates.append(Looper())
         
@@ -195,6 +196,15 @@ class MultiLoop:
         self.oscServUI.addMsgHandler("/save", self.saveSet)
         self.oscServUI.addMsgHandler("/load", self.loadSet)
         self.oscServUI.addMsgHandler("/sceneHit", self.sceneHit)
+
+        for i in range(16):
+                for j in range(16):
+                    self.oscServUI.addMsgHandler("/doubleGrid_1/" + str(i+1) + "/" + str(j+1), self.doubleGridHandler)
+                    self.oscServUI.addMsgHandler("/doubleGrid_2/" + str(i+1) + "/" + str(j+1), self.doubleGridHandler)
+
+        for i in range(4):
+            self.oscServUI.addMsgHandler("/doubleSelector_1/1/" + str(i+1), self.doubleGridSelector)
+            self.oscServUI.addMsgHandler("/doubleSelector_2/1/" + str(i+1), self.doubleGridSelector)
         
         for k in range(n):
             
@@ -279,16 +289,16 @@ class MultiLoop:
             for i in range(16):
                 for j in range(16):
                     self.gridcallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].grid, addr, stuff, self.gridStates[int(addr.split("/")[1])-1].prog)
-                    self.oscServUI.addMsgHandler("/" +str(k+1) + "/grid/" + str(i+1) + "/" + str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridcallbacks[k][i][j]))
+                    self.oscServUI.addMsgHandler("/" +str(k+1) + "/grid/" + str(i+1) + "/" + str(j+1),  self.gridHandler)
             
             for i in range(16):
                 for j in range(16):
                     self.offlinecallbacks[k][i][j] = lambda addr, tags, stuff, source: self.assign2(self.gridStates[int(addr.split("/")[1])-1].offlineGrid, addr, stuff, 0)
                     self.oscServUI.addMsgHandler("/" + str(k+1) + "/offGrid/" + str(i+1) + "/" + str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.offlinecallbacks[k][i][j]))
-            
+
             for j in range(4):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/pageSelector/1/" + str(j+1), self.changeMiniPage)
-            
+
             self.oscServUI.addMsgHandler("/getGridScale/" + str(k+1) + "/1", self.getGridToSend)
             self.oscServUI.addMsgHandler("/applyRecvGrid/" + str(k+1) + "/1", self.applyRecvGrid)
             self.oscServUI.addMsgHandler("/applyRecvScale/" + str(k+1) + "/1", self.applyRecvScale)
@@ -746,9 +756,12 @@ class MultiLoop:
 
     ## is the helper function used to take a grid and display it in the specified grid UI element  
     def pullUpGrid(self, grid, gridAddr): #add difG arguement? add reference to target grid object, and change object in this function itself?
+        newGrid = self.rotateGridLeft(grid)
         for i in range(len(grid)):
             for j in range(len(grid)):
                 self.sendToUI(gridAddr + "/"+str(i+1) +"/" + str(16-j), grid[i][j])
+                if gridAddr in self.doubleMap.keys():
+                    self.sendToUI(self.doubleMap[gridAddr] + "/"+str(i+1) +"/" + str(16-j), newGrid[i][j])
     
     ## helper function that calculates the "difference grid" between two grids
     @staticmethod
@@ -1060,8 +1073,63 @@ class MultiLoop:
                 return
             d.c[i] = self.colToChord(a[i], state.root, state.scale)
             #print self.prog, "\n\n\n"
-    
-        
+
+    def gridHandler(self, addr, tags, stuff, source):
+        k = int(addr.split("/")[1]) - 1
+        i = int(addr.split("/")[3]) - 1
+        j = int(addr.split("/")[4]) - 1
+        self.bounceBack(addr, tags, stuff, source, self.gridcallbacks[k][i][j])
+        x, y = self.gridAddrInd(addr)
+        addrStem = "/".join(addr.split("/")[0:3])
+        if addrStem in self.doubleMap.keys():
+            self.sendToUI(self.doubleMap[addrStem] + "/" + str(15-y + 1) + "/" + str(15-x + 1), 1)
+            print "SEND TO", self.doubleMap[addrStem] + "/" + str(15-y + 1) + "/" + str(15-x + 1)
+
+    def doubleGridHandler(self, addr, tags, stuff, source):
+        x, y = self.doubleGridAddrToInd(addr)
+        print x, y
+        addrStem = "/".join(addr.split("/")[0:2])
+        if addrStem in self.doubleMap.keys():
+            newAddr = self.doubleMap[addrStem] + "/" + str(x+1) + "/" + str(16-y)
+            k = int(self.doubleMap[addrStem].split("/")[1]) - 1
+            i = x
+            j = 15 - y
+            self.sendToUI(newAddr, 1)
+            self.bounceBack(newAddr, tags, stuff, source, self.gridcallbacks[k][i][j])
+
+    def doubleGridSelector(self, addr, tags, stuff, source):
+        selectorInd = addr.split("/")[1].split("_")[1]
+        selectedIndex = 4 - int(addr.split("/")[3])
+
+        if "/doubleGrid_"+selectorInd in self.doubleMap.keys():
+            self.doubleMap.pop(self.doubleMap.pop("/doubleGrid_"+selectorInd))
+
+        self.doubleMap["/doubleGrid_"+selectorInd] = "/" + str(selectedIndex+1) + "/grid"
+        self.doubleMap["/" + str(selectedIndex+1) + "/grid"] = "/doubleGrid_"+selectorInd
+
+        rotatedGrid = self.rotateGridLeft(self.gridStates[selectedIndex].grid)
+        for i in range(len(rotatedGrid)):
+            for j in range(len(rotatedGrid)):
+                self.sendToUI("/doubleGrid_"+selectorInd + "/"+str(i+1) +"/" + str(16-j), rotatedGrid[i][j])
+
+    @staticmethod
+    def normalToDoubleGridInd(x, y):
+        return
+
+    @staticmethod
+    def doubleGridAddrToInd(addr):
+        oldX = int(addr.split("/")[2]) - 1
+        oldY = int(addr.split("/")[3]) - 1
+        return 15-oldY, 15-oldX
+
+    @staticmethod
+    def rotateGridLeft(grid):
+        newGrid = [[0 for i in range(16)] for j in range(16)]
+        for i in range(16):
+            for j in range(16):
+                newGrid[15-j][i] = grid[i][j]
+        return newGrid
+
     # helper function for saving
     @staticmethod
     def gridKeyToString(grid, key):
