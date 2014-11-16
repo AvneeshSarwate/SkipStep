@@ -5,11 +5,21 @@ MORE DOCS AND INSTALLATION INSTRUCTIONS COMING SOON
 
 SkipStep is a step sequencer influenced musical tool for algorithmic composition and live performance. 
 
-A quick video showing SkipStep in action: 
-	https://www.dropbox.com/s/a365qh0hxx4nbhh/SkipStep_Live_Clips.m4v?dl=0 
-
 The ICMC paper about SkipStep is saved in this repository as the file SkipStep_ICMC.pdf 
-- NOTE: this paper does not document the newly added “scene” and “offline-edit” features
+	(includes pictures)
+It describes the motivation and design principles behind SkipStep
+- NOTE: this paper is missing features built since April 2014
+
+A quick video showing SkipStep in action (30 sec): 
+https://www.dropbox.com/s/a365qh0hxx4nbhh/SkipStep_Live_Clips.m4v?dl=0 
+
+A video demonstrating the algorithms currently available in SkipStep (4:30):
+https://www.dropbox.com/s/83q0uiwms04s1dy/SkipStepDemo1.mov?dl=0
+
+An example of how the algorithms can take a static loop and make dynamic (2 min):
+https://www.dropbox.com/s/cqe1ah4k9q5gwch/SkipStepDemo2.mov?dl=0
+
+
 
 
 
