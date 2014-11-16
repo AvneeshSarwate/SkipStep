@@ -1,4 +1,5 @@
 TASKS
+- BUG: when both double selectors on same index, one doesn’t update the other
 - decide how tempoFit should work as a feature
 	tempoFit will take the current instrument and adjust its tempo so the
 	rhythm is the same duration as that of the target instrument. It will 

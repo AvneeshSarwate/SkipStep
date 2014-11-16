@@ -1082,7 +1082,7 @@ class MultiLoop:
         x, y = self.gridAddrInd(addr)
         addrStem = "/".join(addr.split("/")[0:3])
         if addrStem in self.doubleMap.keys():
-            self.sendToUI(self.doubleMap[addrStem] + "/" + str(15-y + 1) + "/" + str(15-x + 1), 1)
+            self.sendToUI(self.doubleMap[addrStem] + "/" + str(15-y + 1) + "/" + str(15-x + 1), stuff[0])
             print "SEND TO", self.doubleMap[addrStem] + "/" + str(15-y + 1) + "/" + str(15-x + 1)
 
     def doubleGridHandler(self, addr, tags, stuff, source):
