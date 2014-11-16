@@ -435,6 +435,8 @@ class MultiLoop:
         for i in range(len(state.grid)):
             if state.refreshModeSavedGrid[k][i] != state.grid[k][i]:
                 self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), state.refreshModeSavedGrid[k][i])
+                if "/" + str(si+1) + "/grid" in self.doubleMap.keys():
+                    self.sendToUI(self.doubleMap["/" + str(si+1) + "/grid"] + "/" + str(15-i + 1) + "/" + str(15-k + 1), state.refreshModeSavedGrid[k][i])
                 state.grid[k][i] = state.refreshModeSavedGrid[k][i]
         state.prog.c[k] = self.gridStates[si].refreshModeSavedProg.c[k]
     
