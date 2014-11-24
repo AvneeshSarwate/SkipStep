@@ -866,7 +866,7 @@ class MultiLoop:
         with state.lock:
             custScale = [i - min(state.customScale) for i in state.customScale]
             custScale.sort()
-            print custScale
+            print "custom scale", custScale
             state.scale = custScale
             state.prog = self.gridToProg(state.grid, custScale, state.root)
         self.updateNoteLabels(state.scale, si)
@@ -887,7 +887,7 @@ class MultiLoop:
     ## handler abstraction for custom-scale controls: OSCaddr: /si/custScale/i/1, /copyScale/i/1, /recievedScale/i/1
     ## is used inside a lambda function that is the actual handler
     @staticmethod
-    def assignScale(self, addr, stuff, scale):
+    def assignScale(addr, stuff, scale):
         print addr
         i = int(addr.split("/")[len(addr.split("/"))-2]) 
         if stuff[0] != 0:
