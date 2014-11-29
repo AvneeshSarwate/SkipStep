@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest;
 n = 4; //set n - number of instruments
 
 /*----------------create n tempo clocks (and associated beat variables?)----------------
@@ -8,14 +8,15 @@ When tap-tempoing:
 2. or leave the tempo of the tempoClocks at 1 and reschedule them every beats[i]*0.25,
     where beats[i] is changed by the tap tempo
 */
-tempoClocks = Array.fill(n, TempoClock.new(1)); //currently using option 2
+tempoClocks = List(); //currently using option 2
+(1..n).do({|i| tempoClocks.add(TempoClock.new(1))});
 
 
 //----------------create old/new time variables for touch tempo -------------------
 oldTap = 0;
 newTap = 0;
 tapLim = 2;
-beats = Array.fill(n, {0.7}); //create n beats
+beats = Array.fill(n, {1.5}); //create n beats (default 0.7)
 lastHits = Array.fill(n, {0});
 
 
@@ -24,6 +25,7 @@ netAd = NetAddr("localhost", 5174);
 oscMetronomeHit = {
 	|i| lastHits[i-1] = SystemClock.beats;
 	netAd.sendMsg("/played-"++i, i);
+	("/played-"++i + "," + i).postln;
 };
 (0..(n-1)).do(
 	{|i| tempoClocks[i].sched(0, {
@@ -95,7 +97,7 @@ tempoChangeHandler = {|msg, time, addr, recvPort|
 
 OSCFunc(tempoChangeHandler, "/tempoChange");
 
-
+indTest = 1;
 //--------------------------------set up tempo sync handler--------------------------------
 //msg[1] is a symbol-type binary vector indicating which instruments to change the beat for
 //msg[2] is a symbol-type binary vector indicating whether to sync (1) tempo, and (2) next hit
@@ -114,11 +116,19 @@ tempoSyncHandler = {|msg, time, addr, recvPort|
 					{
 						//next hit sync
 						tempoClocks[i].clear();
-						("pause" + ((beats[msg[3]]*0.25) - (SystemClock.beats - lastHits[msg[3]]))).postln;
-						beats[msg[3]].postln;
-					(SystemClock.beats - lastHits[msg[3]]).postln;
+						("\n" + msg[3]).postln;
+						(i + "time to next beat" + ((beats[msg[3]]*0.25) - (SystemClock.beats - lastHits[msg[3]]))).postln;
+						(i + "beat duration" + (beats[msg[3]]*0.25)).postln;
+						(i + "time from last beat" + (SystemClock.beats - lastHits[msg[3]]) + "\n").postln;
 						tempoClocks[i].sched((beats[msg[3]]*0.25) - (SystemClock.beats - lastHits[msg[3]]),
-							{oscMetronomeHit.value(i+1); beats[i]*0.25/*0.25*/})
+							{
+								oscMetronomeHit.value(i+1);
+								//(i + "index check" + indTest).postln;
+								indTest = indTest+1;
+								beats[i]*0.25/*0.25*/
+						});
+						("clock queue" + i).postln;
+						tempoClocks[i].queue.postln;
 				});
 			}
 		)}
@@ -147,6 +157,16 @@ OSCFunc(tempoSyncHandler, "/tempoSync");
 
 
 //------------------- templates and testing - final version above ------------
+
+
+
+(
+var tempoClocks;
+n = 4;
+tempoClocks = Array.fill(n, TempoClock.new(1));
+tempoClocks[1] === tempoClocks[2];
+)
+
 
 //FIRST DATA OF OSC MESSAGE WILL ALWAYS BE INSTRUMENT INDEX (when appropriate)
 
