@@ -1,4 +1,5 @@
 TASKS
+- finish implementing immediate-play stepjump - “TODO stepjump”
 - BUG: when both double selectors on same index, one doesn’t update the other
 - decide how tempoFit should work as a feature
 	tempoFit will take the current instrument and adjust its tempo so the
@@ -60,4 +61,37 @@ ALGS page
      grid save
 
 
+un done stuff marked in source as TODO stepjump
+additional logic for immediate-play stepjump:
+	first, separate realPlay into 2 functions:
+		pre progInd increment/play - takes progInd, si, returns chord to play
+		post - takes si, updates the gridStates[si] 
 
+	create new playChord case in SuperCollider for stepjump case:
+		turns notes on, and auto turns them off slightly before 
+		the next metronome hit (allowing for articulation breaks) 
+	
+	create new endpoint in Supercollider that says whether a stepjump push
+	is within the appropriate error range to set the “ignore hit” flag
+	it will send the value back to python
+
+	modify play chord to take stepjump flag 
+
+   STEPJUMP
+	call to supercollider function to see whether to set the “ignore hit” flag     
+
+   STEPJUMP-FLAG-RETURN
+	if jump was slightly before a metronome hit:
+		set an “ignore hit” flag for the next hit
+	set progInd to jumped index
+	call pre function
+	call playChord with stepjump flag
+	increment progInd 
+	call post function 
+	
+   HIT-EVENT
+	if “ignore hit” flag set, 
+		switch flag off
+	else
+		do normal realPlay logic 
+	

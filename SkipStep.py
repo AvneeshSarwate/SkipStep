@@ -52,7 +52,8 @@ class Looper:
         self.metronomeToggled = True 
         self.rhythmInstSubsets = [] # set of indexes for the instruments will be affected by rhythm controls
         self.syncTypes = [] # set of indexes for what rhythmic synchronizations will be applied. order: [tempo, nexthit, index]
-        
+        self.skipHit = False
+
         self.lock = threading.Lock()
 
 class MultiLoop:
@@ -202,10 +203,12 @@ class MultiLoop:
                     self.oscServUI.addMsgHandler("/doubleGrid_1/" + str(i+1) + "/" + str(j+1), self.doubleGridHandler)
                     self.oscServUI.addMsgHandler("/doubleGrid_2/" + str(i+1) + "/" + str(j+1), self.doubleGridHandler)
 
-        for i in range(4):
+        for i in range(n):
             self.oscServUI.addMsgHandler("/doubleSelector_1/1/" + str(i+1), self.doubleGridSelector)
             self.oscServUI.addMsgHandler("/doubleSelector_2/1/" + str(i+1), self.doubleGridSelector)
         
+        #TODO stepjump: set up/fix handlers for stepjump stuff 
+
         for k in range(n):
             
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/noisy", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseFlip))
@@ -350,22 +353,20 @@ class MultiLoop:
         print "test 2"
         self.iPadClients.append(oscClient)
 
-    def playChord(self, chord, channel = 0, piano = "normal"):
+    def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False):
         msg = OSC.OSCMessage()
         msg.setAddress("/playChord")
         msg.append(channel)
         msg.append(piano)
+        msg.append(stepJumpFlag)
         for i in chord.n:
             msg.append(i)
         self.superColliderClient.send(msg)
     
-    ##the function that handles everything that needs to happen during the "step" of a metronome
-    ##is called when an OSC message from the ChucK metronome is recieved 
-    def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
+    def preChordPlay(self, progInd, si):
         colChord = phrase.Chord()  # placeholder 
-        si = int(addr.split("-")[1])-1
-        #print "                 played", si
-
+        
+        #calculates what column to play based on the index
         state = self.gridStates[si]
         with state.lock: 
             if state.isColSubLooping:
@@ -382,11 +383,81 @@ class MultiLoop:
                 colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if state.refreshModeOn and not state.pianoModeIsOn:
                 self.refreshColumn(playind, si)
-            state.progInd += state.stepIncrement
+
+        return colChord
+
+    def postChordPlay(self, si):
+        state = self.gridStates[si]
+        if (not state.isColSubLooping and (state.progInd == 16))  or (state.isColSubLooping and (state.progInd == len(state.columnSubsetLooping))) or (state.progInd == -1):
+            if state.gridseqFlag and sum(state.gridseq) != -8:
+                state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
+                while state.gridseq[state.gridseqInd] == -1: 
+                    state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                    print "       progressing to index", state.gridseqInd
+                
+                
+                print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
+                self.sendToUI("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1", 1)
+                
+                if state.gridseq[state.gridseqInd] == "blank": 
+                    g = [[0 for i in range(16)] for j in range(16)]
+                    scale = state.scale
+                    root = state.root
+                    colsub = []
+                else:
+                    g, scale, root, colsub = self.stringToMiniState(state.savedGrid[state.gridseq[state.gridseqInd]])
+                
+                if state.noisy:
+                    g = self.noiseChoice(si)
+                    if not state.refreshModeOn:
+                        state.savedGrid[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
+                with state.lock:
+                    self.putMiniStateLive(g, scale, root, colsub, si) 
+                state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
+                print "done with sequencing update"
+                
+            else:
+                #print "NOT SEQUENCING ", si+1
+                if state.noisy:
+                    g = self.noiseChoice(si)
+                    with state.lock:
+                        self.putGridLive(g, si)
+
+    ##the function that handles everything that needs to happen during the "step" of a metronome
+    ##is called when an OSC message from the ChucK metronome is recieved 
+    def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
+        if self.skipHit: 
+            self.skipHit = False
+            return
+
+        colChord = phrase.Chord()  # placeholder 
+        si = int(addr.split("-")[1])-1
+        #print "                 played", si
+
+        #calculates what column to play based on the index
+        state = self.gridStates[si]
+        with state.lock: 
+            if state.isColSubLooping:
+                state.progInd %= len(state.columnSubsetLooping)
+                playind = state.columnSubsetLooping[state.progInd]
+                
+            else:
+                state.progInd %= 16
+                playind = state.progInd
+            if state.pianoModeIsOn:
+                colChord = phrase.Chord([-1])
+            else:
+                self.sendToUI("/" + str(si+1) + "/step/" + str(playind+1) + "/1", 1)
+                colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+            if state.refreshModeOn and not state.pianoModeIsOn:
+                self.refreshColumn(playind, si)
     
         #plays the chords that are defined by each column (phrase.play to be documented later)
         #print colChord, si
         self.playChord(colChord, channel = si)
+
+        #updates progInd to the next step
+        state.progInd += state.stepIncrement
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
@@ -553,11 +624,16 @@ class MultiLoop:
         self.superColliderClient.send(msg)
     
 
+    def preStepJump(self, addr, tags, stuff, source):
+        #TODO stepjump: send ping with si value to superCollider
+        return
+
 
     ##is the handler for the stepjump control, OSCaddr: /si/step/i/1 
     def stepjump(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
+        si = stuff[0]  #index of grid action was taken on
         state = self.gridStates[si]
+        state.skipHit = stuff[1] == 1
         if stuff[0] != 0:
             state.progInd, j = self.gridAddrInd(addr) #replace with gridAddrInd
             if state.isColSubLooping:
@@ -570,9 +646,15 @@ class MultiLoop:
                     i = len(state.columnSubsetLooping) - 1
                     while state.columnSubsetLooping[i] >= state.progInd:
                         state.progInd = state.columnSubsetLooping[i]
-                        i -= 1
-                    
-            print "                                jumped to " + str(self.gridStates[si].progInd)
+                        i -= 1         
+       
+        colChord = self.preChordPlay(self.progInd, si)
+
+        self.playChord(colChord, channel = si, stepJumpFlag = True)
+
+        state.progInd += state.stepIncrement
+
+        self.postChordPlay(si)
     
     ## is the handler  for the grid noise toggle control, OSCaddr: /si/noisy 
     def noiseFlip(self, addr, tags, stuff, source):
