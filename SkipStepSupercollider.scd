@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, netAd, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport;
 n = 4; //set n - number of instruments
 
 /*----------------create n tempo clocks (and associated beat variables?)----------------
@@ -21,11 +21,11 @@ lastHits = Array.fill(n, {0});
 
 
 //------------------set up tempoClocks to send metronome hits via OSC ---------------------
-netAd = NetAddr("localhost", 5174);
+pythonOSCport = NetAddr("localhost", 5174);
 oscMetronomeHit = {
 	|i| lastHits[i-1] = SystemClock.beats;
-	netAd.sendMsg("/played-"++i, i);
-	("/played-"++i + "," + i).postln;
+	pythonOSCport.sendMsg("/played-"++i, i);
+	//("/played-"++i + "," + i).postln;
 };
 (0..(n-1)).do(
 	{|i| tempoClocks[i].sched(0, {
@@ -37,7 +37,7 @@ oscMetronomeHit = {
 //--------------------------------set up playChord hanlder--------------------------------
 //msg[1] is an index for which gridState the message is from
 //msg[2] is either "normal", "on", or "off" - specifying a piano vs non-piano play
-//msg[3] is a boolean indicating whether the play is a stepjump play or not
+//msg[3] is a int (1 or 0) indicating whether the play is a stepjump play or not
 MIDIClient.init;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
@@ -46,8 +46,11 @@ playChordParamNum = 4; //start index of where the chord notes start in the OSC m
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
 		{
-			if (msg[3] == True,
-				{/*TODO stepjump: expression for duration*/},
+			if (msg[3] == 1,
+				{
+					chordDur = beats[msg[1]] - (SystemClock.beats-lastHits[msg[1]]) - 0.005;
+					("stepjump duration is" + chordDur).postln;
+				},
 				{chordDur = 0.25*beats[msg[1]]-0.005}
 			);
 			Task({
@@ -71,17 +74,18 @@ OSCFunc(playHandler, "/playChord");
 
 
 //--------------------------------set up stepjump error calculator--------------------------------
-
-pythonOSCport = NetAddr("127.0.0.1", 5174);
+//msg[1] is index of gridState
 
 skipHitCalc = {|msg, time, addr, recvPort|
-	if ((SystemClock.beats - lastHit[msg[1]]) > (beats - steperr),
-		{pythonOSCport.send("/stepjumpFlag", msg[1], 1)},
-		{pythonOSCport.send("/stepjumpFlag", msg[1], 0)},
+	//TODO stepjump: turn of the currently playing chord - add a set object that tracks "on" notes
+	("flag value is " + ((SystemClock.beats - lastHits[msg[1]]) > ((0.25*beats[msg[1]]) - 0.03))).postln;
+	if ((SystemClock.beats - lastHits[msg[1]]) > ((0.25*beats[msg[1]]) - 0.03),
+		{pythonOSCport.sendMsg("/stepJumpFlag", msg[1], 1)},
+		{pythonOSCport.sendMsg("/stepJumpFlag", msg[1], 0)},
 	)
 };
 
-OSCFunc(playHandler, "/skipHitCalc");
+OSCFunc(skipHitCalc, "/skipHitCalc");
 
 
 //--------------------------------set up tap tempo handler--------------------------------
@@ -161,8 +165,6 @@ tempoSyncHandler = {|msg, time, addr, recvPort|
 OSCFunc(tempoSyncHandler, "/tempoSync");
 
 )
-
-
 
 
 

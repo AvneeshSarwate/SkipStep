@@ -84,8 +84,8 @@ class MultiLoop:
 
         self.sceneInd = [-1]*4 # stores the selected indicies of the scene selectors
         self.sceneTogs = [False] * 4 # stores a boolean for each scene selector indicating whether or not it will be used
-        self.recievedGrid = [[0 for i in range(16)] for j in range (16)] # the data of the grid recieved from over the network
-        self.copyGrid = [[0 for i in range(16)] for j in range (16)] # the data from the grid being prepped to send over the network
+        self.recievedGrid = [[0 for i in range(16)] for j in range(16)] # the data of the grid recieved from over the network
+        self.copyGrid = [[0 for i in range(16)] for j in range(16)] # the data from the grid being prepped to send over the network
         self.copyScale = [] # the data from the grid being prepped to send over the network
         self.recievedScale = [] # the data of the grid recieved from over the network
         self.num = n # the number of "instruments" used in SkipStep
@@ -106,6 +106,7 @@ class MultiLoop:
         self.oscServSelf.addDefaultHandlers()
         for i in range(self.num):
             self.oscServSelf.addMsgHandler("/played-" + str(i+1), self.realPlay)
+
 
         # OSC server that recieves messages from the iPad        
         self.oscServUI = OSC.OSCServer((selfIP, 8000))
@@ -198,6 +199,8 @@ class MultiLoop:
         self.oscServUI.addMsgHandler("/load", self.loadSet)
         self.oscServUI.addMsgHandler("/sceneHit", self.sceneHit)
 
+        self.oscServSelf.addMsgHandler("/stepJumpFlag", self.stepjump)
+
         for i in range(16):
                 for j in range(16):
                     self.oscServUI.addMsgHandler("/doubleGrid_1/" + str(i+1) + "/" + str(j+1), self.doubleGridHandler)
@@ -207,7 +210,6 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/doubleSelector_1/1/" + str(i+1), self.doubleGridSelector)
             self.oscServUI.addMsgHandler("/doubleSelector_2/1/" + str(i+1), self.doubleGridSelector)
         
-        #TODO stepjump: set up/fix handlers for stepjump stuff 
 
         for k in range(n):
             
@@ -265,7 +267,7 @@ class MultiLoop:
             
             
             for i in range(16):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/step/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.stepjump))
+                self.oscServUI.addMsgHandler("/" +str(k+1) + "/step/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.preStepJump))
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/pianoKey/" + str(i+1) + "/1", self.pianoKey)
                 
             for i in range(16):
@@ -358,7 +360,7 @@ class MultiLoop:
         msg.setAddress("/playChord")
         msg.append(channel)
         msg.append(piano)
-        msg.append(stepJumpFlag)
+        msg.append(1 if stepJumpFlag else 0)
         for i in chord.n:
             msg.append(i)
         self.superColliderClient.send(msg)
@@ -426,16 +428,17 @@ class MultiLoop:
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the ChucK metronome is recieved 
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
-        if self.skipHit: 
-            self.skipHit = False
-            return
-
         colChord = phrase.Chord()  # placeholder 
         si = int(addr.split("-")[1])-1
         #print "                 played", si
 
         #calculates what column to play based on the index
         state = self.gridStates[si]
+
+        if state.skipHit: 
+            state.skipHit = False
+            return
+
         with state.lock: 
             if state.isColSubLooping:
                 state.progInd %= len(state.columnSubsetLooping)
@@ -451,7 +454,7 @@ class MultiLoop:
                 colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if state.refreshModeOn and not state.pianoModeIsOn:
                 self.refreshColumn(playind, si)
-    
+
         #plays the chords that are defined by each column (phrase.play to be documented later)
         #print colChord, si
         self.playChord(colChord, channel = si)
@@ -498,7 +501,7 @@ class MultiLoop:
                     g = self.noiseChoice(si)
                     with state.lock:
                         self.putGridLive(g, si)
-        
+
                 
     ## helper function is called to return columns to their saved state when snapshot mode is on 
     def refreshColumn(self, k, si):
@@ -625,8 +628,13 @@ class MultiLoop:
     
 
     def preStepJump(self, addr, tags, stuff, source):
-        #TODO stepjump: send ping with si value to superCollider
-        return
+        if stuff[0] == 0: return
+        print "PRE JUMP"
+        si = int(addr.split("/")[1]) - 1
+        msg = OSC.OSCMessage()
+        msg.setAddress("/skipHitCalc")
+        msg.append(si)
+        self.superColliderClient.send(msg)
 
 
     ##is the handler for the stepjump control, OSCaddr: /si/step/i/1 
@@ -634,21 +642,21 @@ class MultiLoop:
         si = stuff[0]  #index of grid action was taken on
         state = self.gridStates[si]
         state.skipHit = stuff[1] == 1
-        if stuff[0] != 0:
-            state.progInd, j = self.gridAddrInd(addr) #replace with gridAddrInd
-            if state.isColSubLooping:
-                if state.progInd in state.columnSubsetLooping:
-                    state.progInd = state.columnSubsetLooping.index(state.progInd)
-                else:
-                    if state.progInd > state.columnSubsetLooping[-1]:
-                        state.progInd = len(state.columnSubsetLooping) - 1
-                        return
-                    i = len(state.columnSubsetLooping) - 1
-                    while state.columnSubsetLooping[i] >= state.progInd:
-                        state.progInd = state.columnSubsetLooping[i]
-                        i -= 1         
+        print "STEP JUMP FLAG VALUE", state.skipHit
+        state.progInd, j = self.gridAddrInd(addr) #TODO stepjump: addr is currently "stepJumpFlag" - msg needs to include progInd
+        if state.isColSubLooping:
+            if state.progInd in state.columnSubsetLooping:
+                state.progInd = state.columnSubsetLooping.index(state.progInd)
+            else:
+                if state.progInd > state.columnSubsetLooping[-1]:
+                    state.progInd = len(state.columnSubsetLooping) - 1
+                    return
+                i = len(state.columnSubsetLooping) - 1
+                while state.columnSubsetLooping[i] >= state.progInd:
+                    state.progInd = state.columnSubsetLooping[i]
+                    i -= 1
        
-        colChord = self.preChordPlay(self.progInd, si)
+        colChord = self.preChordPlay(state.progInd, si)
 
         self.playChord(colChord, channel = si, stepJumpFlag = True)
 
