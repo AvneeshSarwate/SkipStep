@@ -75,13 +75,14 @@ OSCFunc(playHandler, "/playChord");
 
 //--------------------------------set up stepjump error calculator--------------------------------
 //msg[1] is index of gridState
+//msg[2] is the index of the stepjump
 
 skipHitCalc = {|msg, time, addr, recvPort|
 	//TODO stepjump: turn of the currently playing chord - add a set object that tracks "on" notes
 	("flag value is " + ((SystemClock.beats - lastHits[msg[1]]) > ((0.25*beats[msg[1]]) - 0.03))).postln;
 	if ((SystemClock.beats - lastHits[msg[1]]) > ((0.25*beats[msg[1]]) - 0.03),
-		{pythonOSCport.sendMsg("/stepJumpFlag", msg[1], 1)},
-		{pythonOSCport.sendMsg("/stepJumpFlag", msg[1], 0)},
+		{pythonOSCport.sendMsg("/stepJumpFlag", msg[1], 1, msg[2])},
+		{pythonOSCport.sendMsg("/stepJumpFlag", msg[1], 0, msg[2])},
 	)
 };
 

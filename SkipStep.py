@@ -631,9 +631,11 @@ class MultiLoop:
         if stuff[0] == 0: return
         print "PRE JUMP"
         si = int(addr.split("/")[1]) - 1
+        progInd, j = self.gridAddrInd(addr)
         msg = OSC.OSCMessage()
         msg.setAddress("/skipHitCalc")
         msg.append(si)
+        msg.append(progInd)
         self.superColliderClient.send(msg)
 
 
@@ -643,7 +645,7 @@ class MultiLoop:
         state = self.gridStates[si]
         state.skipHit = stuff[1] == 1
         print "STEP JUMP FLAG VALUE", state.skipHit
-        state.progInd, j = self.gridAddrInd(addr) #TODO stepjump: addr is currently "stepJumpFlag" - msg needs to include progInd
+        state.progInd = stuff[2]
         if state.isColSubLooping:
             if state.progInd in state.columnSubsetLooping:
                 state.progInd = state.columnSubsetLooping.index(state.progInd)

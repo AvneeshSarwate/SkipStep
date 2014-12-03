@@ -9,10 +9,9 @@ TASKS
 - finish implementing tempoFit and test multi-metronome features 
 	next-hit-sync not working, the rest besides tempoFit work 
 - handle race conditions for tempo syncing
-- make step jumping immediately play the touched note 
-	(use same mechanism as next-hit-sync to resync it to metronome)
 - refactoring (mainly cleaning up names)
 	match OSC address names to functions
+	specify what arguments come in via OSC and what is sent out via OSC
 	organize __init__() section handler assignment of functions on
 		the same miniPage are adjacent 
 - inspect/fix bug/desing-flaw with refresh mode over grid sequencing 
