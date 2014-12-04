@@ -1,5 +1,7 @@
 TASKS
 - finish implementing immediate-play stepjump - “TODO stepjump”
+- implement on/off toggle for immediate-play stepjump
+- determine whether current design of immediate-play stepjump is good 
 - BUG: when both double selectors on same index, one doesn’t update the other
 - decide how tempoFit should work as a feature
 	tempoFit will take the current instrument and adjust its tempo so the

@@ -364,8 +364,9 @@ class MultiLoop:
         for i in chord.n:
             msg.append(i)
         self.superColliderClient.send(msg)
-    
-    def preChordPlay(self, progInd, si):
+
+    ## function that determines what chord will be played based on the progInd
+    def preChordPlay(self, si):
         colChord = phrase.Chord()  # placeholder 
         
         #calculates what column to play based on the index
@@ -388,6 +389,8 @@ class MultiLoop:
 
         return colChord
 
+    ## function that handles changing state (transformation functions, grid indexing, etc)
+    ## that occurs when a loop repeats
     def postChordPlay(self, si):
         state = self.gridStates[si]
         if (not state.isColSubLooping and (state.progInd == 16))  or (state.isColSubLooping and (state.progInd == len(state.columnSubsetLooping))) or (state.progInd == -1):
@@ -428,7 +431,6 @@ class MultiLoop:
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the ChucK metronome is recieved 
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
-        colChord = phrase.Chord()  # placeholder 
         si = int(addr.split("-")[1])-1
         #print "                 played", si
 
@@ -439,21 +441,8 @@ class MultiLoop:
             state.skipHit = False
             return
 
-        with state.lock: 
-            if state.isColSubLooping:
-                state.progInd %= len(state.columnSubsetLooping)
-                playind = state.columnSubsetLooping[state.progInd]
-                
-            else:
-                state.progInd %= 16
-                playind = state.progInd
-            if state.pianoModeIsOn:
-                colChord = phrase.Chord([-1])
-            else:
-                self.sendToUI("/" + str(si+1) + "/step/" + str(playind+1) + "/1", 1)
-                colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
-            if state.refreshModeOn and not state.pianoModeIsOn:
-                self.refreshColumn(playind, si)
+        colChord = self.preChordPlay(si)
+
 
         #plays the chords that are defined by each column (phrase.play to be documented later)
         #print colChord, si
@@ -464,43 +453,8 @@ class MultiLoop:
         
         #noise moved to after playing so noise calculations can be done in downtime while note is "playing"
         #could move other stuff into this loop as well if performance is an issue
-        
-        
-        state = self.gridStates[si]
-        if (not state.isColSubLooping and (state.progInd == 16))  or (state.isColSubLooping and (state.progInd == len(state.columnSubsetLooping))) or (state.progInd == -1):
-            if state.gridseqFlag and sum(state.gridseq) != -8:
-                state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
-                while state.gridseq[state.gridseqInd] == -1: 
-                    state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                    print "       progressing to index", state.gridseqInd
-                
-                
-                print "GRID SEQUENCING CHANGE ", si+1, "seq ind is ", state.gridseqInd, "seq value is", state.gridseq[state.gridseqInd]
-                self.sendToUI("/" + str(si+1) + "/gridseq/" + str(state.gridseqInd+1) + "/1", 1)
-                
-                if state.gridseq[state.gridseqInd] == "blank": 
-                    g = [[0 for i in range(16)] for j in range(16)]
-                    scale = state.scale
-                    root = state.root
-                    colsub = []
-                else:
-                    g, scale, root, colsub = self.stringToMiniState(state.savedGrid[state.gridseq[state.gridseqInd]])
-                
-                if state.noisy:
-                    g = self.noiseChoice(si)
-                    if not state.refreshModeOn:
-                        state.savedGrid[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
-                with state.lock:
-                    self.putMiniStateLive(g, scale, root, colsub, si) 
-                state.gridseqInd = (state.gridseqInd + state.stepIncrement) % 8
-                print "done with sequencing update"
-                
-            else:
-                #print "NOT SEQUENCING ", si+1
-                if state.noisy:
-                    g = self.noiseChoice(si)
-                    with state.lock:
-                        self.putGridLive(g, si)
+        self.postChordPlay(si)
+
 
                 
     ## helper function is called to return columns to their saved state when snapshot mode is on 
@@ -658,7 +612,7 @@ class MultiLoop:
                     state.progInd = state.columnSubsetLooping[i]
                     i -= 1
        
-        colChord = self.preChordPlay(state.progInd, si)
+        colChord = self.preChordPlay(si)
 
         self.playChord(colChord, channel = si, stepJumpFlag = True)
 
