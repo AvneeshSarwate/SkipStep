@@ -211,6 +211,8 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/doubleSelector_2/1/" + str(i+1), self.doubleGridSelector)
         
 
+        self.oscServUI.addMsgHandler("/responseAlg", self.applyResponseAlg)
+
         for k in range(n):
             
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/noisy", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseFlip))
@@ -1778,6 +1780,54 @@ class MultiLoop:
                 if cli.address()[0] == source[0]:
                     cli.send(msg) #self.oscClientUI.send(msg)
             msg.clear()
+
+    ## TODO responsealgs: add button and handler for this method
+    ## uses grid and offline grid of instrument 1 as old control grid and changed control grid respectively
+    ## and uses the grid of instrument 2 as the target grid. a single button hit launches the
+    ## response function which is copied and pasted into the responseAlg() function
+    #currently quadShift
+    def applyResponseAlg(self, addr, tags, stuff, source):
+
+        if stuff[0] == 0: return
+
+        state1 = self.gridStates[0]
+        state2 = self.gridStates[1]
+
+        newg = self.responseAlg(state1.grid, state1.offlineGrid, state2.grid)
+
+        self.pullUpGrid(newg, "/2/grid")
+        state2.grid = newg
+        state2.prog = self.gridToProg(state2.grid, state2.scale, state2.root)
+
+    def responseAlg(self, oldGrid, newGrid, targetGrid):
+        shifts = [0] * 4
+        g =  [[0 for i in range(16)] for j in range(16)]
+        for i1 in range(4):
+            oldYsum = 0
+            newYsum = 0
+            oldYcount = 0
+            newYcount = 0
+            for i2 in range(4):
+                for j in range(16):
+                    oldYcount += oldGrid[4*i1+i2][j]
+                    newYcount += newGrid[4*i1+i2][j]
+                    if oldGrid[4*i1+i2][j] == 1 : oldYsum += j
+                    if newGrid[4*i1+i2][j] == 1 : newYsum += j
+            print "oldYsum", oldYsum, "newYsum", newYsum, "oldYcount", oldYcount, "newYcount", newYcount
+            shifts[i1] = int(1.0*newYsum/newYcount - 1.0*oldYsum/oldYcount)
+
+            if shifts[i1] == 0 : continue
+            if shifts[i1] > 0:
+                oldCopy = copy.deepcopy(oldGrid)
+                for i in range(shifts[i1]):
+                    oldCopy = self.gridShift(oldCopy, "up")
+                g = self.columnOverlay(g, oldCopy, range(4*i1, 4*i1+4))
+            if shifts[i1] < 0:
+                oldCopy = copy.deepcopy(oldGrid)
+                for i in range(abs(shifts[i1])):
+                    oldCopy = self.gridShift(oldCopy, "down")
+                g = self.columnOverlay(g, oldCopy, range(4*i1, 4*i1+4))
+        return g
                  
 def startSoloBackend():
     subprocess.call("chuck LooperBackendSolo.ck", shell=True)

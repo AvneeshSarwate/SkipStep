@@ -198,3 +198,54 @@ def naiveNoise(grid, lev):
             else:
                 newG[i][j] = grid[i][j]
     return newG
+
+
+def gridDiff(newGrid, oldGrid):
+    diff =  [[0 for i in range(16)] for j in range(16)]
+    for i in range(len(newGrid)):
+        for j in range(len(newGrid)):
+            diff[i][j] = newGrid[i][j] - oldGrid[i][j]
+    return diff
+
+def bit(i):
+    return 1 if i >= 1 else 0
+
+def quadShift(oldGrid, newGrid, targetGrid):
+    shifts = [0] * 4
+    g =  [[0 for i in range(16)] for j in range(16)]
+    for i1 in range(4):
+        oldYsum = 0
+        newYsum = 0
+        oldYcount = 0
+        newYcount = 0
+        for i2 in range(4):
+            for j in range(16):
+                oldYcount += oldGrid[4*i1+i2][j]
+                newYcount += newGrid[4*i1+i2][j]
+                if oldGrid[4*i1+i2][j] == 1 : oldYsum += j
+                if newGrid[4*i1+i2][j] == 1 : newYsum += j
+        print "oldYsum", oldYsum, "newYsum", newYsum, "oldYcount", oldYcount, "newYcount", newYcount
+        shifts[i1] = int(1.0*newYsum/newYcount - 1.0*oldYsum/oldYcount)
+
+        if shifts[i1] == 0 : continue
+        if shifts[i1] > 0:
+            oldCopy = copy.deepcopy(oldGrid)
+            for i in range(shifts[i1]):
+                oldCopy = gridShift(oldCopy, "up")
+            g = columnOverlay(g, oldCopy, range(4*i1, 4*i1+4))
+        if shifts[i1] < 0:
+            oldCopy = copy.deepcopy(oldGrid)
+            for i in range(abs(shifts[i1])):
+                oldCopy = gridShift(oldCopy, "down")
+            g = columnOverlay(g, oldCopy, range(4*i1, 4*i1+4))
+    return g
+
+
+
+
+
+
+
+
+
+
