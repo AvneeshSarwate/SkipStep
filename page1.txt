@@ -1,1 +1,0 @@
-/step /col /colsel /noisy /noiselev /noiseSel /noiseHit /refresh /piano /gridload /gridsave /load /save /undo /clear /up /down /left /right /arrowToggle /sync
