@@ -240,6 +240,84 @@ def quadShift(oldGrid, newGrid, targetGrid):
             g = columnOverlay(g, oldCopy, range(4*i1, 4*i1+4))
     return g
 
+def percentDiff(oldGrid, newGrid, targetGrid):
+    percent = .5
+
+    diff = gridDiff(newGrid, oldGrid)
+
+    diffList = [(i, j, diff[i][j]) for i in range(16) for j in range(16)]
+
+    random.shuffle(diffList)
+
+    randDiff = diffList[0:int(percent*len(diffList))]
+
+    for d in randDiff:
+        targetGrid[d[0]][d[1]] = bit((targetGrid[d[0]][d[1]] + d[2]))
+
+
+def correlatedDensity(oldGrid, newGrid, targetGrid):
+
+    diff = gridDiff(newGrid, oldGrid)
+
+    netDiff = sum([sum(i) for i in diff])
+
+
+
+
+
+class ResponseFunctionManager:
+
+    def __init__(self, responseFunc):
+        self.functionMap = {}
+        self.triggerMap = {}
+
+    ##holds a dict of [key, set((oldGrid, newGrid, targetGrid, responseFunc))]
+    def add(self, key, responseFunc, oldGrid, newGrid, targetGrid):
+        if key in self.functionMap.keys():
+            self.functionMap[key].add((responseFunc, oldGrid, newGrid, targetGrid))
+        else:
+            self.functionMap[key] = {(responseFunc, oldGrid, newGrid, targetGrid)}
+
+    ## calls responseFunc(newGrid, oldGrid, targetGrid) for all tuples specified by the key
+    def call(self, key):
+        if key in self.functionMap.keys():
+            for tup in self.functionMap[key]:
+                tup[0](tup[1], tup[2], tup[3])
+
+    ##stateHolderObj holds some state
+    # triggerEvaluatorFunc takes stateHolderObj (and optionally other things) as arguments,
+    #   updates the stateHolderObj based on the args and returns true or false
+    # pingTrigger(key) calls triggerEvaluatorFunc(stateHolderObj, *args) and if it returns true,
+    #   calls responseFunc(newGrid, oldGrid, targetGrid) for all tuples specified by the key
+    #
+    #   If true is returned the the response function is called on the registered grids
+    def setTrigger(self, key, stateHolderObj, triggerEvaluatorFunc, responseFunc, oldGrid, newGrid, targetGrid):
+        if key in self.triggerMap.keys():
+            self.triggerMap[key].add(
+                {
+                    "obj": stateHolderObj,
+                    "evalFunc": triggerEvaluatorFunc,
+                    "responseFunc": (responseFunc, oldGrid, newGrid, targetGrid)
+                }
+            )
+        else:
+            self.triggerMap[key] = {{
+                                        "obj": stateHolderObj,
+                                        "evalFunc": triggerEvaluatorFunc,
+                                        "responseFunc": (responseFunc, oldGrid, newGrid, targetGrid)
+                                    }}
+
+    def pingTrigger(self, key, *args):
+        if key in self.triggerMap.keys():
+            for trigger in self.triggerMap[key]:
+                if trigger["evalFunc"](trigger["obj"], *args):
+                    func = trigger["responseFunc"]
+                    func[0](func[1], func[2], func[3])
+
+
+
+
+
 
 
 
