@@ -52,7 +52,7 @@ class Looper:
         self.metronomeToggled = True 
         self.rhythmInstSubsets = [] # set of indexes for the instruments will be affected by rhythm controls
         self.syncTypes = [] # set of indexes for what rhythmic synchronizations will be applied. order: [tempo, nexthit, index]
-        self.skipHit = False
+        self.skipHit = False #flag that determines whether to skip the handling of the metronome hit based on the residual time between a stepjump hit and the next metronome hit
 
         self.lock = threading.Lock()
 
@@ -431,7 +431,7 @@ class MultiLoop:
                         self.putGridLive(g, si)
 
     ##the function that handles everything that needs to happen during the "step" of a metronome
-    ##is called when an OSC message from the ChucK metronome is recieved 
+    ##is called when an OSC message from the SuperCollider metronome is recieved
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
         si = int(addr.split("-")[1])-1
         #print "                 played", si
@@ -462,6 +462,10 @@ class MultiLoop:
     ## helper function is called to return columns to their saved state when snapshot mode is on 
     def refreshColumn(self, k, si):
         state = self.gridStates[si]
+
+        if state.algSubsets:
+            if not k in state.algColumnSub: return
+
         for i in range(len(state.grid)):
             if state.refreshModeSavedGrid[k][i] != state.grid[k][i]:
                 self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), state.refreshModeSavedGrid[k][i])
@@ -955,15 +959,23 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         if state.offlineEdit:
-            state.offlineGrid = [[0 for i in range(16)] for j in range (16)]
+            if state.algSubsets:
+                state.offlineGrid = self.columnOverlay(state.offlineGrid, [[0 for i in range(16)] for j in range (16)], state.algColumnSub)
+            else:
+                state.offlineGrid = [[0 for i in range(16)] for j in range (16)]
             self.pullUpGrid(state.offlineGrid, "/" +str(si+1) + "/offGrid")
             return
         if state.gridseqEdit:
             state.gridseq[state.gridseqInd] = "blank"
             self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), "b")
             return
-        state.prog.c = [phrase.Chord([-1]) for i in range(16)]
-        state.grid = [[0 for i in range(16)] for j in range (16)]
+        if state.algSubsets:
+            for i in state.algColumnSub:
+                state.prog.c[i] = phrase.Chord([-1])
+                state.grid = self.columnOverlay(state.grid, [[0 for i in range(16)] for j in range (16)], state.algColumnSub)
+        else:
+            state.prog.c = [phrase.Chord([-1]) for i in range(16)]
+            state.grid = [[0 for i in range(16)] for j in range (16)]
         self.pullUpGrid(state.grid, "/" +str(si+1) + "/grid")
     
     
