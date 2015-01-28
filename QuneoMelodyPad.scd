@@ -1,4 +1,4 @@
-(var midiOut, rhythmList, pitchSeqList, tempoClocks, noteToInd, noteToXY, padPlay, indDictList, art, degrees, rhythms, scales, scale, speed, buildMelody, root, roots, ordinals, sliderInd;
+(var midiOut, rhythmList, pitchSeqList, tempoClocks, noteToInd, noteToXY, padPlay, indDictList, art, degrees, rhythms, scales, scale, speed, buildMelody, root, roots, ordinals, sliderInd, padOn, padOff;
 
 MIDIIn.connectAll;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
@@ -73,7 +73,7 @@ padPlay = {|padInd, ind|
 	Task({
 		midiOut.noteOn(0, pd["mel"][ind%pd["mel"].size]);
 
-		(pd["mel"][ind%pd["mel"].size] + " " + ((speed * pd["rhy"][ ind%pd["rhy"].size ]) - art)).postln;
+		//(pd["mel"][ind%pd["mel"].size] + " " + ((speed * pd["rhy"][ ind%pd["rhy"].size ]) - art)).postln;
 
 		((speed * pd["rhy"][ ind%pd["rhy"].size ]) - art).wait;
 
@@ -81,11 +81,26 @@ padPlay = {|padInd, ind|
 	}).play;
 
 	tempoClocks[padInd].sched((speed * pd["rhy"][ ind%pd["rhy"].size ]), {padPlay.value(padInd, ind+1)});
-
 };
 
-padPlay.value(1, 0);
 
+a = {|vel, note, chan, port|
+	//insted of sliderInd directly - should scale it to some value between 0 and LCM of melody and rhtyhm lenghts
+	padPlay.value(noteToInd.value(note), sliderInd);
+	("played pad" + noteToInd.value(note)).postln;
+};
+padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
+
+padOff = MIDIFunc.noteOff({|vel, note, chan, port|
+	tempoClocks[noteToInd.value(note)].clear();
+	},
+	nil, nil, 2017846184);
+
+)
+
+(
+MIDIClient.init;
+MIDIClient.sources[1].uid;
 )
 
 (
