@@ -108,9 +108,9 @@ midiOut.latency = 0;
 pianoOn = MIDIFunc.noteOn({|vel, note, chan, port|
 	semaphore.wait;
 	activeChord.add(note);
-	//activeChord.postln;
+	activeChord.postln;
 	if(pianoAudioToggle, {midiOut.noteOn(channel, note, vel);});
-	semaphore.signal;}, nil, nil, 23048651);
+	semaphore.signal;}, nil, nil, MIDIClient.sources[2].uid);
 
 pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	var newInd, oldInd, newChord;
@@ -129,7 +129,7 @@ pianoOff = MIDIFunc.noteOff({|vel, note, chan, port|
 	if(pianoAudioToggle, {midiOut.noteOff(channel, note, vel);});
 	//activeChord.postln;
 	semaphore.signal;}, //so there are no "hanging" notes when you release a piano note before a pad
-	nil, nil, 23048651);
+	nil, nil, MIDIClient.sources[2].uid);
 
 //functions for noteOn/off messages from Queneo
 a = {|vel, note, chan, port|
@@ -183,9 +183,9 @@ a = {|vel, note, chan, port|
 	);
 	if(note == pianoToggleNote, {pianoAudioToggle = pianoAudioToggle.not;});
 	semaphore.signal;
-	//vel.postln;
+	vel.postln;
 };
-padOn = MIDIFunc.noteOn(a, nil, nil, 536587261);
+padOn = MIDIFunc.noteOn(a, nil, nil, MIDIClient.sources[1].uid);
 
 b = {|vel, note, chan, port|
 	var newChord, padInd, noteOffSet;
@@ -222,7 +222,7 @@ b = {|vel, note, chan, port|
 	});
 	semaphore.signal;
 }; //if two pads share a note and one pad turns off, the shared note turns off - fix this so shared note stays on
-padOff = MIDIFunc.noteOff(b, nil, nil, 536587261);
+padOff = MIDIFunc.noteOff(b, nil, nil, MIDIClient.sources[1].uid);
 
 //vibrato handling function
 c = {|vel, note, chan, port|
@@ -296,7 +296,7 @@ c = {|vel, note, chan, port|
 		semaphore.signal;
 	});
 };
-ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
+ccHandler = MIDIFunc.cc(c, nil, nil, MIDIClient.sources[1].uid);
 
 )
 
@@ -308,7 +308,8 @@ ccHandler = MIDIFunc.cc(c, nil, nil, 536587261);
 
 
 
-
+MIDIClient.init;
+MIDIClient.sources[1].uid;
 
 
 
