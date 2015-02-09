@@ -1,7 +1,16 @@
 
 let osc = OscShape {path = "/play",
                     params = [S "sound" Nothing,
-                              F "mid1" (Just 0)
+                              F "mid1" (Just 0),
+                              F "mid2" (Just 0),
+                              F "mid3" (Just 0),
+                              F "mid4" (Just 0),
+                              F "mid5" (Just 0),
+                              F "mid6" (Just 0),
+                              F "mid7" (Just 0),
+                              F "mid8" (Just 0),
+                              F "mid9" (Just 0),
+                              F "mid10" (Just 0)
                              ],
                     timestamp = NoStamp,
                     latency = 0,
@@ -9,12 +18,23 @@ let osc = OscShape {path = "/play",
                     preamble = []
                    }
 
-s <- stream "127.0.0.1" 57120 osc
 let mid1 = makeF osc "mid1"
+    mid2 = makeF osc "mid2"
+    mid3 = makeF osc "mid3"
+    mid4 = makeF osc "mid4"
+    mid5 = makeF osc "mid5"
+    mid6 = makeF osc "mid6"
+    mid7 = makeF osc "mid7"
+    mid8 = makeF osc "mid8"
+    mid9 = makeF osc "mid9"
+    mid10 = makeF osc "mid10"
 
+s <- stream "127.0.0.1" 57120 osc
 
-s $ sound "bd*12" |+| mid1 "0.1 0.4"
+s $ sound "bd*2" |+| mid1 "0.1 0.4" |+| mid10 "0.3 0.4"
 
 s $ silence
 
 s $ sound "ho:1 bd:3*16 sn:5 sn bd*4"
+
+s $ sound "[bd*3 bd, sn*4 sn]"

@@ -42,6 +42,7 @@ midiSend =  {|msg, time, addr, recvPort|
 	drumInd = if(drumInd.isNil, 0, {drumInd.asInteger});
 	drumType = drumTypes[drumStr.split($:)[0]].asInteger;
 
+	msg.postln;
 
 	//send cc map stuff if applicable
 	Task({
