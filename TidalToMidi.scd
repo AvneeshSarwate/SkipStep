@@ -30,9 +30,6 @@ drumTypes.put("bin", 102);
 drumTypes.put("bend", 104);
 
 //TODO: BUILD MAP FROM TIDAL SYNTH PARAMS TO MIDI-CC PARAMS
-//TODO: BUILD WAY TO MANUALLY MAP MIDI-CC PARAMS FROM CODE TO ABLETON
-
-//Fill in OLD FUNC
 
 midiSend =  {|msg, time, addr, recvPort, chanInd|
 	var drumInd, drumType, drumStr;
@@ -43,6 +40,10 @@ midiSend =  {|msg, time, addr, recvPort, chanInd|
 	drumType = drumTypes[drumStr.split($:)[0]].asInteger;
 
 	msg.postln;
+
+	(2..(msg.size - 1)).do({|i|
+		if(msg[i] > -1, {midiOut.control(chanInd-1, i-2, (msg[i]*127).round)});
+	});
 
 	//send cc map stuff if applicable
 	Task({
@@ -55,6 +56,29 @@ midiSend =  {|msg, time, addr, recvPort, chanInd|
 (1..4).do({|i|
 	OSCFunc(midiSend.value(_, _, _, _, i), "play-"++i.asString);
 });
+
+(
+//FUNCTION TO "TWIDDLE KNOB" FOR A MIDI-CC
+var twiddle = {|chan, ccNum|
+	var midiOut;
+
+	MIDIClient.init;
+	midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
+	midiOut.latency = 0;
+
+	Task({
+		midiOut.control(chan, ccNum, 0);
+		0.01.wait;
+		midiOut.control(chan, ccNum, 127);
+	}).play;
+};
+twiddle.value(0, 1);
+)
+
+
+
+
+
 
 
 )
@@ -132,29 +156,15 @@ Task({
 )
 
 (
-//FUNCTION TO "TWIDDLE KNOB" FOR A MIDI-CC
-twiddle = {|chan, ccNum|
-
-	MIDIClient.init;
-	midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
-	midiOut.latency = 0;
-
-	Task({
-		midiOut.control(chan, ccNum, 0);
-		0.01.wait;
-		midiOut.control(chan, ccNum, 128);
-	}).play;
-};
-twiddle.value(0, 1);
-)
-(
 var j, func;
 j = List();
 func = {i*2};
 (1..5).do({|i| j.add(func)});
 j[2].value();
 )
+[1, 2, 4].size
 
+(0.5*127).round
 
 "a:b".split($l)[1]
 
