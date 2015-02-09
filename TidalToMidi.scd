@@ -32,9 +32,9 @@ drumTypes.put("bend", 104);
 //TODO: BUILD MAP FROM TIDAL SYNTH PARAMS TO MIDI-CC PARAMS
 //TODO: BUILD WAY TO MANUALLY MAP MIDI-CC PARAMS FROM CODE TO ABLETON
 
-ind = 0;
+//Fill in OLD FUNC
 
-midiSend =  {|msg, time, addr, recvPort|
+midiSend =  {|msg, time, addr, recvPort, chanInd|
 	var drumInd, drumType, drumStr;
 
 	drumStr = msg[1].asString;
@@ -46,18 +46,16 @@ midiSend =  {|msg, time, addr, recvPort|
 
 	//send cc map stuff if applicable
 	Task({
-		midiOut.noteOn(drumChan, drumType+drumInd); //maybe add velocity based on gain?
+		midiOut.noteOn(chanInd-1, drumType+drumInd); //maybe add velocity based on gain?
 		0.001.wait;
-		midiOut.noteOff(drumChan, drumType+drumInd);
+		midiOut.noteOff(chanInd-1, drumType+drumInd);
 	}).play;
-	ind = ind+1;
-	ind.postln;
-	if(ind%100 == 50, {"aaaaaay".postln});
-
-
 };
 
-OSCFunc(midiSend, "/play");
+(1..4).do({|i|
+	OSCFunc(midiSend.value(_, _, _, _, i), "play-"++i.asString);
+});
+
 
 )
 //------------------------------------------------------------------------
@@ -76,7 +74,49 @@ OSCFunc(midiSend, "/play");
 
 
 //------------------------------------------------------------------------
+//OLD FUNC
+(
+
+midiSend =  {|msg, time, addr, recvPort|
+	var drumInd, drumType, drumStr;
+
+	drumStr = msg[1].asString;
+	drumInd = drumStr.split($:)[1];
+	drumInd = if(drumInd.isNil, 0, {drumInd.asInteger});
+	drumType = drumTypes[drumStr.split($:)[0]].asInteger;
+
+	msg.postln;
+
+	//send cc map stuff if applicable
+	Task({
+		midiOut.noteOn(drumChan, drumType+drumInd); //maybe add velocity based on gain?
+		0.001.wait;
+		midiOut.noteOff(drumChan, drumType+drumInd);
+	}).play;
+	//ind = ind+1;
+	//ind.postln;
+	//if(ind%100 == 50, {"aaaaaay".postln});
+
+};
+
+OSCFunc(midiSend, "/play");
+)
+
+//------------------------------------------------------------------------
 //IGNORE: scratch code
+
+(
+var fu, bu;
+fu = {|ar, br, cr|
+	[ar, br, cr].postln;
+};
+fu.value(1, 2, 3);
+bu = fu.value(1,2, _);
+bu.value(5);
+)
+
+"ab" ++ 5.asString
+
 (
 var midiOut;
 MIDIClient.init;
@@ -107,6 +147,14 @@ twiddle = {|chan, ccNum|
 };
 twiddle.value(0, 1);
 )
+(
+var j, func;
+j = List();
+func = {i*2};
+(1..5).do({|i| j.add(func)});
+j[2].value();
+)
+
 
 "a:b".split($l)[1]
 

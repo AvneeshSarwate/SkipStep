@@ -1,40 +1,54 @@
+let paramList = [S "sound" Nothing,
+              F "mid1" (Just 0),
+              F "mid2" (Just 0),
+              F "mid3" (Just 0),
+              F "mid4" (Just 0),
+              F "mid5" (Just 0),
+              F "mid6" (Just 0),
+              F "mid7" (Just 0),
+              F "mid8" (Just 0),
+              F "mid9" (Just 0),
+              F "mid10" (Just 0)]
 
-let osc = OscShape {path = "/play",
-                    params = [S "sound" Nothing,
-                              F "mid1" (Just 0),
-                              F "mid2" (Just 0),
-                              F "mid3" (Just 0),
-                              F "mid4" (Just 0),
-                              F "mid5" (Just 0),
-                              F "mid6" (Just 0),
-                              F "mid7" (Just 0),
-                              F "mid8" (Just 0),
-                              F "mid9" (Just 0),
-                              F "mid10" (Just 0)
-                             ],
+
+let makeOscShape paramList num = OscShape {path = "/play-" ++ (show num),
+                    params = paramList,
                     timestamp = NoStamp,
                     latency = 0,
                     namedParams = False,
                     preamble = []
                    }
 
-let mid1 = makeF osc "mid1"
-    mid2 = makeF osc "mid2"
-    mid3 = makeF osc "mid3"
-    mid4 = makeF osc "mid4"
-    mid5 = makeF osc "mid5"
-    mid6 = makeF osc "mid6"
-    mid7 = makeF osc "mid7"
-    mid8 = makeF osc "mid8"
-    mid9 = makeF osc "mid9"
-    mid10 = makeF osc "mid10"
+let shapes = (makeOscShape paramList) <$> [1, 2, 3, 4]
 
-s <- stream "127.0.0.1" 57120 osc
+let mid1 = makeF (shapes!!0) "mid1"
+    mid2 = makeF (shapes!!0) "mid2"
+    mid3 = makeF (shapes!!0) "mid3"
+    mid4 = makeF (shapes!!0) "mid4"
+    mid5 = makeF (shapes!!0) "mid5"
+    mid6 = makeF (shapes!!0) "mid6"
+    mid7 = makeF (shapes!!0) "mid7"
+    mid8 = makeF (shapes!!0) "mid8"
+    mid9 = makeF (shapes!!0) "mid9"
+    mid10 = makeF (shapes!!0) "mid10"
 
-s $ sound "bd*2" |+| mid1 "0.1 0.4" |+| mid10 "0.3 0.4"
+s1 <- stream "127.0.0.1" 57120 (shapes!!0)
+s2 <- stream "127.0.0.1" 57120 (shapes!!1)
 
-s $ silence
 
-s $ sound "ho:1 bd:3*16 sn:5 sn bd*4"
+let mks os = do
+             s <- stream "127.0.0.1" 57120 os
+             (s)
+             
 
-s $ sound "[bd*3 bd, sn*4 sn]"
+let osc1 = makeOscShape paramList 1
+let osc2 = makeOscShape paramList 2
+
+
+
+s1 <- stream "127.0.0.1" 57120 osc1
+s2 <- stream "127.0.0.1" 57120 osc2
+
+s1 $ sound "bd*12" |+| mid1 "0.1 0.4" |+| mid10 "0.3 0.4"
+s2 $ sound "sn:5*2" |+| mid1 "0.1 0.4" |+| mid10 "0.3 0.4"
+
