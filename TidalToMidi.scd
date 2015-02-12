@@ -28,6 +28,7 @@ drumTypes.put("bot", 90);
 drumTypes.put("cp", 100);
 drumTypes.put("bin", 102);
 drumTypes.put("bend", 104);
+drumTypes.put("aud", 108)
 
 //TODO: BUILD MAP FROM TIDAL SYNTH PARAMS TO MIDI-CC PARAMS
 
@@ -57,6 +58,9 @@ midiSend =  {|msg, time, addr, recvPort, chanInd|
 	OSCFunc(midiSend.value(_, _, _, _, i), "play-"++i.asString);
 });
 
+)
+
+
 (
 //FUNCTION TO "TWIDDLE KNOB" FOR A MIDI-CC
 var twiddle = {|chan, ccNum|
@@ -72,16 +76,12 @@ var twiddle = {|chan, ccNum|
 		midiOut.control(chan, ccNum, 127);
 	}).play;
 };
-twiddle.value(0, 1);
+twiddle.value(0, 0);
 )
 
 
 
 
-
-
-
-)
 //------------------------------------------------------------------------
 //minimal example to test where the quantization was coming from
 (
