@@ -105,6 +105,8 @@ b = {|vel, note, chan, port|
 		//if highest note shift up
 		if(noteToInd.(note) == 15, {octaveShift.(1)});
 
+		//TODO: add toggle for turning "auto transposing" on or off
+
 		//if lowest note shift down
 		if(noteToInd.(note) == 0, {octaveShift.(-1)});
 	});
