@@ -33,6 +33,32 @@ oscMetronomeHit = {
 		beats[i]*0.25/*0.25*/})}
 );
 
+/*
+beatHit
+
+vars - loopingOn[i], holdPlayOn (can't be on at same time, buttons toggle them on/off)
+       lastHits[] - array indicating value of lastHit flag for each instrument/metronome
+       metronomeTasks[] - column/instrument -> task mapping
+       notesOn[] - on notes for each instrument
+
+MetronomeTask - loops and sends metronomeHit while (!loopOn[i] lastHits[i]) is true, then sets it to false
+
+padDown -
+    if this is not a "turn off loop" scenario
+        send padDown message to python, wait on "gridLoaded" message
+
+onGridLoaded
+    start MetronomeTask
+    add task to metronomeTask[i]
+
+padUp -
+    turn off notes for that instrument/column
+    destroy/erase/stop task for that column
+
+TODO in Python - create padDown endpoint, add lastHit flag, check that refres
+
+*/
+
 
 //--------------------------------set up playChord hanlder--------------------------------
 //msg[1] is an index for which gridState the message is from
@@ -46,6 +72,7 @@ playChordParamNum = 4; //start index of where the chord notes start in the OSC m
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
 		{
+			//TODO: set lastHits[i] flag if needed
 			if (msg[3] == 1,
 				{
 					chordDur = beats[msg[1]] - (SystemClock.beats-lastHits[msg[1]]) - 0.005;
@@ -54,6 +81,7 @@ playHandler = {|msg, time, addr, recvPort|
 				{chordDur = 0.25*beats[msg[1]]-0.005}
 			);
 			Task({
+				//TODO: add onNotes tracking
 				msg[playChordParamNum..].do({|i| midiOut.noteOn(msg[1], i)});/*hit noteOn messages*/
 				chordDur.wait; /*wait for beat*/
 				msg[playChordParamNum..].do({|i| midiOut.noteOff(msg[1], i)}); /*hit noteOff messages*/
