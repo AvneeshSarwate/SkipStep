@@ -55,7 +55,9 @@ padUp -
     turn off notes for that instrument/column
     destroy/erase/stop task for that column
 
-TODO in Python - create padDown endpoint, add lastHit flag, check that refres
+TODO in Python - create padDown endpoint, add lastHit flag,
+check that refresh/auto-alg stuff (stuff in postChordPlay() in python)
+all works properly wrt timing after the last chord is played in all use cases
 
 */
 
