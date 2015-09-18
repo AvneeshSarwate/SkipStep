@@ -84,8 +84,19 @@ TODO: - need a way to stop a looping melody without starting a new one
          - need to save 4 "reactive" miniStates
       - maybe don't have step tracker move, but be static and act as a "start point" control
       - expand miniState to include: alg parameters (type, intensity, loop), refershMode, "start point" ^
+      - change grid save/load UI to a single selector, which selects which miniState is "active to edit"
+      - remove "offline grid" logic
+      - must modify function for every UI element that interacts with miniState
+         - gridState contains a "miniState" list (consolidation of miniState parameters),
+           and a "selected miniState" ind indicated which is "active to edit"
+         - change all "state.{property}" to "state.miniStates[activeInd].{property}"
+         - can you replace "state = self.gridStates[someInd]" with
+           "state = self.gridStates[someInd].miniStates[activeInd]"
+             - can we move to a model where mini state UI hanlders don't access any properties not in minStates?
+             - can we remove all state information not related to a miniState from the model?
+                - moving close to the design that what is on the ipad only defines "musical closures"
+                  and all performative state is controlled by the pad
       - need to do lights
-
 
 */
 
