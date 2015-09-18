@@ -357,6 +357,15 @@ class MultiLoop:
         print "test 2"
         self.iPadClients.append(oscClient)
 
+    #stuff[0] is the gridState, stuff[1] is which saved grid in the gridState needs to be pulled up
+    def padHitResponder(self, addr, tags, stuff, sournce):
+        state = self.gridStates[stuff[0]]
+        self.putMiniStateLive(*self.stringToMiniState(state.savedGrid[stuff[1]]))
+        msg = OSC.OSCMessage()
+        msg.setAddress("/startMetronome")
+        msg.append(stuff[0])
+        self.superColliderClient.send(msg)
+
     def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False):
         msg = OSC.OSCMessage()
         msg.setAddress("/playChord")
@@ -396,6 +405,10 @@ class MultiLoop:
     def postChordPlay(self, si):
         state = self.gridStates[si]
         if (not state.isColSubLooping and (state.progInd == 16))  or (state.isColSubLooping and (state.progInd == len(state.columnSubsetLooping))) or (state.progInd == -1):
+            msg = OSC.OSCMessage()
+            msg.setAddress("/lastBeats")
+            msg.append(si)
+            self.superColliderClient.send(msg)
             if state.gridseqFlag and sum(state.gridseq) != -8:
                 state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
                 while state.gridseq[state.gridseqInd] == -1: 

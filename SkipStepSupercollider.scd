@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastHits, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn;
 n = 4; //set n - number of instruments
 
 /*----------------create n tempo clocks (and associated beat variables?)----------------
@@ -33,17 +33,33 @@ oscMetronomeHit = {
 		beats[i]*0.25/*0.25*/})}
 );
 
+
+//------------------set up code to handle Quneo triggering ---------------------
+noteToInd = {|x| x - 36}; //convert note to pad index
+noteToXY = {|x| [noteToInd.(x)%4, floor(noteToInd.(x)/4)]}; //convert note to pad xy (bottom left 0,0)
+isPadNote = {|x| (noteToInd.(x) >=0) && (noteToInd.(x) < 16)};
+
+loopingOn = Array.fill(n, {false});
+lastBeats = Array.fill(n, {false});
+metronomeClocks = Array.fill(n, {TempoClock.new(1)});
+notesOn = Array.fill(n, {Set.new()});
+holdDownPlay = false;
+masterLoopingOn = false;
+loop_BUTTON = 5;
+hold_BUTTON = 6;
+
 /*
 beatHit
 
 vars - loopingOn[i], holdPlayOn (can't be on at same time, buttons toggle them on/off)
-       lastHits[] - array indicating value of lastHit flag for each instrument/metronome
-       metronomeTasks[] - column/instrument -> task mapping
+       lastBeats[] - array indicating value of lastHit flag for each instrument/metronome
+       metronomeClocks[] - column/instrument -> task mapping
        notesOn[] - on notes for each instrument
 
-MetronomeTask - loops and sends metronomeHit while (!loopOn[i] lastHits[i]) is true, then sets it to false
+MetronomeTask - loops and sends metronomeHit while (!loopOn[i] lastBeats[i]) is true, then sets it to false
 
 padDown -
+    if another pad in the same column is looping, kill that loop
     if this is not a "turn off loop" scenario
         send padDown message to python, wait on "gridLoaded" message
 
@@ -60,6 +76,83 @@ check that refresh/auto-alg stuff (stuff in postChordPlay() in python)
 all works properly wrt timing after the last chord is played in all use cases
 
 */
+
+clockFuncGenerator = {|i|
+	{
+		var returnVal;
+		if(loopingOn[i].not && holdDownPlay.not && lastBeats[i],
+			{
+				lastBeats[i] = false;
+				returnVal = nil;
+				//turn off red/normal
+			},
+			{
+				lastHits[i-1] = SystemClock.beats;
+				pythonOSCport.sendMsg("/played-"++i, i);
+				returnVal = beats[i]*0.25;
+		});
+
+		returnVal
+	}
+};
+
+a = {|vel, note, chan, port|
+	if(isPadNote.(note), {
+		var xVal = noteToXY.(note)[0];
+		var yVal = noteToXY.(note)[1];
+
+		//reset everything about that instrument
+		//turn off all lights on pad
+		lastBeats[xVal] = false;
+		loopingOn[xVal] = false;
+		metronomeClocks[xVal].clear;
+		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
+		notesOn[xVal}.clear;
+		pythonOSCport.sendMsg("/padHit", xVal, yVal);
+
+		if(masterLoopingOn, {loopingOn[xVal] = true});
+		//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
+	});
+	//TODO: hanlde looping and holdDownPlay (where it only plays while you're holding it down)
+	if(note == loop_BUTTON, {
+		masterLoopingOn = masterLoopingOn.not;
+		//toggle lighting
+	});
+	if(note == hold_BUTTON, {
+		holdDownPlay = holdDownPlay.not;
+		toggle lighting
+	});
+
+};
+
+padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
+
+
+b = {|vel, note, chan, port|
+	if(isPadNote.(note) && holdDownPlay, {
+		var xVal = noteToXY.(note)[0];
+		var yVal = noteToXY.(note)[1];
+		metronomeClocks[xVal].clear;
+		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
+		notesOn[xVal}.clear;
+		//turn off orange
+		/*LIGHTING BUG - if you hold down a pad not in holdMode, turn on hold mode, and let go of the pad,
+		it will turn off that pad's despite it not being a holdMode light*/
+	});
+};
+padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
+
+//msg[1] is the instrument index for which to start the metronome
+startMetronomeResponse = {|msg, time, addr, recvPort|
+	metronomeClocks[msg[1]].sched(0, clockFuncGenerator.(msg[1]));
+};
+
+OSCFunc(startMetronomeResponse, "/startMetronome");
+
+lastBeatsHandler = = {|msg, time, addr, recvPort|
+	lastBeats[msg[1]] = true;
+};
+
 
 
 //--------------------------------set up playChord hanlder--------------------------------
@@ -84,9 +177,15 @@ playHandler = {|msg, time, addr, recvPort|
 			);
 			Task({
 				//TODO: add onNotes tracking
-				msg[playChordParamNum..].do({|i| midiOut.noteOn(msg[1], i)});/*hit noteOn messages*/
+				msg[playChordParamNum..].do({|i|
+					midiOut.noteOn(msg[1], i);
+					notesOn[msg[1]].add(i);
+				});/*hit noteOn messages*/
 				chordDur.wait; /*wait for beat*/
-				msg[playChordParamNum..].do({|i| midiOut.noteOff(msg[1], i)}); /*hit noteOff messages*/
+				msg[playChordParamNum..].do({|i|
+					midiOut.noteOff(msg[1], i);
+					notesOn[msg[1]].remove(i);
+				}); /*hit noteOff messages*/
 				0.005.wait; //articulation
 			}).play;
 
@@ -214,7 +313,30 @@ OSCFunc(tempoSyncHandler, "/tempoSync");
 
 //------------------- templates and testing - final version above ------------
 
+(
+k = 5;
+(1..4).do({|i|
+	Task({
+		{|break|
+			var lv = 1;
+			{
+				if(lv > k, {break.value();});
+				i.postln;
+				lv.postln;
+				k.postln;
+				" ".postln;
+				lv = lv +1;
+				1.wait;
+			}.loop;
+		}.block;
+	}).play;
+});
+)
 
+(
+
+
+)
 
 (
 var tempoClocks;
