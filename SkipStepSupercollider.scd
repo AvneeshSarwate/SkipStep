@@ -1,7 +1,10 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastHits, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn;
-n = 4; //set n - number of instruments
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote;
 
+
+n = 4; //set n - number of instruments
+MIDIClient.init;
+MIDIIn.connectAll;
 /*----------------create n tempo clocks (and associated beat variables?)----------------
 When tap-tempoing:
 1. either adjust the .tempo of the tempoClocks and reschedule them every .25 beats,
@@ -22,7 +25,7 @@ lastHits = Array.fill(n, {0});
 
 //------------------set up tempoClocks to send metronome hits via OSC ---------------------
 pythonOSCport = NetAddr("localhost", 5174);
-oscMetronomeHit = {
+/*oscMetronomeHit = {
 	|i| lastHits[i-1] = SystemClock.beats;
 	pythonOSCport.sendMsg("/played-"++i, i);
 	//("/played-"++i + "," + i).postln;
@@ -31,7 +34,7 @@ oscMetronomeHit = {
 	{|i| tempoClocks[i].sched(0, {
 		oscMetronomeHit.value(i+1); //i+1 in .value() is a hack to get around a small unknown bug
 		beats[i]*0.25/*0.25*/})}
-);
+);*/
 
 
 //------------------set up code to handle Quneo triggering ---------------------
@@ -45,8 +48,8 @@ metronomeClocks = Array.fill(n, {TempoClock.new(1)});
 notesOn = Array.fill(n, {Set.new()});
 holdDownPlay = false;
 masterLoopingOn = false;
-loop_BUTTON = 5;
-hold_BUTTON = 6;
+loop_BUTTON = 26;
+hold_BUTTON = 24;
 
 /*
 beatHit
@@ -75,6 +78,15 @@ TODO in Python - create padDown endpoint, add lastHit flag,
 check that refresh/auto-alg stuff (stuff in postChordPlay() in python)
 all works properly wrt timing after the last chord is played in all use cases
 
+ -------------------------------------------------------------------------------------
+TODO: - need a way to stop a looping melody without starting a new one
+      - need to rework how saving miniStates works -
+         - need to save 4 "reactive" miniStates
+      - maybe don't have step tracker move, but be static and act as a "start point" control
+      - expand miniState to include: alg parameters (type, intensity, loop), refershMode, "start point" ^
+      - need to do lights
+
+
 */
 
 clockFuncGenerator = {|i|
@@ -84,11 +96,13 @@ clockFuncGenerator = {|i|
 			{
 				lastBeats[i] = false;
 				returnVal = nil;
+				("lastBeat cutoff" + i).postln;
 				//turn off red/normal
 			},
 			{
-				lastHits[i-1] = SystemClock.beats;
+				lastHits[i] = SystemClock.beats;
 				pythonOSCport.sendMsg("/played-"++i, i);
+				("beat" + i + " " + beats[i]).postln;
 				returnVal = beats[i]*0.25;
 		});
 
@@ -100,14 +114,14 @@ a = {|vel, note, chan, port|
 	if(isPadNote.(note), {
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
-
+		"padOn".postln;
 		//reset everything about that instrument
 		//turn off all lights on pad
 		lastBeats[xVal] = false;
 		loopingOn[xVal] = false;
 		metronomeClocks[xVal].clear;
 		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
-		notesOn[xVal}.clear;
+		notesOn[xVal].clear;
 		pythonOSCport.sendMsg("/padHit", xVal, yVal);
 
 		if(masterLoopingOn, {loopingOn[xVal] = true});
@@ -120,7 +134,7 @@ a = {|vel, note, chan, port|
 	});
 	if(note == hold_BUTTON, {
 		holdDownPlay = holdDownPlay.not;
-		toggle lighting
+		//toggle lighting
 	});
 
 };
@@ -134,7 +148,7 @@ b = {|vel, note, chan, port|
 		var yVal = noteToXY.(note)[1];
 		metronomeClocks[xVal].clear;
 		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
-		notesOn[xVal}.clear;
+		notesOn[xVal].clear;
 		//turn off orange
 		/*LIGHTING BUG - if you hold down a pad not in holdMode, turn on hold mode, and let go of the pad,
 		it will turn off that pad's despite it not being a holdMode light*/
@@ -144,22 +158,22 @@ padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
 
 //msg[1] is the instrument index for which to start the metronome
 startMetronomeResponse = {|msg, time, addr, recvPort|
+	("metronome started for" + msg[1]).postln;
 	metronomeClocks[msg[1]].sched(0, clockFuncGenerator.(msg[1]));
 };
-
 OSCFunc(startMetronomeResponse, "/startMetronome");
 
-lastBeatsHandler = = {|msg, time, addr, recvPort|
+
+lastBeatsHandler = {|msg, time, addr, recvPort|
+	("lastBeat flag set" + msg[1]).postln;
 	lastBeats[msg[1]] = true;
 };
-
-
+OSCFunc(lastBeatsHandler, "/lastBeats");
 
 //--------------------------------set up playChord hanlder--------------------------------
 //msg[1] is an index for which gridState the message is from
 //msg[2] is either "normal", "on", or "off" - specifying a piano vs non-piano play
 //msg[3] is a int (1 or 0) indicating whether the play is a stepjump play or not
-MIDIClient.init;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
 playChordParamNum = 4; //start index of where the chord notes start in the OSC message
@@ -173,7 +187,7 @@ playHandler = {|msg, time, addr, recvPort|
 					chordDur = beats[msg[1]] - (SystemClock.beats-lastHits[msg[1]]) - 0.005;
 					("stepjump duration is" + chordDur).postln;
 				},
-				{chordDur = 0.25*beats[msg[1]]-0.005}
+				{("BEATS VAL" + [beats[msg[1]], msg[1]]).postln; chordDur = 0.25*beats[msg[1]]-0.005}
 			);
 			Task({
 				//TODO: add onNotes tracking

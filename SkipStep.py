@@ -105,7 +105,9 @@ class MultiLoop:
         self.oscServSelf = OSC.OSCServer(("127.0.0.1", port)) #LANdini 50505, 5174 chuck
         self.oscServSelf.addDefaultHandlers()
         for i in range(self.num):
-            self.oscServSelf.addMsgHandler("/played-" + str(i+1), self.realPlay)
+            self.oscServSelf.addMsgHandler("/played-" + str(i), self.realPlay)
+        self.oscServSelf.addMsgHandler("/padHit", self.padHitResponder)
+
 
 
         # OSC server that recieves messages from the iPad        
@@ -212,6 +214,8 @@ class MultiLoop:
         
 
         self.oscServUI.addMsgHandler("/responseAlg", self.applyResponseAlg)
+
+
 
         for k in range(n):
             
@@ -348,7 +352,6 @@ class MultiLoop:
 
     #TODO:  register this handler and add a control to UI
     def addiPad(self, addr, tags, stuff, source):
-        print "add iPad stuff", stuff
         if stuff[0] == 0: return
         iPadIP = raw_input("\nEnter the IP address of your iPad (and set its port to 9000):")
         print "test 1"
@@ -359,11 +362,15 @@ class MultiLoop:
 
     #stuff[0] is the gridState, stuff[1] is which saved grid in the gridState needs to be pulled up
     def padHitResponder(self, addr, tags, stuff, sournce):
-        state = self.gridStates[stuff[0]]
-        self.putMiniStateLive(*self.stringToMiniState(state.savedGrid[stuff[1]]))
+        print "padHit", stuff
+        state = self.gridStates[int(stuff[0])]
+        state.progInd = 0
+        grid, scale, root, columnSubsetLooping = self.stringToMiniState(state.savedGrid[int(stuff[1])])
+        self.putMiniStateLive(grid, scale, root, columnSubsetLooping, int(stuff[0]))
         msg = OSC.OSCMessage()
         msg.setAddress("/startMetronome")
         msg.append(stuff[0])
+        print "pulled up grid, sending back to SC to start metronome for instrument", stuff[0], "pad", stuff[1]
         self.superColliderClient.send(msg)
 
     def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False):
@@ -446,7 +453,7 @@ class MultiLoop:
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the SuperCollider metronome is recieved
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
-        si = int(addr.split("-")[1])-1
+        si = int(addr.split("-")[1])
         #print "                 played", si
 
         #calculates what column to play based on the index
