@@ -37,10 +37,20 @@ s2 <- stream "127.0.0.1" 57120 (shapes!!1)
 
 
 s1 $ pat1 |+| mid1 (slow 2 sinewave1) |+| mid2 (slow 3.4 ((+0.3) <$> (/2) <$> sinewave1))
-s1 $ slow 2 pat6 |+| mid1 (slow 3 sinewave1) |+| mid2 (slow 4 ((+0.3) <$> (/2) <$> sinewave1))
+s1 $ slow 2 p6 |+| mid1 (slow 3 sinewave1) |+| mid2 (slow 4 ((+0.3) <$> (/2) <$> sinewave1))
 
 let pat1 = sound "{bin:1 ~ bin [bot:1 bot:4 bot:1], bd:5 lt {bd:2 ~ bd:3, bot:7 ~ bot:7 ~ bot:7}}}"
 
 
-s1 $ sound "bd bd bd" 
-s2 $ sound "{[a a:1], a:2 a:4 a:7 ~ a:5}"
+s1 $ sound "{bd cp bd cp, [bin bot:3] ~ ~ bd*3 [bd sn:3]}"
+
+s1 $ silence
+
+d1 $ sound "{bd bd cp, sn:5 sn:5 ~ bin}"
+
+cps 1.5
+
+d1 $ sound "[bd bd sn:2, lt lt ht lt, hc hc hc]"
+
+
+d1 $ silence

@@ -28,7 +28,7 @@ drumTypes.put("bot", 90);
 drumTypes.put("cp", 100);
 drumTypes.put("bin", 102);
 drumTypes.put("bend", 104);
-drumTypes.put("aud", 108)
+drumTypes.put("aud", 108);
 
 //TODO: BUILD MAP FROM TIDAL SYNTH PARAMS TO MIDI-CC PARAMS
 

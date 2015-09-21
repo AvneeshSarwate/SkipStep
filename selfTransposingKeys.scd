@@ -1,9 +1,12 @@
 (
-var midiOut, noteToInd, noteToXY, isPadNote, padOn, padOff, octaveShift, padIndToNote, rootMove, scale, root, indToNote, padToOnPitch, dUP, dDOWN, dLEFT, dRIGHT, startInd, rootMoveHelper, createPadToNoteMap, directions;
+var midiOut, noteToInd, noteToXY, isPadNote, padOn, padOff, octaveShift, padIndToNote, rootMove, scale, root, indToNote, padToOnPitch, dUP, dDOWN, dLEFT, dRIGHT, startInd, rootMoveHelper, createPadToNoteMap, directions, padIndToLight, changeLights, quneoOut, autoTransposeToggle, autoTranspose, chanOut, ccHandler, bendCenter;
 
 MIDIIn.connectAll;
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
+
+quneoOut = MIDIOut.newByName("QUNEO", "QUNEO");
+quneoOut.latency = 0;
 
 noteToInd = {|x| x - 36}; //convert note to pad index
 noteToXY = {|x| [noteToInd.(x)%4, floor(noteToInd.(x)/4)]}; //convert note to pad xy (bottom left 0,0)
@@ -16,9 +19,15 @@ dDOWN = 21;
 dLEFT = 18;
 dRIGHT = 17;
 directions = Set[17, 18, 20, 21];
+autoTransposeToggle = 19;
+bendCenter = 8192;
+
+chanOut = 4;
+
+autoTranspose = true;
 
 
-scale = [0, 2, 4, 5, 7, 9, 11];
+scale = [0, 2, 3, 5, 7, 8, 10];
 root = 48;
 startInd = -3;
 
@@ -47,6 +56,30 @@ createPadToNoteMap = {|ind|
 
 padIndToNote = createPadToNoteMap.(startInd);
 
+padIndToLight = ((0..15)*2+1);
+
+changeLights = {|root, padIndToNote|
+	(0..15).do({|i|
+		if((root%12) == (padIndToNote[i]%12),
+			(root + " " + padIndToNote[i] + " " + (root%12) + " " + (padIndToNote[i]%12) + " " + padIndToLight[i]).postln;
+			{quneoOut.noteOn(0, padIndToLight[i], 80)},
+			{quneoOut.noteOff(0, padIndToLight[i], 80)}
+		);
+	});
+};
+
+
+/*Task({
+	((0..15)*2+1).do({|i|
+		quneoOut.noteOn(0, i, 80);
+		(0.3).wait;
+		i.postln;
+		//quneoOut.noteOff(0, i, 80);
+	});
+}).play;*/
+
+changeLights.(root, padIndToNote);
+
 padIndToNote.postln;
 
 //shifts pad->pitch mapping up or down an octave
@@ -70,10 +103,10 @@ rootMoveHelper = {|i|
 //args: direction is midiNote for up/down/left/right controls from Quneo
 rootMove = {|direction|
 	switch (direction,
-		dUP, {rootMoveHelper.(4)},
-		dDOWN, {rootMoveHelper.(-4)},
-		dLEFT, {rootMoveHelper.(1)},
-		dRIGHT, {rootMoveHelper.(-1)}
+		dUP, {rootMoveHelper.(-4)},
+		dDOWN, {rootMoveHelper.(4)},
+		dLEFT, {rootMoveHelper.(-1)},
+		dRIGHT, {rootMoveHelper.(1)}
 	);
 };
 
@@ -81,17 +114,22 @@ a = {|vel, note, chan, port|
 	if(isPadNote.(note), {
 		//noteOn
 		var padNote = padIndToNote[noteToInd.(note)];
-		midiOut.noteOn(0, padNote, vel);
+		midiOut.noteOn(chanOut, padNote, vel);
 		padToOnPitch.put(noteToInd.(note), padNote);
 		(padNote + "ON").postln;
 	});
 
 	//otherwise call rootMove based on which direction pad was hit
 	if(directions.includes(note),
-		{rootMove.(note)}
+		{
+			rootMove.(note);
+			changeLights.(root, padIndToNote);
+	});
+	if(note == autoTransposeToggle,
+		{autoTranspose = autoTranspose.not}
 	);
-
 };
+
 padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
 
 
@@ -99,19 +137,29 @@ b = {|vel, note, chan, port|
 	if(isPadNote.(note), {
 		//noteOff
 		var padNote = padToOnPitch.at(noteToInd.(note));
-		midiOut.noteOff(0, padNote);
+		midiOut.noteOff(chanOut, padNote);
 		padToOnPitch.removeAt(noteToInd.(note));
 		(padNote + "OFF").postln;
 		//if highest note shift up
-		if(noteToInd.(note) == 15, {octaveShift.(1)});
+		if(noteToInd.(note) == 15 && autoTranspose, {octaveShift.(1)});
 
 		//TODO: add toggle for turning "auto transposing" on or off
 
 		//if lowest note shift down
-		if(noteToInd.(note) == 0, {octaveShift.(-1)});
+		if(noteToInd.(note) == 0 && autoTranspose, {octaveShift.(-1)});
 	});
+	if(note == 9, {midiOut.bend(chanOut, bendCenter)}); //when taking hand off bendSlider, bend returns to normal
 };
 padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
+
+quneoOut.control(0, 4);
+c = {|vel, note, chan, port|
+	if(note == 9, {
+		midiOut.bend(chanOut, (vel / 127 * 2* bendCenter));
+		vel.postln;
+	});
+};
+ccHandler = MIDIFunc.cc(c, nil, nil, MIDIClient.sources[1].uid);
 
 
 )

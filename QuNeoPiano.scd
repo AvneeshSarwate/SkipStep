@@ -47,7 +47,7 @@ bendScale = 50;
 xAvgLen = 3;
 xHitDelay = 9;
 nonVibratoWindow = 13;
-vibratoExp = 1.1;
+vibratoExp = 0.8;
 
 //function that maps a chord to its inversion
 //TODO: edge case when chord only has 1 note
@@ -166,7 +166,7 @@ a = {|vel, note, chan, port|
 			padMap.put(padInd, noteMap);
 			if(isRolling[padInd].not,
 				{
-					newChord.do({|i| midiOut.noteOn(channel, i, vel)});
+					newChord.do({|i| midiOut.noteOn(channel, i, vel+30)});
 					"PAD CHORD PLAY".postln;
 			});
 			onNotes = onNotes | newChord.as(Set);

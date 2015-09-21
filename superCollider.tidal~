@@ -1,0 +1,56 @@
+
+let osc = OscShape {path = "/play",
+                    params = [S "sound" Nothing
+                             ],
+                    timestamp = BundleStamp,
+                    latency = 0.04,
+                    namedParams = False,
+                    preamble = []
+                   }
+
+s = stream "127.0.0.1" 57120 osc
+
+
+
+
+supercollider n ps l = OscShape { 
+  -- The OSC path
+  path = "/s_new",
+  preamble = [string n, int32 (-1), int32 1, int32 1],
+  namedParams = True,
+  params = ps,
+  timestamp = BundleStamp,
+  latency = l
+  }
+
+scStream n ps l = do let shape = (supercollider n ps l)
+                     sc <- stream "127.0.0.1" 57110 shape
+                     return (sc, shape)
+
+-- Then you could evaluate the following (with ctrl-enter, or ctrl-c
+-- ctrl-e) to control it with tidal:
+
+-- Define the name of the synth (hn1), the parameters with default
+-- values, and the latency (here set to 0, i.e. no extra latency):
+(sc, shape) <- scStream "hn1" [ F "vol" (Just 1.2),
+                                F "freq" (Just 3000),
+                                F "atk" (Just 0.01),
+                                F "rel" (Just 0.2),
+                                I "pos" (Just 0)
+                              ] 0
+
+-- Make the parameter functions (not sure how to get rid of the
+-- redundancy here, maybe some lenses?)
+let vol   = makeF shape "vol"
+    freq  = makeF shape "freq"
+    atk   = makeF shape "atk"
+    rel   = makeF shape "rel"
+    pos   = makeI shape "pos"
+
+-- Then you can pattern the parameters like so
+sc $ freq "400 8000"
+
+-- more complex:
+sc $ superimpose (density 1.5) $ every 4 (density 1.5) $ freq (every 3 ((/2) <$>) "3000 20 8000 1600")
+  |+| vol "0.6"
+  |+| rel (scale 0 0.5 $ slow 2 sine1)
