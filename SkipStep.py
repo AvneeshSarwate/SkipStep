@@ -53,8 +53,38 @@ class Looper:
         self.rhythmInstSubsets = [] # set of indexes for the instruments will be affected by rhythm controls
         self.syncTypes = [] # set of indexes for what rhythmic synchronizations will be applied. order: [tempo, nexthit, index]
         self.skipHit = False #flag that determines whether to skip the handling of the metronome hit based on the residual time between a stepjump hit and the next metronome hit
+        self.melodyStates = [MelodyState() for i in range(4)]
+        self.melodyStateInd = 0
+
 
         self.lock = threading.Lock()
+
+class MelodyState:
+
+    def __init__(self):
+        self.startInd = 0
+        self.grid = [[0 for i in range(16)] for j in range (16)] # the data of the active grid
+        self.refreshModeSavedGrid = [[0 for i in range(16)] for j in range (16)] # the data of the "saved" grid in refresh mode
+        self.prog = phrase.Progression() # object represnting the melodic content of the active grid
+        self.prog.c = [phrase.Chord([-1]) for i in range(16)] # initializing self.prog
+        self.prog.t = [.25 for i in range(16)] # initialzing self.prog
+        self.customScale = [] # the data of what scale is represented in the custom scale control
+        self.refreshModeSavedProg = 0 #  representing the melodic content of self.refreshModeSavedGrid
+        self.root = 48 # the "root note" of the grid
+        self.scale = phrase.modes["maj5"] # the scale that is being used to translate the grid into notes
+        self.noisy = False # boolean for whether automatic varation is turned on
+        self.columnSubsetLooping = [] # the data for what columns have been selected with the online looping column subset control
+        self.isColSubLooping = False # boolean for whether or not looping is ocurring over column subsets
+        self.algColumnSub = [] # the data for what columns have been selected with the algorithmic column subset control
+        self.algSubsets = False # boolean for whether or not algorithms are occuring over column subsets
+        self.noiselev = 2 # the "intensity" of the random variation as indicated by the intensity control
+        self.refreshModeOn = False # boolean for whether or not refresh mode is on
+        self.noiseInd = 1 # index determining which transofrmation function is selected
+        self.undoStack = [] # stack which saves grids when transformations are triggered, allowing "undoing" the transformation
+
+
+
+
 
 class MultiLoop:
     
@@ -170,9 +200,6 @@ class MultiLoop:
         self.pianocallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         self.offlinecallbacks = [[[0 for i in range(16)] for j in range (16)] for k in range(n)]
         
-        # TODO: change to use a function that is universal tap tempo 
-        self.oscServUI.addMsgHandler("/tempo", self.tempo)
-        
         self.recievedcallbacks = [[0 for i in range(16)] for j in range (16)]
         self.copycallbacks = [[0 for i in range(16)] for j in range (16)]
         
@@ -193,15 +220,9 @@ class MultiLoop:
             for j in range(16):
                 self.copycallbacks[i][j] = lambda addr, tags, stuff, source: self.assign2(self.copyGrid, addr, stuff, 0)
                 self.oscServUI.addMsgHandler("copyGrid/"+str(i+1)+"/"+str(j+1), lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.copycallbacks[i][j]))
-        
-        self.oscServUI.addMsgHandler("/sendGrid", self.sendButtonTest)
-        self.oscServSelf.addMsgHandler("/recievedGrid", self.recieveGrid)
-        
+
         self.oscServUI.addMsgHandler("/save", self.saveSet)
         self.oscServUI.addMsgHandler("/load", self.loadSet)
-        self.oscServUI.addMsgHandler("/sceneHit", self.sceneHit)
-
-        self.oscServSelf.addMsgHandler("/stepJumpFlag", self.stepjump)
 
         for i in range(16):
                 for j in range(16):
@@ -222,7 +243,6 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/noisy", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseFlip))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/colsel", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsubflip))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/funcSubToggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.algColsubFlip))
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/piano", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.pianoModeOn))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/refresh", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.refreshHandler))
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/scaleApply", self.applyCustomScale)
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/up", self.gridShiftHandler)
@@ -233,49 +253,11 @@ class MultiLoop:
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/clear", self.gridClear)
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/noiseHit", self.noiseHit)
             self.oscServUI.addMsgHandler("/" +str(k+1) + "/undo", self.undo)
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/pullGrid", self.pullGrid)
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/pushGrid", self.pushGrid)
+            self.oscServUI.addMsgHandler("/" +str(k+1) + "/miniStateSelect", self.miniStateSelection)
 
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/sync", self.indexSync)
-
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/offlineToggle", self.offlineToggle)
-
-
-            #syncHit
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncHit", self.syncHit)
-            #subsetTapTempo
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/subsetTap", self.tempo)
-            #syncToggle
-            for j in range(3): # TODO: don't hardcode this
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleType/" + str(j+1) + "/1", self.syncTypeToggle)
-            #instToggle
-            for j in range(self.num): # TODO: don't hardcode this
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/syncToggleInst/" + str(j+1) + "/1", self.syncInstChoice)
-            #tempoChange 
-            for j in range(self.num): # TODO: don't hardcode this
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/tempoChange/" + str(j+1) + "/1", self.tempoChange)
-            
-
-            for j in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/scene/" + str(j) + "/1", self.simpleScene)
-
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/sceneToggle", self.sceneToggle)
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/sceneClear", self.sceneClear)
-            for j in range(8):
-                self.oscServUI.addMsgHandler("/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1", self.sceneSelector)
-                #print "/" + str(k+1) + "/sceneSelect/" + str(j+1) + "/1"
-
-            for j in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridseq/" + str(j) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqIndHandler))
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/seqtoggle", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqToggleHandler))
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/seqedit", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.gridSeqEditHandler)) 
-            self.oscServUI.addMsgHandler("/" +str(k+1) + "/seqclear", self.gridSeqClear)
-            
-            
             for i in range(16):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/step/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.preStepJump))
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/pianoKey/" + str(i+1) + "/1", self.pianoKey)
-                
+
             for i in range(16):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/col/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.colsub))
 
@@ -284,13 +266,7 @@ class MultiLoop:
             
             for i in range(5):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/noiselev/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.noiseLevHandler))
-            
-            for i in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridload/" + str(i+1) + "/1", self.gridload)
-            
-            for i in range(8):
-                self.oscServUI.addMsgHandler("/" +str(k+1) + "/gridsave/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, self.saveGrid))
-                
+
             for i in range(16):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/custScale/" + str(i+1) + "/1", lambda addr, tags, stuff, source: self.bounceBack(addr, tags, stuff, source, lambda addr, tags, stuff, source: self.assignScale(addr, stuff, self.gridStates[int(addr.split("/")[1])-1].customScale)))
                 
@@ -309,11 +285,6 @@ class MultiLoop:
 
             for j in range(4):
                 self.oscServUI.addMsgHandler("/" +str(k+1) + "/pageSelector/1/" + str(j+1), self.changeMiniPage)
-
-            self.oscServUI.addMsgHandler("/getGridScale/" + str(k+1) + "/1", self.getGridToSend)
-            self.oscServUI.addMsgHandler("/applyRecvGrid/" + str(k+1) + "/1", self.applyRecvGrid)
-            self.oscServUI.addMsgHandler("/applyRecvScale/" + str(k+1) + "/1", self.applyRecvScale)
-            
             
             
     
@@ -364,7 +335,8 @@ class MultiLoop:
     def padHitResponder(self, addr, tags, stuff, sournce):
         print "padHit", stuff
         state = self.gridStates[int(stuff[0])]
-        state.progInd = 0
+        melodyState = state.melodyStates[state.melodyStateInd]
+        state.progInd = melodyState.startInd
         grid, scale, root, columnSubsetLooping = self.stringToMiniState(state.savedGrid[int(stuff[1])])
         self.putMiniStateLive(grid, scale, root, columnSubsetLooping, int(stuff[0]))
         msg = OSC.OSCMessage()
@@ -389,10 +361,11 @@ class MultiLoop:
         
         #calculates what column to play based on the index
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         with state.lock: 
-            if state.isColSubLooping:
-                state.progInd %= len(state.columnSubsetLooping)
-                playind = state.columnSubsetLooping[state.progInd]
+            if melodyState.isColSubLooping:
+                state.progInd %= len(melodyState.columnSubsetLooping)
+                playind = melodyState.columnSubsetLooping[state.progInd]
                 
             else:
                 state.progInd %= 16
@@ -400,7 +373,6 @@ class MultiLoop:
             if state.pianoModeIsOn:
                 colChord = phrase.Chord([-1])
             else:
-                self.sendToUI("/" + str(si+1) + "/step/" + str(playind+1) + "/1", 1)
                 colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if state.refreshModeOn and not state.pianoModeIsOn:
                 self.refreshColumn(playind, si)
@@ -411,7 +383,8 @@ class MultiLoop:
     ## that occurs when a loop repeats
     def postChordPlay(self, si):
         state = self.gridStates[si]
-        if (not state.isColSubLooping and (state.progInd == 16))  or (state.isColSubLooping and (state.progInd == len(state.columnSubsetLooping))) or (state.progInd == -1):
+        melodyState = state.melodyStates[state.melodyStateInd]
+        if (not melodyState.isColSubLooping and (state.progInd == 16))  or (melodyState.isColSubLooping and (state.progInd == len(melodyState.columnSubsetLooping))) or (state.progInd == -1):
             msg = OSC.OSCMessage()
             msg.setAddress("/lastBeats")
             msg.append(si)
@@ -428,15 +401,15 @@ class MultiLoop:
                 
                 if state.gridseq[state.gridseqInd] == "blank": 
                     g = [[0 for i in range(16)] for j in range(16)]
-                    scale = state.scale
-                    root = state.root
+                    scale = melodyState.scale
+                    root = melodyState.root
                     colsub = []
                 else:
                     g, scale, root, colsub = self.stringToMiniState(state.savedGrid[state.gridseq[state.gridseqInd]])
                 
-                if state.noisy:
+                if melodyState.noisy:
                     g = self.noiseChoice(si)
-                    if not state.refreshModeOn:
+                    if not melodyState.refreshModeOn:
                         state.savedGrid[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
                 with state.lock:
                     self.putMiniStateLive(g, scale, root, colsub, si) 
@@ -445,7 +418,7 @@ class MultiLoop:
                 
             else:
                 #print "NOT SEQUENCING ", si+1
-                if state.noisy:
+                if melodyState.noisy:
                     g = self.noiseChoice(si)
                     with state.lock:
                         self.putGridLive(g, si)
@@ -458,6 +431,7 @@ class MultiLoop:
 
         #calculates what column to play based on the index
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
 
         if state.skipHit: 
             state.skipHit = False
@@ -482,176 +456,66 @@ class MultiLoop:
     ## helper function is called to return columns to their saved state when snapshot mode is on 
     def refreshColumn(self, k, si):
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
 
-        if state.algSubsets:
-            if not k in state.algColumnSub: return
+        if melodyState.algSubsets:
+            if not k in melodyState.algColumnSub: return
 
-        for i in range(len(state.grid)):
-            if state.refreshModeSavedGrid[k][i] != state.grid[k][i]:
-                self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), state.refreshModeSavedGrid[k][i])
+        for i in range(len(melodyState.grid)):
+            if melodyState.refreshmodeSavedGrid[k][i] != melodyState.grid[k][i]:
+                self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), melodyState.refreshmodeSavedGrid[k][i])
                 if "/" + str(si+1) + "/grid" in self.doubleMap.keys():
-                    self.sendToUI(self.doubleMap["/" + str(si+1) + "/grid"] + "/" + str(15-i + 1) + "/" + str(15-k + 1), state.refreshModeSavedGrid[k][i])
-                state.grid[k][i] = state.refreshModeSavedGrid[k][i]
-        state.prog.c[k] = self.gridStates[si].refreshModeSavedProg.c[k]
+                    self.sendToUI(self.doubleMap["/" + str(si+1) + "/grid"] + "/" + str(15-i + 1) + "/" + str(15-k + 1), melodyState.refreshmodeSavedGrid[k][i])
+                melodyState.grid[k][i] = melodyState.refreshmodeSavedGrid[k][i]
+        melodyState.prog.c[k] = melodyState.refreshModeSavedProg.c[k]
     
     ## is the handler  for the snapshot mode control, OSCaddr: /si/refresh
     def refreshHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         if stuff[0] != 0:
-            state.refreshModeOn = True
-            state.refreshModeSavedProg = phrase.Progression(state.prog)
-            state.refreshModeSavedGrid = copy.deepcopy(state.grid)
+            melodyState.refreshModeOn = True
+            melodyState.refreshModeSavedProg = phrase.Progression(melodyState.prog)
+            melodyState.refreshmodeSavedGrid = copy.deepcopy(melodyState.grid)
             print "                           refresh on"
         else:
-            state.refreshModeOn = False
-            print "                           refresh off"   
+            melodyState.refreshModeOn = False
+            print "                           refresh off"
 
-    ## handler function for the index synchronizer control, OSCaddr: /si/sync
-    def indexSync(self, addr, tags, stuff, source):
+    def miniStateSelection(self, addr, tags, stuff, source):
+        #TODO - create a pullUpMelodyState function
         if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-        syncInd = state.progInd
-        for i in range(self.num):
-            print i, "synced to", si 
-            self.gridStates[i].progInd = syncInd
 
-    ## helper for syncing indexes of instruments
-    # TODO: have this triggered in SuperCollider tempoSyncHandler:
-    #       after handling tempo-sync, and next-hit-sync,
-    #       SuperCollider sends a message that is caught here
-    #       this could potentially solve sync race conditions 
-    def indexSyncSub(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-        syncInd = state.progInd
-        print state.rhythmInstSubsets
-        for i in state.rhythmInstSubsets:
-            self.gridStates[i].progInd = syncInd
-
-    ## handler for the tempo synchronizing trigger button 
-    def syncHit(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-
-        inst = []
-        syncs = []
-        for i in range(self.num):
-            if i in state.rhythmInstSubsets:
-                inst.append("1")
-            else:
-                inst.append("0")
-        for i in range(3): # TODO: don't hardcode this
-            if i in state.syncTypes:
-                syncs.append("1")
-            else:
-                syncs.append("0")
-        
-        msg = OSC.OSCMessage()
-        msg.setAddress("/tempoSync")
-        msg.append("".join(inst))
-        msg.append("".join(syncs))
-        msg.append(si)
-        self.superColliderClient.send(msg)
-
-        if 2 in state.syncTypes: # TODO: don't hardcode this
-            print 'INDEX SYNC'
-            self.indexSyncSub(addr, tags, stuff, source)
-
-    ## Handler for the syncType selector control 
-    def syncTypeToggle(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
-        if stuff[0] == 1 and not ind in state.syncTypes:
-            state.syncTypes.append(ind)
-        if stuff[0] == 0 and ind in state.syncTypes:
-            state.syncTypes.remove(ind)
+        state.melodyStateInd = ind
+        melodyState = state.melodyStates[state.melodyStateInd]
 
-    ## handler for the instrument subset selector for rhythmic features
-    def syncInstChoice(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
-        if stuff[0] == 1 and not ind in state.rhythmInstSubsets:
-            state.rhythmInstSubsets.append(ind)
-        if stuff[0] == 0 and ind in state.rhythmInstSubsets:
-            state.rhythmInstSubsets.remove(ind) 
 
-    ## TODO: is this even necessary?
-    ## you can get everything to sync to the same start index by using the normal sync
-    ## when the "reference" instrument has  index < len(shortest rhythm)
-    def loopSync(self, addr, tags, stuff, source):
+        self.pullUpGrid(melodyState.grid, "/" +str(si+1) + "/grid")
+        self.pullUpScale(melodyState.customScale, "/" +str(si+1) + "/custScale")
+        self.updateNoteLabels(melodyState.customScale, si)
+        self.pullUpColSub(melodyState.columnSubsetLooping, "/" + str(si+1) + +"/col", selAddr="/" + str(si+1) + +"/colsel")
+        self.pullUpAlgStatus(melodyState.noisy, melodyState.noiseInd, melodyState.noiselev)
+        self.sendToUI("/" +str(si+1) + "/refresh", 1 if melodyState.refreshModeOn else 0)
+        self.sendToUI("/" + str(si+1) + "/step/" + str(melodyState.startInd+1) + "/1", 1)
+
+    def pullUpAlgStatus(self, algLooping, algSelection, algIntensity, si):
+        self.sendToUI("/" +str(si+1) + "/noisy", algLooping)
+        self.sendToUI("/" +str(si+1) + "/noiseSel/" + str(algSelection+1) + "/1", 1)
+        self.sendToUI("/" +str(si+1) + "/noiselev/" + str(algIntensity+1) + "/1", 1)
         return
-
-    def tempoChange(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return 
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
-        inst = []
-        timeChange = [3.0, 2.0, 1.0/2, 1.0/3]
-        for i in range(self.num):
-            if i in state.rhythmInstSubsets:
-                inst.append("1")
-            else:
-                inst.append("0")
-        msg = OSC.OSCMessage()
-        msg.setAddress("/tempoChange")
-        msg.append("".join(inst))
-        msg.append(timeChange[ind])
-        print msg 
-        self.superColliderClient.send(msg)
-    
-
-    def preStepJump(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        print "PRE JUMP"
-        si = int(addr.split("/")[1]) - 1
-        progInd, j = self.gridAddrInd(addr)
-        msg = OSC.OSCMessage()
-        msg.setAddress("/skipHitCalc")
-        msg.append(si)
-        msg.append(progInd)
-        self.superColliderClient.send(msg)
-
-
-    ##is the handler for the stepjump control, OSCaddr: /si/step/i/1 
-    def stepjump(self, addr, tags, stuff, source):
-        si = stuff[0]  #index of grid action was taken on
-        state = self.gridStates[si]
-        state.skipHit = stuff[1] == 1
-        print "STEP JUMP FLAG VALUE", state.skipHit
-        state.progInd = stuff[2]
-        if state.isColSubLooping:
-            if state.progInd in state.columnSubsetLooping:
-                state.progInd = state.columnSubsetLooping.index(state.progInd)
-            else:
-                if state.progInd > state.columnSubsetLooping[-1]:
-                    state.progInd = len(state.columnSubsetLooping) - 1
-                    return
-                i = len(state.columnSubsetLooping) - 1
-                while state.columnSubsetLooping[i] >= state.progInd:
-                    state.progInd = state.columnSubsetLooping[i]
-                    i -= 1
-       
-        colChord = self.preChordPlay(si)
-
-        self.playChord(colChord, channel = si, stepJumpFlag = True)
-
-        state.progInd += state.stepIncrement
-
-        self.postChordPlay(si)
-    
     ## is the handler  for the grid noise toggle control, OSCaddr: /si/noisy 
     def noiseFlip(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         print "                               noise flip " + str(stuff[0] == 1)
-        state.noisy = (stuff[0] == 1)
+        melodyState.noisy = (stuff[0] == 1)
     
     ## is the handler  for the noise level control, OSCaddr: /si/noiselev/i/1 
     def noiseLevHandler(self, addr, tags, stuff, source):
@@ -663,13 +527,15 @@ class MultiLoop:
     def colsub(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
         s = ""
         if state.offlineEdit:
             colvar = state.offlineColumnSubsetLooping
             s = "OFFline"
         else:
-            colvar = state.columnSubsetLooping
+            colvar = melodyState.columnSubsetLooping
             s = "online"
 
         if stuff[0] == 1 and ind not in colvar: #do we need 2nd conditional?
@@ -679,23 +545,27 @@ class MultiLoop:
             colvar.remove(ind)
             print s, colvar, "                            removed " + str(ind)
         print "OFF COL", state.offlineColumnSubsetLooping
-        print "ON COL ", state.columnSubsetLooping
+        print "ON COL ", melodyState.columnSubsetLooping
         colvar.sort()
     
     #i#s the handler  for the column sub toggle control, OSCaddr: /si/colsel/i/1
     def colsubflip(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         with state.lock:
-            state.isColSubLooping = (stuff[0] == 1)
-            state.progInd = 0 if stuff[0] == 1 else state.columnSubsetLooping[state.progInd]
-            print "                      colsub ", str(state.isColSubLooping), "progind" + str(state.progInd)
+            melodyState.isColSubLooping = (stuff[0] == 1)
+            state.progInd = 0 if stuff[0] == 1 else melodyState.columnSubsetLooping[state.progInd]
+            print "                      colsub ", str(melodyState.isColSubLooping), "progind" + str(state.progInd)
         
     def algColsubHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
-        colvar = state.algColumnSub
+        colvar = melodyState.algColumnSub
         if stuff[0] == 1 and ind not in colvar: #do we need 2nd conditional?
             colvar.append(ind)
         if stuff[0] == 0 and ind in colvar:
@@ -705,127 +575,10 @@ class MultiLoop:
     def algColsubFlip(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        state.algSubsets = (stuff[0] == 1)
+        melodyState = state.melodyStates[state.melodyStateInd]
 
-    
-    ##is the handler  for the grid save control,  OSCaddr: /si/gridsave/i/1
-    def saveGrid(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        ind, j = self.gridAddrInd(addr)
-        if stuff[0] != 0:
-            if state.offlineEdit:
-                print "OFFLINE SAVE", state.offlineColumnSubsetLooping            
-                state.savedGrid[ind] = self.miniStateToString(state.offlineGrid, state.scale, state.root, state.offlineColumnSubsetLooping, si, colsel=True)
-            else:
-                print "online SAVE", state.columnSubsetLooping
-                state.savedGrid[ind] = self.miniStateToString(state.grid, state.scale, state.root, state.columnSubsetLooping, si)
-        else: 
-            state.savedGrid[ind] = 0 #or -1??
-    
-    ##is the handler  for the grid load control, OSCaddr: /si/gridload/i/1
-    def gridload(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        ind = self.gridAddrInd(addr)[0]
-        if stuff[0] == 0: return
-        if state.gridseqEdit:
-            state.gridseq[state.gridseqInd] = ind
-            print "/" + str(si+1) + "/seqtext/" + str(state.gridseqInd)
-            self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), str(ind+1))
-            return
-        if state.offlineEdit:
-            grid, scale, root, columnSubsetLooping = self.stringToMiniState(state.savedGrid[ind])
-            state.offlineGrid = grid
-            state.offlineColumnSubsetLooping = columnSubsetLooping
-            self.pullUpGrid(grid, "/" + str(si+1) + "/offGrid")
-            self.pullUpColSub(columnSubsetLooping, "/" + str(si+1) + "/col")
-            return
-        print "grid seq edit is " + str(state.gridseqEdit) 
-        grid, scale, root, columnSubsetLooping = self.stringToMiniState(state.savedGrid[ind])  
-        print "COLUMNS", columnSubsetLooping
-        self.putMiniStateLive(grid, scale, root, columnSubsetLooping, si)
+        melodyState.algSubsets = (stuff[0] == 1)
 
-
-    #handler for the pullt-to-offline-grid control, OSCaddr: /si/pullGrid
-    def pullGrid(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        state.offlineGrid = copy.deepcopy(state.grid)
-        state.offlineColumnSubsetLooping = copy.deepcopy(state.columnSubsetLooping)
-        self.pullUpGrid(state.grid, "/" + str(si+1) + "/offGrid")
-        self.pullUpColSub(state.offlineColumnSubsetLooping, "/" + str(si+1) + "/col")#load offlineColSub
-
-    #handler  for the push-to-live-grid control,  OSCaddr: /si/pushGrid
-    def pushGrid(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return 
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        with state.lock:
-            self.putGridLive(state.offlineGrid, si)
-            if len(state.offlineColumnSubsetLooping) != 0:
-                state.columnSubsetLooping = copy.deepcopy(state.offlineColumnSubsetLooping)
-                self.pullUpColSub(state.columnSubsetLooping, "/" + str(si+1) + "/col", "/" + str(si+1) + "/colsel")
-
-
-    ##is the handler  for the simple scene control, OSCaddr: /si/scene/i/1 
-    def simpleScene(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        ind, j = self.gridAddrInd(addr)
-        for i in range(1, self.num+1):
-            state = self.gridStates[i-1]
-            if state.savedGrid[ind] != 0:
-                print "/" + str(i) + addr[2:len(addr)]
-                self.gridload("/" + str(i) + addr[2:len(addr)], tags, stuff, source)
-            else:
-                self.putMiniStateLive([[0 for i in range(16)] for j in range (16)], state.scale, state.root, state.columnSubsetLooping, i-1)
-
-    ##TODO: IMPORTANT - all scene controls should be NON BOUNCE BACK
-    ## ALSO - all pullUp___() functions used in scene should 
-    # handler for the scene selector control on the scene page, OSCaddr: /si/sceneSelect/i/1
-    def sceneSelector(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-        ind, j = self.gridAddrInd(addr)
-        self.sceneInd[si] = ind
-        if state.savedGrid[ind] == 0:
-            self.pullUpGrid([[0]*16]*16, "/" + str(si+1) + "/sceneGrid")
-            self.pullUpColSub([], "/" + str(si+1) + "/sceneCol")
-        else:
-            grid, key, root, col = self.stringToMiniState(state.savedGrid[ind])
-            self.pullUpGrid(grid, "/" + str(si+1) + "/sceneGrid")
-            self.pullUpColSub(col, "/" + str(si+1) + "/sceneCol")
-
-    # hanlder for the scene-hit control on the scene page, OSCaddr: /sceneHit
-    def sceneHit(self, addr, tags, stuff, source):
-        if source[0] == 0: return 
-        print "SCENE HIT"
-        for i in range(self.num):
-            state = self.gridStates[i]
-            print "SCENE state", i 
-            if self.sceneTogs[i]:
-                if self.sceneInd[i] != -1 and state.savedGrid[self.sceneInd[i]] != 0:
-                    grid, key, root, col = self.stringToMiniState(state.savedGrid[self.sceneInd[i]])
-                    self.putMiniStateLive(grid, key, root, col, i)
-                    print "SCENE put live", i 
-                else:
-                    self.putMiniStateLive([[0]*16]*16, state.key, state.root, [], i)
-
-    # hanlder for the scene clear control on the scene page, OSCaddr: /si/sceneClear 
-    def sceneClear(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1
-        if self.sceneInd[si] != -1:
-            self.sendToUI("/" + str(si+1) + "/sceneSelect/" + str(self.sceneInd[si]+1) + "/1", 0)
-            self.sceneInd[si] = -1
-        self.pullUpGrid([[0]*16]*16, "/" + str(si+1) + "/sceneGrid")
-        self.pullUpColSub([], "/" + str(si+1) + "/sceneCol")
-
-    # hanlder for the scene toggle control on the scene page, OSCaddr: /si/sceneToggle
-    def sceneToggle(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1
-        self.sceneTogs[si] = (stuff[0] == 1)
 
 
     ## is the helper function used to take a grid and display it in the specified grid UI element  
@@ -870,64 +623,6 @@ class MultiLoop:
             else:
                 self.sendToUI(colAddr + "/" + str(i+1) + "/1", 0)
 
-    
-    ## is the handler  for the piano mode toggle control, OSCaddr: /si/piano 
-    def pianoModeOn(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        #switch tab to piano mode tab
-        if stuff[0] == 0:
-            state.pianoModeIsOn = False
-            for ad in ["/step", "/col", "/colsel"]:
-                msg = OSC.OSCMessage()
-                msg.setAddress("/" + str(si+1) + ad + "/visible")
-                msg.append(1)
-                for cli in self.iPadClients: 
-                    if cli.address()[0] == source[0]:
-                        cli.send(msg) #self.oscClientUI.send(msg)
-
-            msg = OSC.OSCMessage()
-            msg.setAddress("/" + str(si+1) + "/pianoKey/visible")
-            msg.append(0)
-            for cli in self.iPadClients: 
-                if cli.address()[0] == source[0]:
-                    cli.send(msg) #self.oscClientUI.send(msg)
-            return
-        print "                      going to piano mode"
-        state.pianoModeIsOn = True
-
-        for ad in ["/step", "/col", "/colsel"]:
-            msg = OSC.OSCMessage()
-            msg.setAddress("/" + str(si+1) + ad + "/visible")
-            msg.append(0)
-            for cli in self.iPadClients: 
-                if cli.address()[0] == source[0]:
-                    cli.send(msg) #self.oscClientUI.send(msg)
-
-        msg = OSC.OSCMessage()
-        msg.setAddress("/" + str(si+1) + "/pianoKey/visible")
-        msg.append(1)
-        for cli in self.iPadClients: 
-            if cli.address()[0] == source[0]:
-                cli.send(msg) #self.oscClientUI.send(msg)
-
-        state.pianogrid = copy.deepcopy(state.grid)
-        self.pullUpGrid(state.pianogrid, "/" +str(si+1) + "/pianoGrid")
-        return
-    
-    ## is the handler  for the piano key control, OSCaddr: /si/pianoKey/i/1
-    def pianoKey(self, addr, tags, stuff, source): #set up handler using lambda functions like with normal grid 
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        i, j = self.gridAddrInd(addr)
-        print i
-        if stuff[0] == 1:
-            state.pianoKeyDown[i] = copy.deepcopy(state.prog.c[i])
-            self.playChord(state.pianoKeyDown[i], piano="on", channel=si) # turns "on" the chord(s) of pressed keys 
-        else:
-            self.playChord(state.pianoKeyDown[i], piano="off", channel=si) # turns "off" the chords(s) of released keys
-            if state.refreshModeOn:
-                self.refreshColumn(i, si)
 
     ## is the handler  for the apply custom scale control,  OSCaddr: /si/scaleApply
     def applyCustomScale(self, addr, tags, stuff, source):
@@ -935,27 +630,16 @@ class MultiLoop:
         if stuff[0] == 0:
             return
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         with state.lock:
-            custScale = [i - min(state.customScale) for i in state.customScale]
+            custScale = [i - min(melodyState.customScale) for i in melodyState.customScale]
             custScale.sort()
             print "custom scale", custScale
-            state.scale = custScale
-            state.prog = self.gridToProg(state.grid, custScale, state.root)
-        self.updateNoteLabels(state.scale, si)
-    
-    ## TODO:REDUNDANT is the handler for the scale definer control, OSCaddr: /si/ 
-    def custScale(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-        i, j = self.gridAddrInd(addr)
-        if stuff[0] != 0:
-            state.customScale.append(i)
-            print "                added note to scale", i 
-        else:
-            if i in state.customScale:
-                state.customScale.remove(i)
-                print "                removed note from scale", i
-    
+            melodyState.scale = custScale
+            melodyState.prog = self.gridToProg(melodyState.grid, custScale, melodyState.root)
+        self.updateNoteLabels(melodyState.scale, si)
+
     ## handler abstraction for custom-scale controls: OSCaddr: /si/custScale/i/1, /copyScale/i/1, /recievedScale/i/1
     ## is used inside a lambda function that is the actual handler
     @staticmethod
@@ -978,9 +662,10 @@ class MultiLoop:
         print source, addr
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         if state.offlineEdit:
-            if state.algSubsets:
-                state.offlineGrid = self.columnOverlay(state.offlineGrid, [[0 for i in range(16)] for j in range (16)], state.algColumnSub)
+            if melodyState.algSubsets:
+                state.offlineGrid = self.columnOverlay(state.offlineGrid, [[0 for i in range(16)] for j in range (16)], melodyState.algColumnSub)
             else:
                 state.offlineGrid = [[0 for i in range(16)] for j in range (16)]
             self.pullUpGrid(state.offlineGrid, "/" +str(si+1) + "/offGrid")
@@ -989,14 +674,14 @@ class MultiLoop:
             state.gridseq[state.gridseqInd] = "blank"
             self.sendToUI("/" + str(si+1) + "/seqtext/" + str(state.gridseqInd+1), "b")
             return
-        if state.algSubsets:
-            for i in state.algColumnSub:
-                state.prog.c[i] = phrase.Chord([-1])
-                state.grid = self.columnOverlay(state.grid, [[0 for i in range(16)] for j in range (16)], state.algColumnSub)
+        if melodyState.algSubsets:
+            for i in melodyState.algColumnSub:
+                melodyState.prog.c[i] = phrase.Chord([-1])
+                melodyState.grid = self.columnOverlay(melodyState.grid, [[0 for i in range(16)] for j in range (16)], melodyState.algColumnSub)
         else:
-            state.prog.c = [phrase.Chord([-1]) for i in range(16)]
-            state.grid = [[0 for i in range(16)] for j in range (16)]
-        self.pullUpGrid(state.grid, "/" +str(si+1) + "/grid")
+            melodyState.prog.c = [phrase.Chord([-1]) for i in range(16)]
+            melodyState.grid = [[0 for i in range(16)] for j in range (16)]
+        self.pullUpGrid(melodyState.grid, "/" +str(si+1) + "/grid")
     
     
     ##is used to start the threading in the SkipStep initialization     
@@ -1059,6 +744,7 @@ class MultiLoop:
         if stuff[0] == 0:
             return
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         direction = addr.split("/")[2]
         print "                   direction:", direction
         if state.arrowToggle:
@@ -1067,39 +753,39 @@ class MultiLoop:
             if direction == "right":
                 state.stepIncrement = 1
             if direction == "up":
-                state.root += 1
+                melodyState.root += 1
                 with state.lock:
-                    state.prog = self.gridToProg(state.grid, state.scale, state.root)
-                self.updateNoteLabels(state.scale, si)
+                    melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
+                self.updateNoteLabels(melodyState.scale, si)
             if direction == "down":
-                state.root -= 1
+                melodyState.root -= 1
                 with state.lock:
-                    state.prog = self.gridToProg(state.grid, state.scale, state.root)
-                self.updateNoteLabels(state.scale, si)
+                    melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
+                self.updateNoteLabels(melodyState.scale, si)
                     
         else:
 
             if state.offlineEdit:
                 print "offline shift", direction
                 g = self.gridShift(state.offlineGrid, direction)
-                if state.algSubsets:
-                    g = self.columnOverlay(state.offlineGrid, g, state.algColumnSub)
+                if melodyState.algSubsets:
+                    g = self.columnOverlay(state.offlineGrid, g, melodyState.algColumnSub)
 
                 print self.gridDif(g, state.offlineGrid)
 
                 state.offlineGrid = g
-                print self.gridDif(state.offlineGrid, state.grid), "SHOULD BE DIF"
+                print self.gridDif(state.offlineGrid, melodyState.grid), "SHOULD BE DIF"
                 self.pullUpGrid(state.offlineGrid, "/" +str(si+1) + "/offGrid")
             else: 
                 print "shift", direction
-                g = self.gridShift(state.grid, direction)
-                if state.algSubsets:
-                    g = self.columnOverlay(state.grid, g, state.algColumnSub)
-                print self.gridDif(g, state.grid)
+                g = self.gridShift(melodyState.grid, direction)
+                if melodyState.algSubsets:
+                    g = self.columnOverlay(melodyState.grid, g, melodyState.algColumnSub)
+                print self.gridDif(g, melodyState.grid)
                 with state.lock:
-                    state.grid = g
-                    state.prog = self.gridToProg(state.grid, state.scale, state.root)
-                self.pullUpGrid(state.grid, "/" +str(si+1) + "/grid")
+                    melodyState.grid = g
+                    melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
+                self.pullUpGrid(melodyState.grid, "/" +str(si+1) + "/grid")
             
     ## helper function that takes a scale and a root note and returns a list of 16 notes from the scale starting from the root
     @staticmethod
@@ -1120,7 +806,30 @@ class MultiLoop:
                 if col[j] != 0:
                     c.append(notes[j])
         return c
-    
+
+    def preStepJump(self, addr, tags, stuff, source):
+        if stuff[0] == 0: return
+        print "PRE JUMP"
+        si = int(addr.split("/")[1]) - 1
+        progInd, j = self.gridAddrInd(addr)
+        state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState.startInd = progInd
+        if state.isColSubLooping:
+            if melodyState.startInd in state.columnSubsetLooping:
+                state.progInd = state.columnSubsetLooping.index(melodyState.startInd)
+            else:
+                if melodyState.startInd > state.columnSubsetLooping[-1]:
+                    state.progInd = len(state.columnSubsetLooping) - 1
+                    self.sendToUI("/" + str(si+1) + "/step/" + str(state.progInd+1) + "/1", 1)
+                    return
+                i = len(state.columnSubsetLooping) - 1
+                while state.columnSubsetLooping[i] >= melodyState.startInd and i > 0:
+                    state.progInd = state.columnSubsetLooping[i]
+                    i -= 1
+                self.sendToUI("/" + str(si+1) + "/step/" + str(state.progInd+1) + "/1", 1)
+
+
     ## helper function that takes an OSC addres of a grid or selector from the touchOSC ui and returns the corrdinates of the picked element
     @staticmethod
     def gridAddrInd(addr):
@@ -1144,6 +853,7 @@ class MultiLoop:
     def assign2(self, a, b, c, d): #a - grid, b - addr, c - stuff, d - prog
         si = int(b.split("/")[1]) - 1 #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         print si
         with state.lock:
             i, j = self.gridAddrInd(b)
@@ -1153,7 +863,7 @@ class MultiLoop:
             if d == 0:
                 print "no prog"
                 return
-            d.c[i] = self.colToChord(a[i], state.root, state.scale)
+            d.c[i] = self.colToChord(a[i], melodyState.root, melodyState.scale)
             #print self.prog, "\n\n\n"
 
     def gridHandler(self, addr, tags, stuff, source):
@@ -1239,8 +949,9 @@ class MultiLoop:
     # helper function for saving
     def miniStateToString(self, grid, scale, root, colsub, si, colsel=False): #TODO: fix colsel keyword hack
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
 
-        if state.isColSubLooping or colsel:
+        if melodyState.isColSubLooping or colsel:
             colsublist = [str(i) for i in colsub]
         else:
             colsublist = []
@@ -1250,6 +961,7 @@ class MultiLoop:
 
         return self.gridKeyToString(grid, scale) + "+" + rootstr + "+" + colsubstring
 
+    ##TODO: NEEDS UPDATING
     # helper function for saving
     def stringToMiniState(self, string):
         grid, scale = self.stringToGridKey(string.split("+")[0]+"+"+string.split("+")[1])
@@ -1264,7 +976,8 @@ class MultiLoop:
     # helper function for saving
     def stateToString(self, si):
         state = self.gridStates[si]
-        liveMini = self.miniStateToString(state.grid, state.scale, state.root, state.columnSubsetLooping, si)
+        melodyState = state.melodyStates[state.melodyStateInd]
+        liveMini = self.miniStateToString(state.grid, melodyState.scale, melodyState.root, melodyState.columnSubsetLooping, si)
         miniList = [liveMini]
         for i in range(len(state.savedGrid)):
             if state.savedGrid[i] == 0:
@@ -1474,6 +1187,8 @@ class MultiLoop:
     def noiseHit(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
+
         if stuff[0] == 0: return
         grid = self.noiseChoice(si)
         if state.offlineEdit:
@@ -1502,32 +1217,33 @@ class MultiLoop:
     ## helper function that returns the grid from the selected transformation function at the selected noise level 
     def noiseChoice(self, si):
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         inputGrid = [[]]
         if state.offlineEdit:     ##TODO: should noiseChoice be responsible for managing undo-stack?
             inputGrid = copy.deepcopy(state.offlineGrid)
             state.offlineUndoStack.append(copy.deepcopy(state.offlineGrid))
             print "OFFLINE NOISE", self.gridSum(inputGrid), len(state.offlineUndoStack)
         else:
-            inputGrid = copy.deepcopy(state.grid)
-            state.undoStack.append(copy.deepcopy(state.grid))
-        print "the noise that was selected was", state.noiseInd
+            inputGrid = copy.deepcopy(melodyState.grid)
+            melodyState.undoStack.append(copy.deepcopy(melodyState.grid))
+        print "the noise that was selected was", melodyState.noiseInd
 
         g = 5
 
-        if state.noiseInd == 1:
-            g = self.chordify(inputGrid, state.noiselev/2)
+        if melodyState.noiseInd == 1:
+            g = self.chordify(inputGrid, melodyState.noiselev/2)
             
-        if state.noiseInd == 2:
-            g = self.smartNoise(inputGrid, state.noiselev/2)
+        if melodyState.noiseInd == 2:
+            g = self.smartNoise(inputGrid, melodyState.noiselev/2)
             
-        if state.noiseInd == 3:
-            g = self.rhythmBreak(inputGrid, state.noiselev/2)
+        if melodyState.noiseInd == 3:
+            g = self.rhythmBreak(inputGrid, melodyState.noiselev/2)
             
-        if state.noiseInd == 4:
-            g = self.simplify(inputGrid, state.noiselev/2)
+        if melodyState.noiseInd == 4:
+            g = self.simplify(inputGrid, melodyState.noiselev/2)
 
-        if state.algSubsets:
-            g = self.columnOverlay(inputGrid, g, state.algColumnSub)
+        if melodyState.algSubsets:
+            g = self.columnOverlay(inputGrid, g, melodyState.algColumnSub)
 
         return g
     
@@ -1543,42 +1259,13 @@ class MultiLoop:
                 g[i] = copy.deepcopy(overlayGrid[i])
             else:
                 g[i] = copy.deepcopy(baseGrid[i])
-        return g 
-
-
-    ## handler  for the tap tempo control, OSCaddr: /si/tempo 
-    ## TODO: reassign this to the subsetTap UI control, have a separate function for universal tap tempo
-    def tempo(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
-        state = self.gridStates[si]
-
-        msg = OSC.OSCMessage()
-        msg.setAddress("/touch")
-
-        metronomeToggleString = []
-        for i in range(self.num):
-            if i in state.rhythmInstSubsets:
-                metronomeToggleString.append("1")
-            else:
-                metronomeToggleString.append("0")
-        msg.append("".join(metronomeToggleString))
-        print "sent touch message", state.rhythmInstSubsets, metronomeToggleString, msg, self.superColliderClient
-        self.superColliderClient.send(msg)
-
-        #NOTE: code previously used to touch-tempo over several SkipStep instances over lan
-        #      due to implementation of multi-metronomes, this will no longer work 
-        # msg.clear()
-        # msg.setAddress("/send/GD")
-        # msg.append("all")
-        # msg.append("/touch") #triggers tempo hit on ALL SkipStep.py, which then sends it to chuck back end
-        # msg.append("stuff")
-        # self.oscLANdiniClient.send(msg)
+        return g
         
     ## handler  for the undo button, OSCaddr: /si/undo
     def undo(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         if stuff[0] == 0: return
         if state.offlineEdit:
             if len(state.offlineUndoStack) == 0: return
@@ -1587,11 +1274,11 @@ class MultiLoop:
             state.offlineGrid = topstack
             self.pullUpGrid(state.offlineGrid, "/" + str(si+1) + "/offGrid")
         else:
-            if len(state.undoStack) == 0: return
+            if len(melodyState.undoStack) == 0: return
             with state.lock:
-                state.grid = state.undoStack.pop()
-                state.prog = self.gridToProg(state.grid, state.scale, state.root)
-                self.pullUpGrid(state.grid, "/" +str(si+1) + "/grid")
+                melodyState.grid = melodyState.undoStack.pop()
+                melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
+                self.pullUpGrid(melodyState.grid, "/" +str(si+1) + "/grid")
     
     #helper function that returns the hamming distance between two grids   
     @staticmethod
@@ -1621,145 +1308,34 @@ class MultiLoop:
                 else: 
                     newG[i][j] = grid[i][j]
         return newG
-    
-    # hanlder that pulls up a grid/scale to send on the sending-page, OSCaddr: /si/getGridScale
-    def getGridToSend(self, addr, tags, stuff, source):
-        if stuff[0] == 0:
-            return
-        si = int(addr.split("/")[2])-1
-        state = self.gridStates[si]
-        self.copyGrid = copy.deepcopy(state.grid)
-        self.copyScale = copy.deepcopy(state.scale)
-        self.pullUpGrid(self.copyGrid, "/copyGrid")
-        self.pullUpScale(self.copyScale, "/copyScale")
-    
-    # hanlder for the control to send the grid/scale on the send-page to others, OSCaddr: /sendGrid
-    def sendButtonTest(self, addr, tags, stuff, source):
-        if stuff[0] == 0:
-            return
-        else:
-            self.sendGrid()
 
-    # helper function that carries out the grid/scale sending
-    def sendGrid(self):
-        #recipient = raw_input("Who do you want to send a grid to: ")
-        #print recipient
-
-        self.destname = ""
-
-        app = IPentry.SendNameGUI(None, self)
-        app.title('my application')
-        app.mainloop()
-
-        recipient = self.destname
-
-        #recipient = "all"
-        msg = OSC.OSCMessage()
-        msg.setAddress("/send/GD")
-        msg.append(recipient)
-        msg.append("/recievedGrid")
-        print self.copyGrid 
-        print
-        print
-        msg.append(self.gridKeyToString(self.copyGrid, self.copyScale)) #replace with edit grid?
-        self.oscLANdiniClient.send(msg)
-        print "sent"
-    
-    # handler that processes a recieved grid/scale, OSCaddr: /recievedGrid
-    def recieveGrid(self, addr, tags, stuff, source):
-        print stuff[0], "got it"
-        grid, scale = self.stringToGridKey(stuff[0])
-        self.recievedGrid = grid
-        self.pullUpGrid(grid, "/recievedGrid")
-        self.pullUpScale(scale, "/recievedScale")
-        self.recievedScale = [i+1 for i in scale]
-        print self.recievedScale
-    
-    # handler for the control that puts the received grid live, OSCaddr: /si/applyRecvGrid
-    def applyRecvGrid(self, addr, tags, stuff, source):
-        if stuff[0] == 0:
-            return
-        si = int(addr.split("/")[2])-1
-        state = self.gridStates[si]
-        with state.lock:
-            state.grid = copy.deepcopy(self.recievedGrid)
-            state.prog = self.gridToProg(state.grid, state.scale, state.root)
-        self.pullUpGrid(state.grid, "/" + str(si+1) + "/grid")
-    
-    # handler for the control that puts the received scale live, OSCaddr: /si/applyRecvGrid   
-    def applyRecvScale(self, addr, tags, stuff, source):
-        if stuff[0] == 0:
-            return
-        si = int(addr.split("/")[2])-1
-        state = self.gridStates[si]
-        with state.lock:
-            minN = min(self.recievedScale)
-            state.scale = [i - minN for i in self.recievedScale]
-            state.prog = self.gridToProg(state.grid, state.scale, state.root)
-        self.pullUpScale(state.scale, "/" + str(si+1) + "/custScale")
-            
-    
-    ## handler  for the grid sequence toggle control, OSCaddr: /si/seqtoggle 
-    def gridSeqToggleHandler(self, addr, tags, stuff, source):
-        print "grid sequencing " + str(stuff[0])
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-        state.gridseqFlag = (stuff[0] == 1)
-        print "grid sequencing " + str(si+1) + " " + str(state.gridseqFlag)
-    
-    ## handler  for the grid sequence edit toggle control,  OSCaddr: /si/seqedit 
-    def gridSeqEditHandler(self, addr, tags, stuff, source):
-        print" grid sequence edit " + str(stuff[0])
-        si = int(addr.split("/")[1]) - 1
-        self.gridStates[si].gridseqEdit = (stuff[0] == 1)
-        print "grid sequence edit" + str(self.gridStates[si].gridseqEdit)
-    
-    ## handler  for the grid sequence index selector control  OSCaddr: /si/gridseq/i/1
-    def gridSeqIndHandler(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        print "in seq ind"
-        si = int(addr.split("/")[1]) - 1
-        if stuff[0] == 1:
-            state = self.gridStates[si]
-            state.gridseqInd = self.gridAddrInd(addr)[0]
-            print" grid sequence index " + str(state.gridseqInd)
-    
-    ## handler  for the grid sequence clear control, OSCaddr: /si/seqclear
-    def gridSeqClear(self, addr, tags, stuff, source):
-        if stuff[0] == 0: return
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-        state.gridseq = [-1]*8
-        for i in range(8):
-            self.sendToUI("/" + str(si+1) + "/seqtext/" + str(i+1), "-")
-    
-    #not implemented
-    def gridwiseStepSynch(self, addr, tags, stuff, source):
-        return
-    
-    #helper function that puts a grid into active use       
+    #TODO: update for melodyStates
+    #helper function that puts a grid into active use
     def putGridLive(self, grid, si):
         state = self.gridStates[si]
-        state.grid = grid
-        self.pullUpGrid(state.grid, "/" + str(si+1) + "/grid")
-        state.prog = self.gridToProg(state.grid, state.scale, state.root) 
-    
+        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState.grid = grid
+        self.pullUpGrid(melodyState.grid, "/" + str(si+1) + "/grid")
+        melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
+
+    ##TODO: update for melodyStates
     ## helper function that takes the variables of a miniState and makes them the active mini state 
     def putMiniStateLive(self, grid, scale, root, columnSubsetLooping, si):
         state = self.gridStates[si]
+        melodyState = state.melodyStates[state.melodyStateInd]
         #with state.lock:
-        state.customScale = [1+i for i in scale]
-        state.grid = grid
-        state.scale = scale
-        state.root = root
-        state.columnSubsetLooping = columnSubsetLooping
-        state.prog = self.gridToProg(state.grid, state.scale, state.root)
+        melodyState.customScale = [1+i for i in scale]
+        melodyState.grid = grid
+        melodyState.scale = scale
+        melodyState.root = root
+        melodyState.columnSubsetLooping = columnSubsetLooping
+        melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
         if len(columnSubsetLooping) == 0:
-            state.isColSubLooping = False
+            melodyState.isColSubLooping = False
             self.sendToUI("/" +str(si+1) + "/colsel", 0)        
             #change UI, switch and selecors
         else:
-            state.isColSubLooping = True
+            melodyState.isColSubLooping = True
             self.sendToUI("/" +str(si+1) + "/colsel", 1)
         for i in range(16):
             if i in columnSubsetLooping:
@@ -1779,22 +1355,6 @@ class MultiLoop:
         for i in range(16):
             #print self.notenames[notes[i]%12]
             self.sendToUI("/"+str(si+1)+"/notelabel/" + str(i+1), self.notenames[notes[i]%12])
-       
-
-    ## hanlder function for toggling offline editing on and off 
-    def offlineToggle(self, addr, tags, stuff, source):
-        si = int(addr.split("/")[1]) - 1
-        state = self.gridStates[si]
-        state.offlineEdit = stuff[0] == 1
-        self.sendToUI("/" + str(si+1) + "/offGrid/visible", stuff[0])
-        if stuff[0] == 1:
-            self.sendToUI("/" + str(si+1) + "/col/color", "gray")
-            self.pullUpColSub(state.offlineColumnSubsetLooping, "/" + str(si+1) + "/col")#load normal colsub
-            print "PULLED UP OFFCOL", state.offlineColumnSubsetLooping
-        else:
-            self.pullUpColSub(state.columnSubsetLooping, "/" + str(si+1) + "/col")#load normal colsub
-            self.sendToUI("/" + str(si+1) + "/col/color", "blue")
-
 
     ## handler  function for the minipage selector control, OSCaddr: /si/pageSelector/1/i 
     def changeMiniPage(self, addr, tags, stuff, source):
