@@ -309,11 +309,11 @@ class MultiLoop:
         state = self.gridStates[int(stuff[0])]
         melodyState = state.melodyStates[state.melodyStateInd]
         state.progInd = melodyState.startInd
-        grid, scale, root, columnSubsetLooping = self.stringToMiniState(state.savedGrid[int(stuff[1])])
-        self.putMiniStateLive(grid, scale, root, columnSubsetLooping, int(stuff[0]))
+        state.melodyStateInd = int(stuff[1])
         msg = OSC.OSCMessage()
         msg.setAddress("/startMetronome")
         msg.append(stuff[0])
+        msg.append(stuff[1])
         print "pulled up grid, sending back to SC to start metronome for instrument", stuff[0], "pad", stuff[1]
         self.superColliderClient.send(msg)
 
@@ -345,7 +345,7 @@ class MultiLoop:
             if state.pianoModeIsOn:
                 colChord = phrase.Chord([-1])
             else:
-                colChord = state.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+                colChord = melodyState.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if state.refreshModeOn and not state.pianoModeIsOn:
                 self.refreshColumn(playind, si)
 
@@ -400,7 +400,7 @@ class MultiLoop:
     ##is called when an OSC message from the SuperCollider metronome is recieved
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
         si = int(addr.split("-")[1])
-        #print "                 played", si
+        print "                 played", si
 
         #calculates what column to play based on the index
         state = self.gridStates[si]
@@ -411,7 +411,7 @@ class MultiLoop:
             return
 
         colChord = self.preChordPlay(si)
-
+        print "                 played", si, colChord
 
         #plays the chords that are defined by each column (phrase.play to be documented later)
         #print colChord, si
@@ -865,6 +865,7 @@ class MultiLoop:
                 print "no prog"
                 return
             melodyState.prog.c[i] = self.colToChord(melodyState.grid[i], melodyState.root, melodyState.scale)
+            print melodyState.prog.c[i]
 
     def gridHandler(self, addr, tags, stuff, source):
         k = int(addr.split("/")[1]) - 1

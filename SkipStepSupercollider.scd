@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT;
 
 
 n = 4; //set n - number of instruments
@@ -19,7 +19,7 @@ quneoOut = MIDIOut.newByName("QUNEO", "QUNEO");
 quneoOut.latency = 0;
 
 padIndToGreen = ((0..15)*2);
-padIndToRed = ((0..15)*2);
+padIndToRed = ((0..15)*2 + 1);
 
 //----------------create old/new time variables for touch tempo -------------------
 oldTap = 0;
@@ -55,7 +55,9 @@ notesOn = Array.fill(n, {Set.new()});
 holdDownPlay = false;
 masterLoopingOn = false;
 loop_BUTTON = 26;
-hold_BUTTON = 24;
+hold_BUTTON = 25;
+loop_LIGHT = 35;
+hold_LIGHT = 34;
 loopingPads = Set.new();
 singlePlayPads = Set.new();
 heldDownPads = Set.new();
@@ -89,12 +91,6 @@ all works properly wrt timing after the last chord is played in all use cases
 
  -------------------------------------------------------------------------------------
 TODO: - need a way to stop a looping melody without starting a new one
-      - need to rework how saving miniStates works -
-         - need to save 4 "reactive" miniStates
-      - maybe don't have step tracker move, but be static and act as a "start point" control
-      - expand miniState to include: alg parameters (type, intensity, loop), refershMode, "start point" ^
-      - change grid save/load UI to a single selector, which selects which miniState is "active to edit"
-      - remove "offline grid" logic
       - must modify function for every UI element that interacts with miniState
          - gridState contains a "miniState" list (consolidation of miniState parameters),
            and a "selected miniState" ind indicated which is "active to edit"
@@ -105,7 +101,8 @@ TODO: - need a way to stop a looping melody without starting a new one
              - can we remove all state information not related to a miniState from the model?
                 - moving close to the design that what is on the ipad only defines "musical closures"
                   and all performative state is controlled by the pad
-      - need to do lights
+      - need to fix lights - specifically holdMode and loopMode control light behavior
+      - need to test with actual audio, see if startPoint control works properly
 
 */
 
@@ -116,10 +113,10 @@ clockFuncGenerator = {|i, j|
 			{
 				lastBeats[i] = false;
 				returnVal = nil;
-				("lastBeat cutoff" + i).postln;
-				singlePlayPad.remove(4*i + j);
+				("lastBeat cutoff" + i + " " + j).postln;
+				singlePlayPads.remove(4*j + i);
 				//turn off red/normal
-				quneoOut.noteOff(0, padIndToRed[4*i + j], 127);
+				quneoOut.noteOff(0, padIndToRed[4*j + i], 127);
 			},
 			{
 				lastHits[i] = SystemClock.beats;
@@ -136,7 +133,7 @@ a = {|vel, note, chan, port|
 	if(isPadNote.(note), {
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
-		var padInd = padTodIn.(note);
+		var padInd = noteToInd.(note);
 		"padOn".postln;
 		//reset everything about that instrument
 		//turn off all lights on pad
@@ -146,10 +143,13 @@ a = {|vel, note, chan, port|
 		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
 		notesOn[xVal].clear;
 		//clear all lights in column
-		((4*xVal)..(4*xVal+3)).do({
-			quneoOut.noteOff(0, padIndToGreen[padInd], 127);
-			quneoOut.noteOff(0, padIndToRed[padInd], 127);
-		})
+		((0..3)*4+xVal).do({|i|
+			loopingPads.remove(i);
+			singlePlayPads.remove(i);
+			heldDownPads.remove(i);
+			quneoOut.noteOff(0, padIndToGreen[i], 127);
+			quneoOut.noteOff(0, padIndToRed[i], 127);
+		});
 
 		if(loopingPads.includes(padInd),
 			{
@@ -163,15 +163,19 @@ a = {|vel, note, chan, port|
 					loopingOn[xVal] = true;
 					loopingPads.add(padInd);
 					quneoOut.noteOn(0, padIndToGreen[padInd], 127);
-				})
+					["looping on", padInd].postln;
+				});
 				if(holdDownPlay, {
 					heldDownPads.add(padInd);
 					quneoOut.noteOn(0, padIndToRed[padInd], 90);
 					quneoOut.noteOn(0, padIndToGreen[padInd], 90);
+					["hold-down on", padInd].postln;
+					heldDownPads.postln;
 				});
 				if(masterLoopingOn.not && holdDownPlay.not, {
 					singlePlayPads.add(padInd);
 					quneoOut.noteOn(0, padIndToRed[padInd], 127);
+					["single-play on", padInd].postln;
 				});
 				pythonOSCport.sendMsg("/padHit", xVal, yVal);
 				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
@@ -184,10 +188,10 @@ a = {|vel, note, chan, port|
 		if(masterLoopingOn,
 			{
 				holdDownPlay = false;
-				quneoOut.noteOff(0, hold_BUTTON, 127);
-				quneoOut.noteOn(0, loop_BUTTON, 127);
+				quneoOut.noteOff(0, hold_LIGHT, 127);
+				quneoOut.noteOn(0, loop_LIGHT, 127);
 			},
-			{quneoOut.noteOff(0, loop_BUTTON, 127);}
+			{quneoOut.noteOff(0, loop_LIGHT, 127);}
 		);
 		//toggle lighting
 	});
@@ -196,10 +200,10 @@ a = {|vel, note, chan, port|
 		if(holdDownPlay,
 			{
 				masterLoopingOn = false;
-				quneoOut.noteOff(0, loop_BUTTON, 127);
-				quneoOut.noteOn(0, hold_BUTTON, 127);
+				quneoOut.noteOff(0, loop_LIGHT, 127);
+				quneoOut.noteOn(0, hold_LIGHT, 127);
 			},
-			{quneoOut.noteOff(0, hold_BUTTON, 127);}
+			{quneoOut.noteOff(0, hold_LIGHT, 127);}
 		);
 		//toggle lighting
 	});
@@ -209,14 +213,16 @@ padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
 
 
 b = {|vel, note, chan, port|
-	if(isPadNote.(note) && heldDownPads.includes(note), {
+	var padInd = noteToInd.(note);
+	["off hanlder", note, isPadNote.(note), heldDownPads.includes(note)].postln;
+	if(isPadNote.(note) && heldDownPads.includes(padInd), {
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
-		var padInd = padTodIn.(note);
 		metronomeClocks[xVal].clear;
 		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
 		notesOn[xVal].clear;
 		heldDownPads.remove(padInd);
+		["hold-down OFF", padInd].postln;
 		//turn off orange
 		quneoOut.noteOff(0, padIndToGreen[padInd], 127);
 		quneoOut.noteOff(0, padIndToRed[padInd], 127);
@@ -257,7 +263,7 @@ playHandler = {|msg, time, addr, recvPort|
 					chordDur = beats[msg[1]] - (SystemClock.beats-lastHits[msg[1]]) - 0.005;
 					("stepjump duration is" + chordDur).postln;
 				},
-				{("BEATS VAL" + [beats[msg[1]], msg[1]]).postln; chordDur = 0.25*beats[msg[1]]-0.005}
+				{chordDur = 0.25*beats[msg[1]]-0.005}
 			);
 			Task({
 				//TODO: add onNotes tracking
