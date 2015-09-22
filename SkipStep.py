@@ -360,6 +360,7 @@ class MultiLoop:
             msg = OSC.OSCMessage()
             msg.setAddress("/lastBeats")
             msg.append(si)
+            msg.append(state.melodyStateInd)
             self.superColliderClient.send(msg)
             if state.gridseqFlag and sum(state.gridseq) != -8:
                 state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 

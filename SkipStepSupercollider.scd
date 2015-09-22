@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads;
 
 
 n = 4; //set n - number of instruments
@@ -14,6 +14,12 @@ When tap-tempoing:
 tempoClocks = List(); //currently using option 2
 (1..n).do({|i| tempoClocks.add(TempoClock.new(1))});
 
+
+quneoOut = MIDIOut.newByName("QUNEO", "QUNEO");
+quneoOut.latency = 0;
+
+padIndToGreen = ((0..15)*2);
+padIndToRed = ((0..15)*2);
 
 //----------------create old/new time variables for touch tempo -------------------
 oldTap = 0;
@@ -50,6 +56,9 @@ holdDownPlay = false;
 masterLoopingOn = false;
 loop_BUTTON = 26;
 hold_BUTTON = 24;
+loopingPads = Set.new();
+singlePlayPads = Set.new();
+heldDownPads = Set.new();
 
 /*
 beatHit
@@ -100,7 +109,7 @@ TODO: - need a way to stop a looping melody without starting a new one
 
 */
 
-clockFuncGenerator = {|i|
+clockFuncGenerator = {|i, j|
 	{
 		var returnVal;
 		if(loopingOn[i].not && holdDownPlay.not && lastBeats[i],
@@ -108,7 +117,9 @@ clockFuncGenerator = {|i|
 				lastBeats[i] = false;
 				returnVal = nil;
 				("lastBeat cutoff" + i).postln;
+				singlePlayPad.remove(4*i + j);
 				//turn off red/normal
+				quneoOut.noteOff(0, padIndToRed[4*i + j], 127);
 			},
 			{
 				lastHits[i] = SystemClock.beats;
@@ -125,6 +136,7 @@ a = {|vel, note, chan, port|
 	if(isPadNote.(note), {
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
+		var padInd = padTodIn.(note);
 		"padOn".postln;
 		//reset everything about that instrument
 		//turn off all lights on pad
@@ -133,48 +145,95 @@ a = {|vel, note, chan, port|
 		metronomeClocks[xVal].clear;
 		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
 		notesOn[xVal].clear;
-		pythonOSCport.sendMsg("/padHit", xVal, yVal);
+		//clear all lights in column
+		((4*xVal)..(4*xVal+3)).do({
+			quneoOut.noteOff(0, padIndToGreen[padInd], 127);
+			quneoOut.noteOff(0, padIndToRed[padInd], 127);
+		})
 
-		if(masterLoopingOn, {loopingOn[xVal] = true});
-		//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
+		if(loopingPads.includes(padInd),
+			{
+				loopingPads.remove(padInd);
+				loopingOn[xVal] = false;
+				//turn off green
+				quneoOut.noteOff(0, padIndToGreen[padInd], 127);
+			},
+			{
+				if(masterLoopingOn,{
+					loopingOn[xVal] = true;
+					loopingPads.add(padInd);
+					quneoOut.noteOn(0, padIndToGreen[padInd], 127);
+				})
+				if(holdDownPlay, {
+					heldDownPads.add(padInd);
+					quneoOut.noteOn(0, padIndToRed[padInd], 90);
+					quneoOut.noteOn(0, padIndToGreen[padInd], 90);
+				});
+				if(masterLoopingOn.not && holdDownPlay.not, {
+					singlePlayPads.add(padInd);
+					quneoOut.noteOn(0, padIndToRed[padInd], 127);
+				});
+				pythonOSCport.sendMsg("/padHit", xVal, yVal);
+				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
+			}
+		);
 	});
 	//TODO: hanlde looping and holdDownPlay (where it only plays while you're holding it down)
 	if(note == loop_BUTTON, {
 		masterLoopingOn = masterLoopingOn.not;
+		if(masterLoopingOn,
+			{
+				holdDownPlay = false;
+				quneoOut.noteOff(0, hold_BUTTON, 127);
+				quneoOut.noteOn(0, loop_BUTTON, 127);
+			},
+			{quneoOut.noteOff(0, loop_BUTTON, 127);}
+		);
 		//toggle lighting
 	});
 	if(note == hold_BUTTON, {
 		holdDownPlay = holdDownPlay.not;
+		if(holdDownPlay,
+			{
+				masterLoopingOn = false;
+				quneoOut.noteOff(0, loop_BUTTON, 127);
+				quneoOut.noteOn(0, hold_BUTTON, 127);
+			},
+			{quneoOut.noteOff(0, hold_BUTTON, 127);}
+		);
 		//toggle lighting
 	});
-
 };
 
 padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
 
 
 b = {|vel, note, chan, port|
-	if(isPadNote.(note) && holdDownPlay, {
+	if(isPadNote.(note) && heldDownPads.includes(note), {
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
+		var padInd = padTodIn.(note);
 		metronomeClocks[xVal].clear;
 		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
 		notesOn[xVal].clear;
+		heldDownPads.remove(padInd);
 		//turn off orange
-		/*LIGHTING BUG - if you hold down a pad not in holdMode, turn on hold mode, and let go of the pad,
-		it will turn off that pad's despite it not being a holdMode light*/
+		quneoOut.noteOff(0, padIndToGreen[padInd], 127);
+		quneoOut.noteOff(0, padIndToRed[padInd], 127);
 	});
 };
 padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
 
 //msg[1] is the instrument index for which to start the metronome
+//msg[2] is the miniState index that is being played on the metronome
 startMetronomeResponse = {|msg, time, addr, recvPort|
 	("metronome started for" + msg[1]).postln;
-	metronomeClocks[msg[1]].sched(0, clockFuncGenerator.(msg[1]));
+	metronomeClocks[msg[1]].sched(0, clockFuncGenerator.(msg[1], msg[2]));
 };
 OSCFunc(startMetronomeResponse, "/startMetronome");
 
-
+//msg[1] is the instrument index
+//msg[2] is the miniState index that is being played on the metronome
 lastBeatsHandler = {|msg, time, addr, recvPort|
 	("lastBeat flag set" + msg[1]).postln;
 	lastBeats[msg[1]] = true;
