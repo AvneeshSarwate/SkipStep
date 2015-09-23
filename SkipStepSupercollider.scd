@@ -144,7 +144,6 @@ a = {|vel, note, chan, port|
 		notesOn[xVal].clear;
 		//clear all lights in column
 		((0..3)*4+xVal).do({|i|
-			loopingPads.remove(i);
 			singlePlayPads.remove(i);
 			heldDownPads.remove(i);
 			quneoOut.noteOff(0, padIndToGreen[i], 127);
@@ -156,10 +155,12 @@ a = {|vel, note, chan, port|
 				loopingPads.remove(padInd);
 				loopingOn[xVal] = false;
 				//turn off green
+
 				quneoOut.noteOff(0, padIndToGreen[padInd], 127);
 			},
 			{
 				if(masterLoopingOn,{
+					((0..3)*4+xVal).do({|i|loopingPads.remove(i)});
 					loopingOn[xVal] = true;
 					loopingPads.add(padInd);
 					quneoOut.noteOn(0, padIndToGreen[padInd], 127);
