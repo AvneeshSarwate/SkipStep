@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON;
 
 
 n = 4; //set n - number of instruments
@@ -25,7 +25,7 @@ padIndToRed = ((0..15)*2 + 1);
 oldTap = 0;
 newTap = 0;
 tapLim = 2;
-beats = Array.fill(n, {0.8}); //create n beats (default 0.7)
+beats = Array.fill(n, {1}); //create n beats (default 0.7)
 lastHits = Array.fill(n, {0});
 
 
@@ -58,9 +58,12 @@ loop_BUTTON = 26;
 hold_BUTTON = 25;
 loop_LIGHT = 35;
 hold_LIGHT = 34;
+tapTempo_BUTTON = 24;
 loopingPads = Set.new();
 singlePlayPads = Set.new();
 heldDownPads = Set.new();
+lastTimeTapped = TempoClock.default.beats;
+beatMods = beats = Array.fill(n, {1});
 
 /*
 beatHit
@@ -104,12 +107,17 @@ TODO: - need a way to stop a looping melody without starting a new one
       - need to fix lights - specifically holdMode and loopMode control light behavior
       - need to test with actual audio, see if startPoint control works properly
 
+nice to have - some way to quickly modify the melodies of a single instrument without having
+to go back to the ipad, switch screens to that melody state, and then change it
+IDEAS -- use bottom position control on Quneo as a global "startInd" controller
+      -- use vertical sliders on Quneo to transpose melodies
+
 */
 
 clockFuncGenerator = {|i, j|
 	{
 		var returnVal;
-		if(loopingOn[i].not && holdDownPlay.not && lastBeats[i],
+		if(loopingOn[i].not && heldDownPads.includes(4*j + i).not && lastBeats[i],
 			{
 				lastBeats[i] = false;
 				returnVal = nil;
@@ -122,7 +130,7 @@ clockFuncGenerator = {|i, j|
 				lastHits[i] = SystemClock.beats;
 				pythonOSCport.sendMsg("/played-"++i, i);
 				("beat" + i + " " + beats[i]).postln;
-				returnVal = beats[i]*0.25;
+				returnVal = beats[i] * (1/ beatMods[i]) * 0.25;
 		});
 
 		returnVal
@@ -182,6 +190,15 @@ a = {|vel, note, chan, port|
 				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
 			}
 		);
+	});
+	["SHOULD BE TAP TEMPO", note, tapTempo_BUTTON].postln;
+	[note >= tapTempo_BUTTON, note <= tapTempo_BUTTON, note == tapTempo_BUTTON].postln;
+	if(note == tapTempo_BUTTON, { //TODO: no idea why tapTempo_BUTTON keeps being read as nil;
+		var thisHit = TempoClock.default.beats;
+		var beatDif = thisHit - lastTimeTapped;
+		lastTimeTapped = thisHit;
+		["tapTempo", 60*(1/beatDif)].postln;
+		if(TempoClock.default.beats2secs(beatDif) < 2, {(0..3).do({|i| metronomeClocks[i].tempo = 1/beatDif})});
 	});
 };
 
