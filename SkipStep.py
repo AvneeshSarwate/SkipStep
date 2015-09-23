@@ -334,7 +334,7 @@ class MultiLoop:
         #calculates what column to play based on the index
         state = self.gridStates[si]
         melodyState = state.melodyStates[state.melodyStateInd]
-        with state.lock: 
+        with state.lock:
             if melodyState.isColSubLooping:
                 state.progInd %= len(melodyState.columnSubsetLooping)
                 playind = melodyState.columnSubsetLooping[state.progInd]
@@ -342,11 +342,10 @@ class MultiLoop:
             else:
                 state.progInd %= 16
                 playind = state.progInd
-            if state.pianoModeIsOn:
-                colChord = phrase.Chord([-1])
-            else:
-                colChord = melodyState.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
-            if state.refreshModeOn and not state.pianoModeIsOn:
+
+            colChord = melodyState.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
+            if melodyState.refreshModeOn:
+                print "pre refresh call "
                 self.refreshColumn(playind, si)
 
         return colChord
@@ -434,11 +433,10 @@ class MultiLoop:
         if melodyState.algSubsets:
             if not k in melodyState.algColumnSub: return
 
+        print "REFRESH ON COL", k
         for i in range(len(melodyState.grid)):
             if melodyState.refreshmodeSavedGrid[k][i] != melodyState.grid[k][i]:
                 self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), melodyState.refreshmodeSavedGrid[k][i])
-                if "/" + str(si+1) + "/grid" in self.doubleMap.keys():
-                    self.sendToUI(self.doubleMap["/" + str(si+1) + "/grid"] + "/" + str(15-i + 1) + "/" + str(15-k + 1), melodyState.refreshmodeSavedGrid[k][i])
                 melodyState.grid[k][i] = melodyState.refreshmodeSavedGrid[k][i]
         melodyState.prog.c[k] = melodyState.refreshModeSavedProg.c[k]
     
