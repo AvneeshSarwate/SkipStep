@@ -25,7 +25,7 @@ padIndToRed = ((0..15)*2 + 1);
 oldTap = 0;
 newTap = 0;
 tapLim = 2;
-beats = Array.fill(n, {1.5}); //create n beats (default 0.7)
+beats = Array.fill(n, {0.8}); //create n beats (default 0.7)
 lastHits = Array.fill(n, {0});
 
 
@@ -183,7 +183,26 @@ a = {|vel, note, chan, port|
 			}
 		);
 	});
-	//TODO: hanlde looping and holdDownPlay (where it only plays while you're holding it down)
+};
+
+padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
+
+
+b = {|vel, note, chan, port|
+	var padInd = noteToInd.(note);
+	["off hanlder", note, isPadNote.(note), heldDownPads.includes(note)].postln;
+	if(isPadNote.(note) && heldDownPads.includes(padInd), {
+		var xVal = noteToXY.(note)[0];
+		var yVal = noteToXY.(note)[1];
+		metronomeClocks[xVal].clear;
+		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
+		notesOn[xVal].clear;
+		heldDownPads.remove(padInd);
+		["hold-down OFF", padInd].postln;
+		//turn off orange
+		quneoOut.noteOff(0, padIndToGreen[padInd], 127);
+		quneoOut.noteOff(0, padIndToRed[padInd], 127);
+	});
 	if(note == loop_BUTTON, {
 		masterLoopingOn = masterLoopingOn.not;
 		if(masterLoopingOn,
@@ -207,26 +226,6 @@ a = {|vel, note, chan, port|
 			{quneoOut.noteOff(0, hold_LIGHT, 127);}
 		);
 		//toggle lighting
-	});
-};
-
-padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
-
-
-b = {|vel, note, chan, port|
-	var padInd = noteToInd.(note);
-	["off hanlder", note, isPadNote.(note), heldDownPads.includes(note)].postln;
-	if(isPadNote.(note) && heldDownPads.includes(padInd), {
-		var xVal = noteToXY.(note)[0];
-		var yVal = noteToXY.(note)[1];
-		metronomeClocks[xVal].clear;
-		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
-		notesOn[xVal].clear;
-		heldDownPads.remove(padInd);
-		["hold-down OFF", padInd].postln;
-		//turn off orange
-		quneoOut.noteOff(0, padIndToGreen[padInd], 127);
-		quneoOut.noteOff(0, padIndToRed[padInd], 127);
 	});
 };
 padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
