@@ -324,15 +324,21 @@ class MultiLoop:
     def applyPadTranspose(self, chord, root, scale, transpose):
         sn = self.scaleNotes
         scaleNotes = list(set(sn(root-12, scale)) | set(sn(root, scale)) | set(sn(root+12, scale)))
+        scaleNotes.sort()
         ch = phrase.Chord()
+        #print scaleNotes
         for i in chord.n:
+            if i == -1:
+               return chord
             ch.append(scaleNotes[scaleNotes.index(i)+transpose])
+        #print ch
         return ch
 
     #stuff[0] is the instrument index, stuff[1] is the value of the transpose
     def padTransposeResponder(self, addr, tags, stuff, sournce):
-        state = self.gridStates[stuff[0]]
+        state = self.gridStates[int(stuff[0])]
         state.padTranspose = int(stuff[1])
+        print "insrtument", stuff[0], "tranpose", state.padTranspose
 
     def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False):
         msg = OSC.OSCMessage()
@@ -366,7 +372,7 @@ class MultiLoop:
                 self.refreshColumn(playind, si)
 
         if state.padTranspose != 0:
-            colChord = self.applyPadTranspose(self, colChord, melodyState.root, melodyState.scale, state.padTranspose)
+            colChord = self.applyPadTranspose(colChord, melodyState.root, melodyState.scale, state.padTranspose)
 
         return colChord
 

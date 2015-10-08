@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions;
 
 
 n = 4; //set n - number of instruments
@@ -64,6 +64,12 @@ singlePlayPads = Set.new();
 heldDownPads = Set.new();
 lastTimeTapped = TempoClock.default.beats;
 beatMods = beats = Array.fill(n, {1});
+transposeMap = Dictionary.new;
+transposePositions = Array.fill(n, {0});
+
+(0..8).do({|i|
+	(i*14..i*14+10).do({|j| transposeMap.put(j, i)});
+});
 
 /*
 beatHit
@@ -249,7 +255,13 @@ padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
 
 
 c = {|vel, note, chan, port|
-	if((note < 10) && (note > 5), {[vel, note, chan, port].postln});
+	if((note < 10) && (note > 5), {
+		if((transposeMap[vel]!= nil) && (transposePositions[note-6] != transposeMap[vel]), {
+			transposePositions[note-6] = transposeMap[vel];
+			pythonOSCport.sendMsg("/padTranspose", note-6, transposePositions[note-6] - 4); //from -4 to 4 tranpose
+		});
+
+	});
 };
 
 ccHandler = MIDIFunc.cc(c, nil, nil, 2017846184);
