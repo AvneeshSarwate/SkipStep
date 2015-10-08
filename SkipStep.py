@@ -54,7 +54,9 @@ class Looper:
         self.syncTypes = [] # set of indexes for what rhythmic synchronizations will be applied. order: [tempo, nexthit, index]
         self.skipHit = False #flag that determines whether to skip the handling of the metronome hit based on the residual time between a stepjump hit and the next metronome hit
         self.melodyStates = [MelodyState() for i in range(4)]
-        self.melodyStateInd = 0
+        self.melodyStateScreenInd = 0
+        self.melodyStatePadInd = 0
+        self.padTranspose = 0
 
 
         self.lock = threading.Lock()
@@ -137,6 +139,7 @@ class MultiLoop:
         for i in range(self.num):
             self.oscServSelf.addMsgHandler("/played-" + str(i), self.realPlay)
         self.oscServSelf.addMsgHandler("/padHit", self.padHitResponder)
+        self.oscServSelf.addMsgHandler("/padTranspose", self.padTransposeResponder)
 
 
 
@@ -307,15 +310,29 @@ class MultiLoop:
     def padHitResponder(self, addr, tags, stuff, sournce):
         print "padHit", stuff
         state = self.gridStates[int(stuff[0])]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        state.melodyStatePadInd = int(stuff[1])
+
+        melodyState = state.melodyStates[state.melodyStatePadInd]
         state.progInd = melodyState.startInd
-        state.melodyStateInd = int(stuff[1])
         msg = OSC.OSCMessage()
         msg.setAddress("/startMetronome")
         msg.append(stuff[0])
         msg.append(stuff[1])
         print "pulled up grid, sending back to SC to start metronome for instrument", stuff[0], "pad", stuff[1]
         self.superColliderClient.send(msg)
+
+    def applyPadTranspose(self, chord, root, scale, transpose):
+        sn = self.scaleNotes
+        scaleNotes = list(set(sn(root-12, scale)) | set(sn(root, scale)) | set(sn(root+12, scale)))
+        ch = phrase.Chord()
+        for i in chord.n:
+            ch.append(scaleNotes[scaleNotes.index(i)+transpose])
+        return ch
+
+    #stuff[0] is the instrument index, stuff[1] is the value of the transpose
+    def padTransposeResponder(self, addr, tags, stuff, sournce):
+        state = self.gridStates[stuff[0]]
+        state.padTranspose = int(stuff[1])
 
     def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False):
         msg = OSC.OSCMessage()
@@ -333,7 +350,7 @@ class MultiLoop:
         
         #calculates what column to play based on the index
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStatePadInd]
         with state.lock:
             if melodyState.isColSubLooping:
                 state.progInd %= len(melodyState.columnSubsetLooping)
@@ -345,8 +362,11 @@ class MultiLoop:
 
             colChord = melodyState.prog.c[playind] # self.prog.c[playind] make this more efficient turn it into a PLAYER object?
             if melodyState.refreshModeOn:
-                print "pre refresh call "
+                #print "pre refresh call "
                 self.refreshColumn(playind, si)
+
+        if state.padTranspose != 0:
+            colChord = self.applyPadTranspose(self, colChord, melodyState.root, melodyState.scale, state.padTranspose)
 
         return colChord
 
@@ -354,12 +374,12 @@ class MultiLoop:
     ## that occurs when a loop repeats
     def postChordPlay(self, si):
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStatePadInd]
         if (not melodyState.isColSubLooping and (state.progInd == 16))  or (melodyState.isColSubLooping and (state.progInd == len(melodyState.columnSubsetLooping))) or (state.progInd == -1):
             msg = OSC.OSCMessage()
             msg.setAddress("/lastBeats")
             msg.append(si)
-            msg.append(state.melodyStateInd)
+            msg.append(state.melodyStatePadInd)
             self.superColliderClient.send(msg)
             if state.gridseqFlag and sum(state.gridseq) != -8:
                 state.progInd = 0 #this fixes a indexing bug when mixing subset and nonsubset mini states 
@@ -380,7 +400,7 @@ class MultiLoop:
                     g, scale, root, colsub = self.stringToMiniState(state.savedGrid[state.gridseq[state.gridseqInd]])
                 
                 if melodyState.noisy:
-                    g = self.noiseChoice(si)
+                    g = self.noiseChoice(si, True)
                     if not melodyState.refreshModeOn:
                         state.savedGrid[state.gridseq[state.gridseqInd]] = self.miniStateToString(g, scale, root, colsub, si)
                 with state.lock:
@@ -391,26 +411,26 @@ class MultiLoop:
             else:
                 #print "NOT SEQUENCING ", si+1
                 if melodyState.noisy:
-                    g = self.noiseChoice(si)
+                    g = self.noiseChoice(si, True)
                     with state.lock:
-                        self.putGridLive(g, si)
+                        self.putGridLive(g, si, True)
 
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the SuperCollider metronome is recieved
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
         si = int(addr.split("-")[1])
-        print "                 played", si
+        #print "                 played", si
 
         #calculates what column to play based on the index
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStatePadInd]
 
         if state.skipHit: 
             state.skipHit = False
             return
 
         colChord = self.preChordPlay(si)
-        print "                 played", si, colChord
+        #print "                 played", si, colChord
 
         #plays the chords that are defined by each column (phrase.play to be documented later)
         #print colChord, si
@@ -428,15 +448,17 @@ class MultiLoop:
     ## helper function is called to return columns to their saved state when snapshot mode is on 
     def refreshColumn(self, k, si):
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStatePadInd]
 
         if melodyState.algSubsets:
             if not k in melodyState.algColumnSub: return
 
-        print "REFRESH ON COL", k
+        print "REFRESH ON COL", k, "melodyScreenInd", state.melodyStateScreenInd, "melodyPadInd", state.melodyStatePadInd
         for i in range(len(melodyState.grid)):
             if melodyState.refreshmodeSavedGrid[k][i] != melodyState.grid[k][i]:
-                self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), melodyState.refreshmodeSavedGrid[k][i])
+                if state.melodyStateScreenInd == state.melodyStatePadInd:
+                    self.sendToUI("/" + str(si+1) + "/grid/" + str(k+1) + "/" + str(16-i), melodyState.refreshmodeSavedGrid[k][i])
+                    print "VISUAL REFRESH ON", state.melodyStateScreenInd
                 melodyState.grid[k][i] = melodyState.refreshmodeSavedGrid[k][i]
         melodyState.prog.c[k] = melodyState.refreshModeSavedProg.c[k]
     
@@ -444,7 +466,7 @@ class MultiLoop:
     def refreshHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         if stuff[0] != 0:
             melodyState.refreshModeOn = True
@@ -462,8 +484,8 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
-        state.melodyStateInd = ind
-        melodyState = state.melodyStates[state.melodyStateInd]
+        state.melodyStateScreenInd = ind
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
 
         self.pullUpGrid(melodyState.grid, "/" +str(si+1) + "/grid")
@@ -489,7 +511,7 @@ class MultiLoop:
     def noiseFlip(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         print "                               noise flip " + str(stuff[0] == 1)
         melodyState.noisy = (stuff[0] == 1)
@@ -499,7 +521,7 @@ class MultiLoop:
         if stuff[0] == 0: return
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         i, j = self.gridAddrInd(addr)
         melodyState.noiselev = 2 * (i+1)
     
@@ -507,7 +529,7 @@ class MultiLoop:
     def colsub(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
         s = ""
@@ -532,7 +554,7 @@ class MultiLoop:
     def colsubflip(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         with state.lock:
             melodyState.isColSubLooping = (stuff[0] == 1)
@@ -542,7 +564,7 @@ class MultiLoop:
     def algColsubHandler(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         ind, j = self.gridAddrInd(addr) #replace with gridAddrInd
         colvar = melodyState.algColumnSub
@@ -555,7 +577,7 @@ class MultiLoop:
     def algColsubFlip(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         melodyState.algSubsets = (stuff[0] == 1)
 
@@ -610,7 +632,7 @@ class MultiLoop:
         if stuff[0] == 0:
             return
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         with state.lock:
             custScale = [i - min(melodyState.customScale) for i in melodyState.customScale]
@@ -625,7 +647,7 @@ class MultiLoop:
     def assignScale(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         i = int(addr.split("/")[len(addr.split("/"))-2]) -1
         if stuff[0] != 0 and not i in melodyState.customScale:
@@ -645,7 +667,7 @@ class MultiLoop:
         print source, addr
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         if state.offlineEdit:
             if melodyState.algSubsets:
                 state.offlineGrid = self.columnOverlay(state.offlineGrid, [[0 for i in range(16)] for j in range (16)], melodyState.algColumnSub)
@@ -727,7 +749,7 @@ class MultiLoop:
         if stuff[0] == 0:
             return
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         direction = addr.split("/")[2]
         print "                   direction:", direction
         if state.arrowToggle:
@@ -797,7 +819,7 @@ class MultiLoop:
         si = int(addr.split("/")[1]) - 1
         progInd, j = self.gridAddrInd(addr)
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         melodyState.startInd = progInd
         if state.isColSubLooping:
             if melodyState.startInd in state.columnSubsetLooping:
@@ -837,7 +859,7 @@ class MultiLoop:
     def assign2(self, a, b, c, d): #a - grid, b - addr, c - stuff, d - prog
         si = int(b.split("/")[1]) - 1 #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         print si
         with state.lock:
             i, j = self.gridAddrInd(b)
@@ -853,7 +875,7 @@ class MultiLoop:
     def simpleGridAssign(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         with state.lock:
             i, j = self.gridAddrInd(addr)
             melodyState.grid[i][j] = stuff[0]
@@ -948,7 +970,7 @@ class MultiLoop:
     # helper function for saving
     def miniStateToString(self, grid, scale, root, colsub, si, colsel=False): #TODO: fix colsel keyword hack
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         if melodyState.isColSubLooping or colsel:
             colsublist = [str(i) for i in colsub]
@@ -975,7 +997,7 @@ class MultiLoop:
     # helper function for saving
     def stateToString(self, si):
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         liveMini = self.miniStateToString(state.grid, melodyState.scale, melodyState.root, melodyState.columnSubsetLooping, si)
         miniList = [liveMini]
         for i in range(len(state.savedGrid)):
@@ -1180,7 +1202,7 @@ class MultiLoop:
         if stuff[0] == 0: return
         si = int(addr.split("/")[1])  - 1 #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         i, j = self.gridAddrInd(addr)
         print i+1, "noise selector"
         melodyState.noiseInd = i+1
@@ -1189,15 +1211,15 @@ class MultiLoop:
     def noiseHit(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
 
         if stuff[0] == 0: return
-        grid = self.noiseChoice(si)
+        grid = self.noiseChoice(si, False)
         if state.offlineEdit:
             state.offlineGrid = grid
             self.pullUpGrid(grid, "/" + str(si+1) + "/offGrid")
         else:
-            self.putGridLive(grid, si)
+            self.putGridLive(grid, si, False)
         
     ## transformation helper function that picks up to k (k is voices) elements to leave on from each column 
     @staticmethod
@@ -1217,9 +1239,9 @@ class MultiLoop:
         return newG
     
     ## helper function that returns the grid from the selected transformation function at the selected noise level 
-    def noiseChoice(self, si):
+    def noiseChoice(self, si, automatedNoise):
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStatePadInd if automatedNoise else state.melodyStateScreenInd]
         inputGrid = [[]]
         if state.offlineEdit:     ##TODO: should noiseChoice be responsible for managing undo-stack?
             inputGrid = copy.deepcopy(state.offlineGrid)
@@ -1267,7 +1289,7 @@ class MultiLoop:
     def undo(self, addr, tags, stuff, source):
         si = int(addr.split("/")[1]) - 1  #index of grid action was taken on
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         if stuff[0] == 0: return
         if state.offlineEdit:
             if len(state.offlineUndoStack) == 0: return
@@ -1313,14 +1335,15 @@ class MultiLoop:
 
     #TODO: update for melodyStates
     #helper function that puts a grid into active use
-    def putGridLive(self, grid, si):
+    def putGridLive(self, grid, si, automatedChange):
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStatePadInd if automatedChange else state.melodyStateScreenInd]
         melodyState.grid = grid
-        self.pullUpGrid(melodyState.grid, "/" + str(si+1) + "/grid")
+        if not automatedChange or state.melodyStateScreenInd == state.melodyStatePadInd:
+            self.pullUpGrid(melodyState.grid, "/" + str(si+1) + "/grid")
         melodyState.prog = self.gridToProg(melodyState.grid, melodyState.scale, melodyState.root)
 
-    ##TODO: update for melodyStates
+    ##TODO: update for melodyStates - CURRENTLY UNUSED
     ## helper function that takes the variables of a miniState and makes them the active mini state 
     def putMiniStateLive(self, grid, scale, root, columnSubsetLooping, si):
         state = self.gridStates[si]
@@ -1353,7 +1376,7 @@ class MultiLoop:
     ## helper function that changes the note labels when a scale is changed 
     def updateNoteLabels(self, scale, si):
         state = self.gridStates[si]
-        melodyState = state.melodyStates[state.melodyStateInd]
+        melodyState = state.melodyStates[state.melodyStateScreenInd]
         notes = self.scaleNotes(melodyState.root, scale)
         print "in label update"
         for i in range(16):
