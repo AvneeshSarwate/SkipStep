@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition;
 
 
 n = 4; //set n - number of instruments
@@ -66,10 +66,17 @@ lastTimeTapped = TempoClock.default.beats;
 beatMods = beats = Array.fill(n, {1});
 transposeMap = Dictionary.new;
 transposePositions = Array.fill(n, {0});
+startPositionMap = Dictionary.new;
+startPosition = 0;
 
 (0..8).do({|i|
 	(i*14..i*14+10).do({|j| transposeMap.put(j, i)});
 });
+
+(0..7).do({|i|
+	(i*16..i*14+13).do({|j| startPositionMap.put(j, i)});
+});
+
 
 /*
 beatHit
@@ -113,10 +120,9 @@ TODO: - need a way to stop a looping melody without starting a new one
       - need to fix lights - specifically holdMode and loopMode control light behavior
       - need to test with actual audio, see if startPoint control works properly
 
-nice to have - some way to quickly modify the melodies of a single instrument without having
-to go back to the ipad, switch screens to that melody state, and then change it
-IDEAS -- use bottom position control on Quneo as a global "startInd" controller
-      -- use vertical sliders on Quneo to transpose melodies
+
+-startInd and multiTranspose working, but need to fine tune the separator space for the sliders
+-also need to do lights for the multi transpose
 
 */
 
@@ -192,7 +198,7 @@ a = {|vel, note, chan, port|
 					quneoOut.noteOn(0, padIndToRed[padInd], 127);
 					["single-play on", padInd].postln;
 				});
-				pythonOSCport.sendMsg("/padHit", xVal, yVal);
+				pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition);
 				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
 			}
 		);
@@ -260,7 +266,12 @@ c = {|vel, note, chan, port|
 			transposePositions[note-6] = transposeMap[vel];
 			pythonOSCport.sendMsg("/padTranspose", note-6, transposePositions[note-6] - 4); //from -4 to 4 tranpose
 		});
-
+	});
+	if(note == 10, {
+		if((startPositionMap[vel] != nil) && (startPosition != startPositionMap[vel]), {
+			startPosition = startPositionMap[vel];
+			startPosition.postln;
+		});
 	});
 };
 

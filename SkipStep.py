@@ -306,14 +306,17 @@ class MultiLoop:
         print "test 2"
         self.iPadClients.append(oscClient)
 
-    #stuff[0] is the gridState, stuff[1] is which saved grid in the gridState needs to be pulled up
+    # stuff[0] is the gridState,
+    # stuff[1] is which saved grid in the gridState needs to be pulled up
+    # stuff[2] is the pad start position (ignored if it is 0)
+
     def padHitResponder(self, addr, tags, stuff, sournce):
         print "padHit", stuff
         state = self.gridStates[int(stuff[0])]
         state.melodyStatePadInd = int(stuff[1])
 
         melodyState = state.melodyStates[state.melodyStatePadInd]
-        state.progInd = melodyState.startInd
+        state.progInd = melodyState.startInd if int(stuff[2]) == 0 else int(stuff[2])
         msg = OSC.OSCMessage()
         msg.setAddress("/startMetronome")
         msg.append(stuff[0])
