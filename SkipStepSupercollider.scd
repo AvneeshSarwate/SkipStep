@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock;
 
 
 n = 4; //set n - number of instruments
@@ -68,6 +68,16 @@ transposeMap = Dictionary.new;
 transposePositions = Array.fill(n, {0});
 startPositionMap = Dictionary.new;
 startPosition = 0;
+recordList = List.new; //raw time, midiNote, on/off
+replayList = List.new; //wait time, midiNote, on/off
+replayRecording = false;
+record_BUTTON = 21;
+replay_BUTTON = 20;
+replayLoopState = [false, false]; //holddown mode and loop mode
+replayedInstrument = 0;
+replayClock = TempoClock.new(1);
+replayingLoop = false;
+replayInd = 0;
 
 (0..8).do({|i|
 	(i*14..i*14+10).do({|j| transposeMap.put(j, i)});
@@ -170,6 +180,12 @@ a = {|vel, note, chan, port|
 			quneoOut.noteOff(0, padIndToRed[i], 127);
 		});
 
+		//the time the pad was hit, what pad was hit, and whether it was a note on/off
+		if(replayRecording, {
+			if(replayedInstrument == -1, {replayedInstrument = xVal});
+			recordList.add([TempoClock.default.beats, note, true]);
+		});
+
 		if(loopingPads.includes(padInd),
 			{
 				loopingPads.remove(padInd);
@@ -205,12 +221,64 @@ a = {|vel, note, chan, port|
 	});
 	["SHOULD BE TAP TEMPO", note, tapTempo_BUTTON].postln;
 	[note >= tapTempo_BUTTON, note <= tapTempo_BUTTON, note == tapTempo_BUTTON].postln;
-	if(note == tapTempo_BUTTON, { //TODO: no idea why tapTempo_BUTTON keeps being read as nil;
+	if(note == tapTempo_BUTTON, {
 		var thisHit = TempoClock.default.beats;
 		var beatDif = thisHit - lastTimeTapped;
 		lastTimeTapped = thisHit;
 		["tapTempo", 60*(1/beatDif)].postln;
 		if(TempoClock.default.beats2secs(beatDif) < 2, {(0..3).do({|i| metronomeClocks[i].tempo = 1/beatDif})});
+	});
+	//if "record" - clear the replayList, capture the loop-style settings, set replayRecord to true
+	if(note == record_BUTTON, {
+		if(replayRecording,
+			{
+				replayRecording = false;
+				recordList.add([TempoClock.default.beats, 0, true]);
+			},
+			{
+				recordList = List.new;
+				replayRecording = true;
+				replayLoopState = [holdDownPlay, masterLoopingOn];
+				replayedInstrument = -1;
+		});
+	});
+	if(note == replay_BUTTON, {
+		if(replayingLoop,
+			{},
+			{
+				/*var roundedTimes = all {:round((elem[0]-start) / ((1/metronomeClocks[0].tempo)/4)),
+					var start = recordList[0][0], elem <- recordList};
+				var unRoundedTimes = all {:(elem[0]-start) / ((1/metronomeClocks[0].tempo)/4),
+					var start = recordList[0][0], elem <- recordList};
+				var roundedDurations = all {:roundedTimes[ind+1] - roundedTimes[ind], ind <- (0..roundedTimes.size-2)};
+				var unRoundedDurations = all {:recordList[ind+1] - unRoundedTimes[ind], ind <- (0..recordList.size-2)};
+				var roundPairs = {:[roundedTimes[ind+1] - roundedTimes[ind], unRoundedTimes[ind+1] - unRoundedTimes[ind]],
+					ind <- (0..roundedTimes.size-2)};*/
+
+
+				var rawDurations;
+				var durationPairs;
+				var durations = all {:round((recordList[ind+1][0] - recordList[ind][0])/((1/metronomeClocks[0].tempo)/4)),
+					ind <- (0..recordList.size-2)};
+				"PRECALCULATION AAAAAAAAAAAAA".postln;
+				rawDurations = all {:(recordList[ind+1][0] - recordList[ind][0])/((1/metronomeClocks[0].tempo)/4),
+					ind <- (0..recordList.size-2)};
+				durationPairs = all {:[round(elem), elem], elem <- rawDurations};
+
+
+				[metronomeClocks[0].tempo].postln;
+				durationPairs.do({|i| i.postln});
+				replayClock.tempo = metronomeClocks[0].tempo;
+				replayInd = 0;
+				/*replayClock.sched({
+					var hit;
+					replayInd = replayInd % replayList.size;
+					hit = replayList[replayInd];
+					if(hit[2], {a.(50, hit[1], 0, 0)}, {b.(50, hit[1], 0, 0)});
+					replayInd = replayInd + 1;
+					hit[0]/4 // the /4 is because hit[0] is the number of 16th notes, and tempo is quarter notes
+				});*/
+		});
 	});
 };
 
