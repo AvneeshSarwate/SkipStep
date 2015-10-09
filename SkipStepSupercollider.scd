@@ -89,50 +89,18 @@ replayInd = 0;
 
 
 /*
-beatHit
-
-vars - loopingOn[i], holdPlayOn (can't be on at same time, buttons toggle them on/off)
-       lastBeats[] - array indicating value of lastHit flag for each instrument/metronome
-       metronomeClocks[] - column/instrument -> task mapping
-       notesOn[] - on notes for each instrument
-
-MetronomeTask - loops and sends metronomeHit while (!loopOn[i] lastBeats[i]) is true, then sets it to false
-
-padDown -
-    if another pad in the same column is looping, kill that loop
-    if this is not a "turn off loop" scenario
-        send padDown message to python, wait on "gridLoaded" message
-
-onGridLoaded
-    start MetronomeTask
-    add task to metronomeTask[i]
-
-padUp -
-    turn off notes for that instrument/column
-    destroy/erase/stop task for that column
-
-TODO in Python - create padDown endpoint, add lastHit flag,
-check that refresh/auto-alg stuff (stuff in postChordPlay() in python)
-all works properly wrt timing after the last chord is played in all use cases
-
  -------------------------------------------------------------------------------------
 TODO: - need a way to stop a looping melody without starting a new one
-      - must modify function for every UI element that interacts with miniState
-         - gridState contains a "miniState" list (consolidation of miniState parameters),
-           and a "selected miniState" ind indicated which is "active to edit"
-         - change all "state.{property}" to "state.miniStates[activeInd].{property}"
-         - can you replace "state = self.gridStates[someInd]" with
-           "state = self.gridStates[someInd].miniStates[activeInd]"
-             - can we move to a model where mini state UI hanlders don't access any properties not in minStates?
-             - can we remove all state information not related to a miniState from the model?
-                - moving close to the design that what is on the ipad only defines "musical closures"
-                  and all performative state is controlled by the pad
-      - need to fix lights - specifically holdMode and loopMode control light behavior
-      - need to test with actual audio, see if startPoint control works properly
+      - can we move to a model where mini state UI hanlders don't access any properties not in minStates?
+         - can we remove all state information not related to a miniState from the model?
+         - moving close to the design that what is on the ipad only defines "musical closures"
+           and all performative state is controlled by the pad
 
 
 -startInd and multiTranspose working, but need to fine tune the separator space for the sliders
 -also need to do lights for the multi transpose
+-fix lights for when you stop playing a loop
+-need to test pad recording with hold-down mode and looping mode
 
 */
 
@@ -244,40 +212,45 @@ a = {|vel, note, chan, port|
 	});
 	if(note == replay_BUTTON, {
 		if(replayingLoop,
-			{},
 			{
-				/*var roundedTimes = all {:round((elem[0]-start) / ((1/metronomeClocks[0].tempo)/4)),
-					var start = recordList[0][0], elem <- recordList};
-				var unRoundedTimes = all {:(elem[0]-start) / ((1/metronomeClocks[0].tempo)/4),
-					var start = recordList[0][0], elem <- recordList};
-				var roundedDurations = all {:roundedTimes[ind+1] - roundedTimes[ind], ind <- (0..roundedTimes.size-2)};
-				var unRoundedDurations = all {:recordList[ind+1] - unRoundedTimes[ind], ind <- (0..recordList.size-2)};
-				var roundPairs = {:[roundedTimes[ind+1] - roundedTimes[ind], unRoundedTimes[ind+1] - unRoundedTimes[ind]],
-					ind <- (0..roundedTimes.size-2)};*/
-
-
+				replayClock.clear;
+				metronomeClocks[replayedInstrument].clear;
+				notesOn[replayedInstrument].do({|i| midiOut.noteOff(replayedInstrument, i)});
+				replayingLoop = false;
+				((0..3)*4+replayedInstrument).do({|i|
+					singlePlayPads.remove(i);
+					heldDownPads.remove(i);
+					loopingPads.remove(i);
+					quneoOut.noteOff(0, padIndToGreen[i], 127);
+					quneoOut.noteOff(0, padIndToRed[i], 127);
+				});
+			},
+			{
 				var rawDurations;
 				var durationPairs;
 				var durations = all {:round((recordList[ind+1][0] - recordList[ind][0])/((1/metronomeClocks[0].tempo)/4)),
 					ind <- (0..recordList.size-2)};
-				"PRECALCULATION AAAAAAAAAAAAA".postln;
+				/*"PRECALCULATION AAAAAAAAAAAAA".postln;
 				rawDurations = all {:(recordList[ind+1][0] - recordList[ind][0])/((1/metronomeClocks[0].tempo)/4),
 					ind <- (0..recordList.size-2)};
-				durationPairs = all {:[round(elem), elem], elem <- rawDurations};
+				durationPairs = all {:[round(elem), elem], elem <- rawDurations};*/
 
+				replayList = all{: [durations[ind], recordList[ind][1], recordList[ind][2]], ind <- (0..recordList.size-2)};
 
 				[metronomeClocks[0].tempo].postln;
 				durationPairs.do({|i| i.postln});
 				replayClock.tempo = metronomeClocks[0].tempo;
 				replayInd = 0;
-				/*replayClock.sched({
+				replayingLoop = true;
+
+				replayClock.sched(0, {
 					var hit;
 					replayInd = replayInd % replayList.size;
 					hit = replayList[replayInd];
 					if(hit[2], {a.(50, hit[1], 0, 0)}, {b.(50, hit[1], 0, 0)});
 					replayInd = replayInd + 1;
 					hit[0]/4 // the /4 is because hit[0] is the number of 16th notes, and tempo is quarter notes
-				});*/
+				});
 		});
 	});
 };
