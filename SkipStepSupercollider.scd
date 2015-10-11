@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, clockCount;
 
 
 n = 4; //set n - number of instruments
@@ -63,7 +63,6 @@ loopingPads = Set.new();
 singlePlayPads = Set.new();
 heldDownPads = Set.new();
 lastTimeTapped = TempoClock.default.beats;
-beatMods = beats = Array.fill(n, {1});
 transposeMap = Dictionary.new;
 transposePositions = Array.fill(n, {0});
 startPositionMap = Dictionary.new;
@@ -78,6 +77,9 @@ replayedInstrument = 0;
 replayClock = TempoClock.new(1);
 replayingLoop = false;
 replayInd = 0;
+clockCount = 0;
+coordinationClock = TempoClock.new(1);
+clockCorrectionValues = Array.fill(n, {[0, 0]}); //[timeErrorTillSynced, numberOfSteps left to do it over],
 
 (0..8).do({|i|
 	(i*14..i*14+10).do({|j| transposeMap.put(j, i)});
@@ -106,7 +108,7 @@ TODO: - need a way to stop a looping melody without starting a new one
 
 clockFuncGenerator = {|i, j|
 	{
-		var returnVal;
+		var returnVal, correction;
 		if(loopingOn[i].not && heldDownPads.includes(4*j + i).not && lastBeats[i],
 			{
 				lastBeats[i] = false;
@@ -114,16 +116,21 @@ clockFuncGenerator = {|i, j|
 				("lastBeat cutoff" + i + " " + j).postln;
 				singlePlayPads.remove(4*j + i);
 				//turn off red/normal
+				clockCount = clockCount - 1;
 				quneoOut.noteOff(0, padIndToRed[4*j + i], 127);
 			},
 			{
 				lastHits[i] = SystemClock.beats;
 				pythonOSCport.sendMsg("/played-"++i, i);
 				("beat" + i + " " + beats[i]).postln;
-				returnVal = beats[i] * (1/ beatMods[i]) * 0.25;
+				returnVal = beats[i] * 0.25;
 		});
-
-		returnVal
+		if(clockCorrectionValues[i][1] != 0, {
+			correction = clockCorrectionValues[i][0] / clockCorrectionValues[i][1]
+			clockCorrectionValues[i][0] = clockCorrectionValues[i][0] - correction;
+			clockCorrectionValues[i][1] = clockCorrectionValues[i][1] - 1
+		});
+		returnVal + correction;
 	}
 };
 
@@ -132,6 +139,7 @@ a = {|vel, note, chan, port|
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
 		var padInd = noteToInd.(note);
+		var beatError;
 		"padOn".postln;
 		//reset everything about that instrument
 		//turn off all lights on pad
@@ -160,9 +168,16 @@ a = {|vel, note, chan, port|
 				loopingOn[xVal] = false;
 				//turn off green
 
+				clockCount = clockCount - 1;
 				quneoOut.noteOff(0, padIndToGreen[padInd], 127);
 			},
 			{
+				clockCount = clockCount + 1;
+				//TODO: if count is 1, coordinationClock is is set to that of currently hit instrument
+				//beatError = (1 - coordinationClock.beats*4 % 1) - the fractional number of 16th notes till the next beat
+				// if < .5, then  clockCorrectionValues[xVal] = [-beatError, 2]
+				//else clockCorrectionValues[xVal] = [1-beatError, 2]
+
 				if(masterLoopingOn,{
 					((0..3)*4+xVal).do({|i|loopingPads.remove(i)});
 					loopingOn[xVal] = true;
@@ -269,6 +284,7 @@ b = {|vel, note, chan, port|
 		notesOn[xVal].clear;
 		heldDownPads.remove(padInd);
 		["hold-down OFF", padInd].postln;
+		clockCount = clockCount - 1;
 		//turn off orange
 		quneoOut.noteOff(0, padIndToGreen[padInd], 127);
 		quneoOut.noteOff(0, padIndToRed[padInd], 127);
@@ -306,6 +322,8 @@ c = {|vel, note, chan, port|
 		if((transposeMap[vel]!= nil) && (transposePositions[note-6] != transposeMap[vel]), {
 			transposePositions[note-6] = transposeMap[vel];
 			pythonOSCport.sendMsg("/padTranspose", note-6, transposePositions[note-6] - 4); //from -4 to 4 tranpose
+			["tranpose on pad", note, transposeMap[vel]].postln;
+			quneoOut.control(0, note-5, vel);
 		});
 	});
 	if(note == 10, {
@@ -490,6 +508,7 @@ OSCFunc(tempoSyncHandler, "/tempoSync");
 
 
 //------------------- templates and testing - final version above ------------
+
 
 (
 k = 5;
