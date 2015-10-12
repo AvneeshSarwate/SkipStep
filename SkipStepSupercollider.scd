@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, clockCount;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, clockCount, coordinationClock, clockCorrectionValues;
 
 
 n = 4; //set n - number of instruments
@@ -177,6 +177,20 @@ a = {|vel, note, chan, port|
 				//beatError = (1 - coordinationClock.beats*4 % 1) - the fractional number of 16th notes till the next beat
 				// if < .5, then  clockCorrectionValues[xVal] = [-beatError, 2]
 				//else clockCorrectionValues[xVal] = [1-beatError, 2]
+				if(clockCount == 1,
+					{
+						coordinationClock.clear;
+						coordinationClock.beats = tempoClocks[xval].beats;
+						coordinationClock.tempo = tempoClocks[xVal].tempo;
+					},
+					{
+						//((coordinationClock.beats*4) % 1) - elapsed fractional 16h notes
+						var beatError = (coordinationClock.beats*4) % 1;
+						if(beatError < .5,
+							{clockCorrectionValues[xval] = [-beatError * 0.25, 2]},
+							{clockCorrectionValues[xval] = [(1-beatError) * 0.25, 2]}
+						);
+				});
 
 				if(masterLoopingOn,{
 					((0..3)*4+xVal).do({|i|loopingPads.remove(i)});
