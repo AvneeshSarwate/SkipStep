@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler;
 
 
 n = 4; //set n - number of instruments
@@ -78,6 +78,8 @@ replayedInstrument = 0;
 replayClock = TempoClock.new(1);
 replayingLoop = false;
 replayInd = 0;
+loopStartFunctions = List.fill(4, {nil});
+
 
 (0..8).do({|i|
 	(i*14..i*14+10).do({|j| transposeMap.put(j, i)});
@@ -169,6 +171,7 @@ a = {|vel, note, chan, port|
 					loopingPads.add(padInd);
 					quneoOut.noteOn(0, padIndToGreen[padInd], 127);
 					["looping on", padInd].postln;
+					loopPlayFunctions[xVal] = {pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition)};
 				});
 				if(holdDownPlay, {
 					heldDownPads.add(padInd);
@@ -176,13 +179,15 @@ a = {|vel, note, chan, port|
 					quneoOut.noteOn(0, padIndToGreen[padInd], 90);
 					["hold-down on", padInd].postln;
 					heldDownPads.postln;
+					pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition);
 				});
 				if(masterLoopingOn.not && holdDownPlay.not, {
 					singlePlayPads.add(padInd);
 					quneoOut.noteOn(0, padIndToRed[padInd], 127);
 					["single-play on", padInd].postln;
+					pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition);
 				});
-				pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition);
+
 				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
 			}
 		);
@@ -194,6 +199,7 @@ a = {|vel, note, chan, port|
 		var beatDif = thisHit - lastTimeTapped;
 		lastTimeTapped = thisHit;
 		["tapTempo", 60*(1/beatDif)].postln;
+		//TODO - send tap info to master clock
 		if(TempoClock.default.beats2secs(beatDif) < 2, {(0..3).do({|i| metronomeClocks[i].tempo = 1/beatDif})});
 	});
 	//if "record" - clear the replayList, capture the loop-style settings, set replayRecord to true
@@ -334,6 +340,27 @@ lastBeatsHandler = {|msg, time, addr, recvPort|
 	lastBeats[msg[1]] = true;
 };
 OSCFunc(lastBeatsHandler, "/lastBeats");
+
+//msg[1] is the new BEAT DURATION (not tempo)
+masterClockBeat = {|msg, time, addr, recvPort|
+	(0..3).do({|i|
+		if(loopStartFunctions[i] != nil, {
+			loopStartFunctions[i].();
+			loopStartFunctions[i] = nil;
+		})
+	});
+};
+OSCFunc(masterClockBeat, "/masterClockBeat");
+
+//msg[1] is the new BEAT DURATION (not tempo)
+masterClockTempoHandler = {|msg, time, addr, recvPort|
+	(0..3).do({|i|
+		//todo bug - this could cause problems when tempo changes while loop is playing
+		beats[i] = msg[1];
+	});
+};
+OSCFunc(masterClockTempoHanlder, "/masterClockTempo");
+
 
 //--------------------------------set up playChord hanlder--------------------------------
 //msg[1] is an index for which gridState the message is from
