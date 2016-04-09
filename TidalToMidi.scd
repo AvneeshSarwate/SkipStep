@@ -35,12 +35,13 @@ drumTypes.put("aud", 108);
 midiSend =  {|msg, time, addr, recvPort, chanInd|
 	var drumInd, drumType, drumStr;
 
+	msg.postln;
+
 	drumStr = msg[1].asString;
 	drumInd = drumStr.split($:)[1];
 	drumInd = if(drumInd.isNil, 0, {drumInd.asInteger});
 	drumType = drumTypes[drumStr.split($:)[0]].asInteger;
 
-	msg.postln;
 
 	(2..(msg.size - 1)).do({|i|
 		if(msg[i] > -1, {midiOut.control(chanInd-1, i-2, (msg[i]*127).round)});

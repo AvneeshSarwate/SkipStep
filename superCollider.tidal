@@ -11,12 +11,14 @@ let paramList = [S "sound" Nothing,
               F "mid10" (Just (-1))]
 
 
-let makeOscShape paramList num = OscShape {path = "/play-" ++ (show num),
+let makeOscShape paramList num = OscShape {
+                    path = "/play-" ++ (show num),
                     params = paramList,
                     timestamp = NoStamp,
                     latency = 0,
                     namedParams = False,
-                    preamble = []
+                    preamble = [],
+                    cpsStamp = False
                    }
 
 let shapes = (makeOscShape paramList) <$> [1, 2, 3, 4]
@@ -33,16 +35,18 @@ let mid1 = makeF (shapes!!0) "mid1"
     mid10 = makeF (shapes!!0) "mid10"
 
 s1 <- stream "127.0.0.1" 57120 (shapes!!0)
+
 s2 <- stream "127.0.0.1" 57120 (shapes!!1)
 
 
-s1 $ pat1 |+| mid1 (slow 2 sinewave1) |+| mid2 (slow 3.4 ((+0.3) <$> (/2) <$> sinewave1))
-s1 $ slow 2 p6 |+| mid1 (slow 3 sinewave1) |+| mid2 (slow 4 ((+0.3) <$> (/2) <$> sinewave1))
+s1 $ pat1 # mid1 (slow 2 sinewave1) # mid2 (slow 3.4 ((+0.3) <$> (/2) <$> sinewave1))
+
+s1 $ slow 2 pat5 |+| mid1 (slow 3 sinewave1) |+| mid2 (slow 4 ((+0.3) <$> (/2) <$> sinewave1))
 
 let pat1 = sound "{bin:1 ~ bin [bot:1 bot:4 bot:1], bd:5 lt {bd:2 ~ bd:3, bot:7 ~ bot:7 ~ bot:7}}}"
 
 
-s1 $ sound "{bd cp bd cp, [bin bot:3] ~ ~ bd*3 [bd sn:3]}"
+s1 $ sound "[[bd bd] ho*3, lt lt ht lt]"
 
 s1 $ silence
 
