@@ -1480,7 +1480,6 @@ res = []
 modeGui = IPentry.ModeSelect(None, res)
 modeGui.title("Select Mode")
 modeGui.mainloop()
-subprocess.call("chuck --kill all", shell=True)
 port = -1
 if res[0] == 0: #solo
     #threading.Thread(target = startSoloBackend).start()

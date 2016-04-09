@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport;
 
 
 n = 4; //set n - number of instruments
@@ -31,6 +31,7 @@ lastHits = Array.fill(n, {0});
 
 //------------------set up tempoClocks to send metronome hits via OSC ---------------------
 pythonOSCport = NetAddr("localhost", 5174);
+masterClockOSCport = NetAddr("localhost", 57120);
 /*oscMetronomeHit = {
 	|i| lastHits[i-1] = SystemClock.beats;
 	pythonOSCport.sendMsg("/played-"++i, i);
@@ -171,7 +172,7 @@ a = {|vel, note, chan, port|
 					loopingPads.add(padInd);
 					quneoOut.noteOn(0, padIndToGreen[padInd], 127);
 					["looping on", padInd].postln;
-					loopPlayFunctions[xVal] = {pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition)};
+					loopStartFunctions[xVal] = {pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition)};
 				});
 				if(holdDownPlay, {
 					heldDownPads.add(padInd);
@@ -200,7 +201,7 @@ a = {|vel, note, chan, port|
 		lastTimeTapped = thisHit;
 		["tapTempo", 60*(1/beatDif)].postln;
 		//TODO - send tap info to master clock
-		if(TempoClock.default.beats2secs(beatDif) < 2, {(0..3).do({|i| metronomeClocks[i].tempo = 1/beatDif})});
+		if(TempoClock.default.beats2secs(beatDif) < 2, {masterClockOSCport.sendMsg("/uploadTempo", beatDif)});
 	});
 	//if "record" - clear the replayList, capture the loop-style settings, set replayRecord to true
 	if(note == record_BUTTON, {
@@ -349,17 +350,15 @@ masterClockBeat = {|msg, time, addr, recvPort|
 			loopStartFunctions[i] = nil;
 		})
 	});
+	"SKIPSTEP BEAT".postln;
 };
 OSCFunc(masterClockBeat, "/masterClockBeat");
 
 //msg[1] is the new BEAT DURATION (not tempo)
 masterClockTempoHandler = {|msg, time, addr, recvPort|
-	(0..3).do({|i|
-		//todo bug - this could cause problems when tempo changes while loop is playing
-		beats[i] = msg[1];
-	});
+	(0..3).do({|i| metronomeClocks[i].tempo = 1/msg[1].asFloat})
 };
-OSCFunc(masterClockTempoHanlder, "/masterClockTempo");
+OSCFunc(masterClockTempoHandler, "/masterClockTempo");
 
 
 //--------------------------------set up playChord hanlder--------------------------------
