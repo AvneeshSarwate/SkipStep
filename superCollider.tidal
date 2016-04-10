@@ -1,15 +1,4 @@
-let paramList = [S "sound" Nothing,
-              F "mid1" (Just (-1)),
-              F "mid2" (Just (-1)),
-              F "mid3" (Just (-1)),
-              F "mid4" (Just (-1)),
-              F "mid5" (Just (-1)),
-              F "mid6" (Just (-1)),
-              F "mid7" (Just (-1)),
-              F "mid8" (Just (-1)),
-              F "mid9" (Just (-1)),
-              F "mid10" (Just (-1))]
-
+let paramList = ([S "sound" Nothing]++) $ map (\x -> F (("mid"++) $ show x) $ Just (-1)) [1,2..10]
 
 let makeOscShape paramList num = OscShape {
                     path = "/play-" ++ (show num),
@@ -23,6 +12,9 @@ let makeOscShape paramList num = OscShape {
 
 let shapes = (makeOscShape paramList) <$> [1, 2, 3, 4]
 
+let midMaker = \i chanNumList -> map (\j -> makeF (shapes!!i) ("mid"++(show j))) chanNumList
+let mid = [midMaker x [1,2..10] | x <- [1,2,3,4]]
+
 let mid1 = makeF (shapes!!0) "mid1"
     mid2 = makeF (shapes!!0) "mid2"
     mid3 = makeF (shapes!!0) "mid3"
@@ -34,12 +26,16 @@ let mid1 = makeF (shapes!!0) "mid1"
     mid9 = makeF (shapes!!0) "mid9"
     mid10 = makeF (shapes!!0) "mid10"
 
+let makeControlFunctions shapeList = 
+
 s1 <- stream "127.0.0.1" 57120 (shapes!!0)
 
 s2 <- stream "127.0.0.1" 57120 (shapes!!1)
 
-
+s1 $ silence
+s1 $ pat1 # (mid!!1!!0) (slow 2 sinewave1) # (mid!!1!!1) (slow 3.4 ((+0.3) <$> (/2) <$> sinewave1))
 s1 $ pat1 # mid1 (slow 2 sinewave1) # mid2 (slow 3.4 ((+0.3) <$> (/2) <$> sinewave1))
+
 
 s1 $ slow 2 pat5 |+| mid1 (slow 3 sinewave1) |+| mid2 (slow 4 ((+0.3) <$> (/2) <$> sinewave1))
 
