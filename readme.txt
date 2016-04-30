@@ -25,7 +25,8 @@ https://www.dropbox.com/s/cqe1ah4k9q5gwch/SkipStepDemo2.mov?dl=0
 A networked performance using SkipStep, performed by the Princeton Laptop Orchestra (10 min):
 http://vimeo.com/99373121
 
-
+(NEW) - An improvised jam showcasing some new SkipStep features
+https://www.dropbox.com/s/a9bts3u4mtg2v73/SkipStep%20Demo%202015%20lite.m4v?dl=0
 
 
 
