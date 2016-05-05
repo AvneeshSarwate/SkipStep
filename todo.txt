@@ -1,0 +1,2 @@
+consider refactoring skipstep's client/server model to be more like Pydal's
+	(i.e, requesting an entire grid at a time)
