@@ -1,6 +1,8 @@
 (
 var masterTempoClock, broadcastOSCport;
 
+MIDIClient.init;
+
 masterTempoClock = TempoClock.new(1);
 broadcastOSCport = NetAddr("localhost", 57120);
 

@@ -3,7 +3,7 @@ var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, pla
 
 
 n = 4; //set n - number of instruments
-MIDIClient.init;
+//MIDIClient.init;
 MIDIIn.connectAll;
 /*----------------create n tempo clocks (and associated beat variables?)----------------
 When tap-tempoing:
