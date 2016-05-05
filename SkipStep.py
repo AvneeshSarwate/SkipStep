@@ -28,7 +28,7 @@ class Looper:
         self.customScale = [] # the data of what scale is represented in the custom scale control  
         self.refreshModeSavedProg = 0 #  representing the melodic content of self.refreshModeSavedGrid 
         self.root = 48 # the "root note" of the grid
-        self.scale = phrase.modes["maj5"] # the scale that is being used to translate the grid into notes
+        self.scale = phrase.modes["minor"] # the scale that is being used to translate the grid into notes
         self.noisy = False # boolean for whether automatic varation is turned on
         self.columnSubsetLooping = [] # the data for what columns have been selected with the online looping column subset control
         self.offlineColumnSubsetLooping = [] # the data for what columns have been selected with the OFFLINE looping column subset control
@@ -70,10 +70,10 @@ class MelodyState:
         self.prog = phrase.Progression() # object represnting the melodic content of the active grid
         self.prog.c = [phrase.Chord([-1]) for i in range(16)] # initializing self.prog
         self.prog.t = [.25 for i in range(16)] # initialzing self.prog
-        self.customScale = copy.deepcopy(phrase.modes["maj5"]+[]) #(create new object) # the data of what scale is represented in the custom scale control
+        self.customScale = copy.deepcopy(phrase.modes["minor"]+[]) #(create new object) # the data of what scale is represented in the custom scale control
         self.refreshModeSavedProg = 0 #  representing the melodic content of self.refreshModeSavedGrid
         self.root = 48 # the "root note" of the grid
-        self.scale = copy.deepcopy(phrase.modes["maj5"]) ##(create new object) # the scale that is being used to translate the grid into notes
+        self.scale = copy.deepcopy(phrase.modes["minor"]) ##(create new object) # the scale that is being used to translate the grid into notes
         self.noisy = False # boolean for whether automatic varation is turned on
         self.columnSubsetLooping = [] # the data for what columns have been selected with the online looping column subset control
         self.isColSubLooping = False # boolean for whether or not looping is ocurring over column subsets
