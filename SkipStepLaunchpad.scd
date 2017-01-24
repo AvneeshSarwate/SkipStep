@@ -91,14 +91,35 @@ loopStartFunctions = List.fill(4, {nil});
 });
 
 
+//------------------set up code to handle launchPad triggering ---------------------
+launchpadOut = MIDIOut.newByName("Launchpad Pro", "Standalone Port");
+launchpadOut.latency = 0;
+launchPad = MIDIClient.sources.select({|elem| (elem.name == "Standalone Port")
+	&& (elem.device == "Launchpad Pro")})[0];
+lastColoredIndPad = [0,0,0,0];
+colorTL1 = 39;
+colorTR1 = 112;
+colorBL1 = 4;
+colorBR1 = 83;
+color1 = [colorTL1, colorTR1, colorBL1, colorBR1];
+
+colorTL2 = 25;
+colorTR2 = 45;
+colorBL2 = 72;
+colorBR2 = 13;
+color2 = [colorTL2, colorTR2, colorBL2, colorBR2];
+channelAndStartIndToPad = {|chan, ind| 10+(20*chan) + if(ind < 8, ind+1, 11+(ind-8))};
+
 
 launchPadToChanelAndStartInd = Dictionary.new;
 (1..8).do{|i|
     (1..8).do{|j|
-        launchPadToChanelAndStartInd.put((i*10+j), [((i-1)/2).floor, ((i-1)%2)*8 + (j-1)])
+        launchPadToChanelAndStartInd.put((i*10+j), [((i-1)/2).floor, ((i-1)%2)*8 + (j-1)]);
+        launchpadOut.noteOn(0, (i*10+j), color1[((i-1)/2).floor]);
     }
 };
 selectedPadPerInst = Dictionary.new;
+
 
 launchPadButtonOn = {|vel, note, chan, port|
     var chanAndStartInd = launchPadToChanelAndStartInd[note];
@@ -116,7 +137,8 @@ launchPadButtonOn = {|vel, note, chan, port|
             pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd);
         });
     })
-}
+};
+launchpadOn = MIDIFunc.noteOn(launchPadButtonOn, nil, nil, launchPad.uid);
 
 launchpadButtonOff = {|vel, note, chan, port|
     var chanAndStartInd = launchPadToChanelAndStartInd[note];
@@ -134,7 +156,10 @@ launchpadButtonOff = {|vel, note, chan, port|
             ["hold-down OFF", padInd].postln;
         });
     })
-}
+};
+launchpadOff = MIDIFunc.noteOn(launchPadButtonOff, nil, nil, launchPad.uid);
+//------------------end code to handle launchpad triggering ---------------------
+
 
 /*
  -------------------------------------------------------------------------------------
@@ -172,6 +197,7 @@ clockFuncGenerator = {|i, j|
 	}
 };
 
+//Quneo noteon
 a = {|vel, note, chan, port|
 	if(isPadNote.(note), {
 		var xVal = noteToXY.(note)[0];
@@ -307,7 +333,7 @@ a = {|vel, note, chan, port|
 
 padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
 
-
+//Quneo noteoff
 b = {|vel, note, chan, port|
 	if(note == loop_BUTTON, {
 		masterLoopingOn = masterLoopingOn.not;
@@ -336,7 +362,7 @@ b = {|vel, note, chan, port|
 };
 padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
 
-
+//Quneo cc
 c = {|vel, note, chan, port|
 	if((note < 10) && (note > 5), {
 		if((transposeMap[vel]!= nil) && (transposePositions[note-6] != transposeMap[vel]), {
@@ -394,7 +420,7 @@ OSCFunc(masterClockTempoHandler, "/masterClockTempo");
 //msg[1] is an index for which gridState the message is from
 //msg[2] is either "normal", "on", or "off" - specifying a piano vs non-piano play
 //msg[3] is a int (1 or 0) indicating whether the play is a stepjump play or not
-//msg[lastIndex] is a int corresopnding to the index this chord is in the sequence
+//msg[4] is a int corresopnding to the index this chord is in the sequence
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
 playChordParamNum = 5; //start index of where the chord notes start in the OSC message
@@ -402,7 +428,7 @@ playChordParamNum = 5; //start index of where the chord notes start in the OSC m
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
 		{
-            //TODO Launchpad - color the index of the chord hit
+            launchpadOut(0, channelAndStartIndToPad.(msg[1], msg[4]), color2[msg[1]]);
 			//TODO: set lastHits[i] flag if needed
 			if (msg[3] == 1,
 				{
