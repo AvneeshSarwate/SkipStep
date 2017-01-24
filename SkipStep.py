@@ -1,7 +1,7 @@
 '''
 Created on Nov 10, 2013
 
-@author: avneeshsarwate
+@author: Avneesh Sarwate
 '''
 
 import phrase
