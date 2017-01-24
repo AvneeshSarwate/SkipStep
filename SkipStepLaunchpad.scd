@@ -91,6 +91,51 @@ loopStartFunctions = List.fill(4, {nil});
 });
 
 
+
+launchPadToChanelAndStartInd = Dictionary.new;
+(1..8).do{|i|
+    (1..8).do{|j|
+        launchPadToChanelAndStartInd.put((i*10+j), [((i-1)/2).floor, ((i-1)%2)*8 + (j-1)])
+    }
+};
+selectedPadPerInst = Dictionary.new;
+
+launchPadButtonOn = {|vel, note, chan, port|
+    var chanAndStartInd = launchPadToChanelAndStartInd[note];
+    if(chanAndStartInd.isNil.not, {
+        var channel = chanAndStartInd[0];
+        var startInd = chanAndStartInd[1];
+        var padSlot = selectedPadPerInst[channel];
+        if(masterLoopingOn,{
+            loopStartFunctions[xVal] = {pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd)};
+        });
+        if(holdDownPlay, {
+            pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd);
+        });
+        if(masterLoopingOn.not && holdDownPlay.not, {
+            pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd);
+        });
+    })
+}
+
+launchpadButtonOff = {|vel, note, chan, port|
+    var chanAndStartInd = launchPadToChanelAndStartInd[note];
+    if(chanAndStartInd.isNil.not, {
+        var channel = chanAndStartInd[0];
+        var startInd = chanAndStartInd[1];
+        var padSlot = selectedPadPerInst[channel];
+        var padInd = channel*4 + padSlot;
+        ["off hanlder", note, isPadNote.(note), heldDownPads.includes(note)].postln;
+        if(heldDownPads.includes(padInd), {
+            metronomeClocks[channel].clear;
+            notesOn[channel].do({|i| midiOut.noteOff(channel, i)});
+            notesOn[channel].clear;
+            heldDownPads.remove(padInd);
+            ["hold-down OFF", padInd].postln;
+        });
+    })
+}
+
 /*
  -------------------------------------------------------------------------------------
 TODO: - need a way to stop a looping melody without starting a new one
@@ -115,9 +160,6 @@ clockFuncGenerator = {|i, j|
 				lastBeats[i] = false;
 				returnVal = nil;
 				("lastBeat cutoff" + i + " " + j).postln;
-				singlePlayPads.remove(4*j + i);
-				//turn off red/normal
-				quneoOut.noteOff(0, padIndToRed[4*j + i], 127);
 			},
 			{
 				lastHits[i] = SystemClock.beats;
@@ -166,6 +208,7 @@ a = {|vel, note, chan, port|
 				quneoOut.noteOff(0, padIndToGreen[padInd], 127);
 			},
 			{
+                selectedPadPerInst[xVal] = yVal;
 				if(masterLoopingOn,{
 					((0..3)*4+xVal).do({|i|loopingPads.remove(i)});
 					loopingOn[xVal] = true;
@@ -266,20 +309,6 @@ padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
 
 
 b = {|vel, note, chan, port|
-	var padInd = noteToInd.(note);
-	["off hanlder", note, isPadNote.(note), heldDownPads.includes(note)].postln;
-	if(isPadNote.(note) && heldDownPads.includes(padInd), {
-		var xVal = noteToXY.(note)[0];
-		var yVal = noteToXY.(note)[1];
-		metronomeClocks[xVal].clear;
-		notesOn[xVal].do({|i| midiOut.noteOff(xVal, i)});
-		notesOn[xVal].clear;
-		heldDownPads.remove(padInd);
-		["hold-down OFF", padInd].postln;
-		//turn off orange
-		quneoOut.noteOff(0, padIndToGreen[padInd], 127);
-		quneoOut.noteOff(0, padIndToRed[padInd], 127);
-	});
 	if(note == loop_BUTTON, {
 		masterLoopingOn = masterLoopingOn.not;
 		if(masterLoopingOn,
@@ -365,13 +394,15 @@ OSCFunc(masterClockTempoHandler, "/masterClockTempo");
 //msg[1] is an index for which gridState the message is from
 //msg[2] is either "normal", "on", or "off" - specifying a piano vs non-piano play
 //msg[3] is a int (1 or 0) indicating whether the play is a stepjump play or not
+//msg[lastIndex] is a int corresopnding to the index this chord is in the sequence
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
-playChordParamNum = 4; //start index of where the chord notes start in the OSC message
+playChordParamNum = 5; //start index of where the chord notes start in the OSC message
 
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
 		{
+            //TODO Launchpad - color the index of the chord hit
 			//TODO: set lastHits[i] flag if needed
 			if (msg[3] == 1,
 				{

@@ -343,12 +343,13 @@ class MultiLoop:
         state.padTranspose = int(stuff[1])
         print "insrtument", stuff[0], "tranpose", state.padTranspose
 
-    def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False):
+    def playChord(self, chord, channel = 0, piano = "normal", stepJumpFlag = False, progInd=-1):
         msg = OSC.OSCMessage()
         msg.setAddress("/playChord")
         msg.append(channel)
         msg.append(piano)
         msg.append(1 if stepJumpFlag else 0)
+        msg.append(progInd)
         for i in chord.n:
             msg.append(i)
         self.superColliderClient.send(msg)
@@ -443,7 +444,7 @@ class MultiLoop:
 
         #plays the chords that are defined by each column (phrase.play to be documented later)
         #print colChord, si
-        self.playChord(colChord, channel = si)
+        self.playChord(colChord, channel = si, progInd=state.progInd)
 
         #updates progInd to the next step
         state.progInd += state.stepIncrement

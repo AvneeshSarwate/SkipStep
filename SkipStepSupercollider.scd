@@ -365,9 +365,10 @@ OSCFunc(masterClockTempoHandler, "/masterClockTempo");
 //msg[1] is an index for which gridState the message is from
 //msg[2] is either "normal", "on", or "off" - specifying a piano vs non-piano play
 //msg[3] is a int (1 or 0) indicating whether the play is a stepjump play or not
+//msg[4] is a int corresopnding to the index this chord is in the sequence
 midiOut = MIDIOut.newByName("IAC Driver", "Bus 1");
 midiOut.latency = 0;
-playChordParamNum = 4; //start index of where the chord notes start in the OSC message
+playChordParamNum = 5; //start index of where the chord notes start in the OSC message
 
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
