@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, quneo;
 
 
 n = 4; //set n - number of instruments
@@ -45,6 +45,9 @@ masterClockOSCport = NetAddr("localhost", 57120);
 
 
 //------------------set up code to handle Quneo triggering ---------------------
+quneo = MIDIClient.sources.select({|elem| (elem.name == "QUNEO")
+	&& (elem.device == "QUNEO")})[0];
+
 noteToInd = {|x| x - 36}; //convert note to pad index
 noteToXY = {|x| [noteToInd.(x)%4, floor(noteToInd.(x)/4)]}; //convert note to pad xy (bottom left 0,0)
 isPadNote = {|x| (noteToInd.(x) >=0) && (noteToInd.(x) < 16)};
@@ -96,18 +99,9 @@ launchpadOut = MIDIOut.newByName("Launchpad Pro", "Standalone Port");
 launchpadOut.latency = 0;
 launchPad = MIDIClient.sources.select({|elem| (elem.name == "Standalone Port")
 	&& (elem.device == "Launchpad Pro")})[0];
-lastColoredIndPad = [0,0,0,0];
-colorTL1 = 39;
-colorTR1 = 112;
-colorBL1 = 4;
-colorBR1 = 83;
-color1 = [colorTL1, colorTR1, colorBL1, colorBR1];
-
-colorTL2 = 25;
-colorTR2 = 45;
-colorBL2 = 72;
-colorBR2 = 13;
-color2 = [colorTL2, colorTR2, colorBL2, colorBR2];
+lastColoredIndPad = [11,31,51,71];
+color1 = [39, 112, 4, 83];
+color2 = [25, 45, 72, 13];
 channelAndStartIndToPad = {|chan, ind| 10+(20*chan) + if(ind < 8, ind+1, 11+(ind-8))};
 
 
@@ -120,7 +114,6 @@ launchPadToChanelAndStartInd = Dictionary.new;
 };
 selectedPadPerInst = Dictionary.new;
 
-
 launchPadButtonOn = {|vel, note, chan, port|
     var chanAndStartInd = launchPadToChanelAndStartInd[note];
     if(chanAndStartInd.isNil.not, {
@@ -128,7 +121,7 @@ launchPadButtonOn = {|vel, note, chan, port|
         var startInd = chanAndStartInd[1];
         var padSlot = selectedPadPerInst[channel];
         if(masterLoopingOn,{
-            loopStartFunctions[xVal] = {pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd)};
+            loopStartFunctions[channel] = {pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd)};
         });
         if(holdDownPlay, {
             pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd);
@@ -138,9 +131,9 @@ launchPadButtonOn = {|vel, note, chan, port|
         });
     })
 };
-launchpadOn = MIDIFunc.noteOn(launchPadButtonOn, nil, nil, launchPad.uid);
+launchPadOnFunc = MIDIFunc.noteOn(launchPadButtonOn, nil, nil, launchPad.uid);
 
-launchpadButtonOff = {|vel, note, chan, port|
+launchPadButtonOff = {|vel, note, chan, port|
     var chanAndStartInd = launchPadToChanelAndStartInd[note];
     if(chanAndStartInd.isNil.not, {
         var channel = chanAndStartInd[0];
@@ -157,7 +150,7 @@ launchpadButtonOff = {|vel, note, chan, port|
         });
     })
 };
-launchpadOff = MIDIFunc.noteOn(launchPadButtonOff, nil, nil, launchPad.uid);
+launchpadOffFunc = MIDIFunc.noteOn(launchPadButtonOff, nil, nil, launchPad.uid);
 //------------------end code to handle launchpad triggering ---------------------
 
 
@@ -241,7 +234,6 @@ a = {|vel, note, chan, port|
 					loopingPads.add(padInd);
 					quneoOut.noteOn(0, padIndToGreen[padInd], 127);
 					["looping on", padInd].postln;
-					loopStartFunctions[xVal] = {pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition)};
 				});
 				if(holdDownPlay, {
 					heldDownPads.add(padInd);
@@ -249,13 +241,11 @@ a = {|vel, note, chan, port|
 					quneoOut.noteOn(0, padIndToGreen[padInd], 90);
 					["hold-down on", padInd].postln;
 					heldDownPads.postln;
-					pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition);
 				});
 				if(masterLoopingOn.not && holdDownPlay.not, {
 					singlePlayPads.add(padInd);
 					quneoOut.noteOn(0, padIndToRed[padInd], 127);
 					["single-play on", padInd].postln;
-					pythonOSCport.sendMsg("/padHit", xVal, yVal, 2*startPosition);
 				});
 
 				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
@@ -331,7 +321,7 @@ a = {|vel, note, chan, port|
 	});
 };
 
-padOn = MIDIFunc.noteOn(a, nil, nil, 2017846184);
+padOn = MIDIFunc.noteOn(a, nil, nil, quneo.uid);
 
 //Quneo noteoff
 b = {|vel, note, chan, port|
@@ -360,7 +350,7 @@ b = {|vel, note, chan, port|
 		//toggle lighting
 	});
 };
-padOff = MIDIFunc.noteOff(b, nil, nil, 2017846184);
+padOff = MIDIFunc.noteOff(b, nil, nil, quneo.uid);
 
 //Quneo cc
 c = {|vel, note, chan, port|
@@ -405,7 +395,7 @@ masterClockBeat = {|msg, time, addr, recvPort|
 			loopStartFunctions[i] = nil;
 		})
 	});
-	"SKIPSTEP BEAT".postln;
+	//"SKIPSTEP BEAT".postln;
 };
 OSCFunc(masterClockBeat, "/masterClockBeat");
 
@@ -428,7 +418,9 @@ playChordParamNum = 5; //start index of where the chord notes start in the OSC m
 playHandler = {|msg, time, addr, recvPort|
 	if (msg[2] == 'normal',
 		{
-            launchpadOut(0, channelAndStartIndToPad.(msg[1], msg[4]), color2[msg[1]]);
+            launchpadOut.(0, lastColoredIndPad[msg[1]], color1[msg[1]]);
+            launchpadOut.(0, channelAndStartIndToPad.(msg[1], msg[4]), color2[msg[1]]);
+            lastColoredIndPad[msg[1]] = channelAndStartIndToPad.(msg[1], msg[4]);
 			//TODO: set lastHits[i] flag if needed
 			if (msg[3] == 1,
 				{
@@ -440,13 +432,17 @@ playHandler = {|msg, time, addr, recvPort|
 			Task({
 				//TODO: add onNotes tracking
 				msg[playChordParamNum..].do({|i|
-					midiOut.noteOn(msg[1], i);
-					notesOn[msg[1]].add(i);
+                    if(i > 0, {
+                        midiOut.noteOn(msg[1], i);
+                        notesOn[msg[1]].add(i);
+                    });
 				});/*hit noteOn messages*/
 				chordDur.wait; /*wait for beat*/
 				msg[playChordParamNum..].do({|i|
-					midiOut.noteOff(msg[1], i);
-					notesOn[msg[1]].remove(i);
+                    if(i > 0, {
+                        midiOut.noteOff(msg[1], i);
+                        notesOn[msg[1]].remove(i);
+                    });
 				}); /*hit noteOff messages*/
 				0.005.wait; //articulation
 			}).play;
