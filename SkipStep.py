@@ -309,7 +309,6 @@ class MultiLoop:
     # stuff[0] is the gridState,
     # stuff[1] is which saved grid in the gridState needs to be pulled up
     # stuff[2] is the pad start position (ignored if it is 0)
-
     def padHitResponder(self, addr, tags, stuff, sournce):
         print "padHit", stuff
         state = self.gridStates[int(stuff[0])]
@@ -427,12 +426,15 @@ class MultiLoop:
 
     ##the function that handles everything that needs to happen during the "step" of a metronome
     ##is called when an OSC message from the SuperCollider metronome is recieved
+    ## stuff[0] is the instrument for which the metronome was hit
+    ## stuff[1] is the melodyState to be switched to
     def realPlay(self, addr, tags, stuff, source): #MultiMetronome: give si as an argument, remove loops
         si = int(addr.split("-")[1])
         #print "                 played", si
 
         #calculates what column to play based on the index
         state = self.gridStates[si]
+        state.melodyStatePadInd = int(stuff[1])
         melodyState = state.melodyStates[state.melodyStatePadInd]
 
         if state.skipHit: 
