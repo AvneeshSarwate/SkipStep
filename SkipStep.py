@@ -11,7 +11,6 @@ import random
 import copy
 import subprocess
 import IPentry
-import lanutil
 
 # the class that represnts all the data of a single "instrument state"
 class Looper:
@@ -96,7 +95,7 @@ class MultiLoop:
         
         
         #finds the IP of the computer
-        selfIP = lanutil.get_lan_ip()
+        selfIP = subprocess.check_output("ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1'", shell=True).replace("\n", "")
         print "\n" + "Your computer's IP address is: " + selfIP + "\n enter this into your iPad"
 
         #opens window to enter IP address of iPad, retrieves the entered value 
@@ -703,14 +702,16 @@ class MultiLoop:
     
     ##is used to start the threading in the SkipStep initialization     
     def playStart(self):
-        self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
-        #self.chuckThread.start()
-        self.audioThread.start()
+        # self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
+        # #self.chuckThread.start()
+        # self.audioThread.start()
+        self.oscServSelf.serve_forever()
     
     ##is used to start the threading in the SkipStep initialization 
     def uiStart(self):
-        self.uiThread = threading.Thread(target=self.oscServUI.serve_forever)
-        self.uiThread.start()
+        # self.uiThread = threading.Thread(target=self.oscServUI.serve_forever)
+        # self.uiThread.start()
+        self.oscServUI.serve_forever()
     
     
     ## converts a grid into a phrase.prog object 
@@ -1498,9 +1499,15 @@ if res[0] == 2: #slave
     threading.Thread(target = startLANdini).start()
     port = 50505
     print res[0]
-loop = MultiLoop(4, port)
-#loop2 = Looper(p, trans)
-#loop.check()
-loop.uiStart()
-loop.playStart()
-#loop.loopStart()
+try:
+    loop = MultiLoop(4, port)
+    #loop2 = Looper(p, trans)
+    #loop.check()
+    loop.uiStart()
+    loop.playStart()
+    #loop.loopStart()
+except KeyboardInterrupt:
+    print "stopped"
+    loop.oscServUI.close()
+    loop.oscServSelf.close()
+
