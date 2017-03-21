@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, quneo, instrumentIsHolding;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, quneoOut, padIndToGreen, padIndToRed, loopingPads, singlePlayPads, heldDownPads, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, quneo, instrumentIsHolding, launchpadBankButtonGroupings, launchpadButtonToChanInd;
 
 
 n = 4; //set n - number of instruments
@@ -102,7 +102,7 @@ quneoOut.noteOff(0, hold_LIGHT, 127);
 (0..7).do({|i|
 	(i*16..i*14+13).do({|j| startPositionMap.put(j, i)});
 });
-
+//------------------end code to handle Quneo triggering ---------------------
 
 //------------------set up code to handle launchPad triggering ---------------------
 launchpadOut = MIDIOut.newByName("Launchpad Pro", "Standalone Port");
@@ -113,8 +113,17 @@ lastColoredIndPad = [11,31,51,71];
 color1 = [39, 112, 4, 83];
 color2 = [25, 45, 72, 13];
 channelAndStartIndToPad = {|chan, ind| 10+(20*chan) + if(ind < 8, ind+1, 11+(ind-8))};
+launchpadBankButtonGroupings = [[80,70,89,79],[60,50,69,59],[40,30,49,39],[20,10,29,19]];
 
+//maps round buttons to (instrumentIndex, bankIndex)
+launchpadBankButtonToChanInd = Dictionary.new;
+(0..3).do{|i|
+    (0..3).do{|j|
+        launchpadBankButtonToChanInd[launchpadBankButtonGroupings[i][j]] = [i, j]; //channel, bank ind
+    }
+};
 
+//maps step sequencer pad midi numbers to (instrumentIndex, sequenceIndex)
 launchPadToChanelAndStartInd = Dictionary.new;
 (1..8).do{|i|
     (1..8).do{|j|
@@ -122,6 +131,14 @@ launchPadToChanelAndStartInd = Dictionary.new;
         launchpadOut.noteOn(0, (i*10+j), color1[((i-1)/2).floor]);
     }
 };
+noteToInd = {|x| (noteToXY.(x)[1]*4) + noteToXY.(x)[0]}; //convert note to pad index
+noteToXY = {|x|
+    var xVal = ((x-10)/20).floor;
+    var yVal = launchpadBankButtonGroupings[xVal].indexOf(x);
+    [xVal, yVal]
+}; //convert note to pad xy (bottom left 0,0)
+isBankNote = {|x| noteToXY.(x)[1].isNil.not};
+
 selectedPadPerInst = Dictionary.new;
 (0..3).do({|i| selectedPadPerInst[i] = 0});
 
@@ -228,11 +245,6 @@ a = {|vel, note, chan, port|
             if((padInd == i) && loopingPads.includes(padInd), {}, {loopingPads.remove(i)});
 		});
 
-		//the time the pad was hit, what pad was hit, and whether it was a note on/off
-		if(replayRecording, {
-			if(replayedInstrument == -1, {replayedInstrument = xVal});
-			recordList.add([TempoClock.default.beats, note, true]);
-		});
 
         if(loopingPads.includes(padInd), {
             "STOP LOOP".postln;
@@ -278,62 +290,6 @@ a = {|vel, note, chan, port|
 		if(TempoClock.default.beats2secs(beatDif) < 2, {masterClockOSCport.sendMsg("/uploadTempo", beatDif)});
 	});
 	//if "record" - clear the replayList, capture the loop-style settings, set replayRecord to true
-	if(note == record_BUTTON, {
-		if(replayRecording,
-			{
-				replayRecording = false;
-				recordList.add([TempoClock.default.beats, 0, true]);
-			},
-			{
-				recordList = List.new;
-				replayRecording = true;
-				replayLoopState = [holdDownPlay, masterLoopingOn];
-				replayedInstrument = -1;
-		});
-	});
-	if(note == replay_BUTTON, {
-		if(replayingLoop,
-			{
-				replayClock.clear;
-				metronomeClocks[replayedInstrument].clear;
-				notesOn[replayedInstrument].do({|i| midiOut.noteOff(replayedInstrument, i)});
-				replayingLoop = false;
-				((0..3)*4+replayedInstrument).do({|i|
-					singlePlayPads.remove(i);
-					heldDownPads.remove(i);
-					loopingPads.remove(i);
-					quneoOut.noteOff(0, padIndToGreen[i], 127);
-					quneoOut.noteOff(0, padIndToRed[i], 127);
-				});
-			},
-			{
-				var rawDurations;
-				var durationPairs;
-				var durations = all {:round((recordList[ind+1][0] - recordList[ind][0])/((1/metronomeClocks[0].tempo)/4)),
-					ind <- (0..recordList.size-2)};
-				/*"PRECALCULATION AAAAAAAAAAAAA".postln;
-				rawDurations = all {:(recordList[ind+1][0] - recordList[ind][0])/((1/metronomeClocks[0].tempo)/4),
-					ind <- (0..recordList.size-2)};
-				durationPairs = all {:[round(elem), elem], elem <- rawDurations};*/
-
-				replayList = all{: [durations[ind], recordList[ind][1], recordList[ind][2]], ind <- (0..recordList.size-2)};
-
-				[metronomeClocks[0].tempo].postln;
-				durationPairs.do({|i| i.postln});
-				replayClock.tempo = metronomeClocks[0].tempo;
-				replayInd = 0;
-				replayingLoop = true;
-
-				replayClock.sched(0, {
-					var hit;
-					replayInd = replayInd % replayList.size;
-					hit = replayList[replayInd];
-					if(hit[2], {a.(50, hit[1], 0, 0)}, {b.(50, hit[1], 0, 0)});
-					replayInd = replayInd + 1;
-					hit[0]/4 // the /4 is because hit[0] is the number of 16th notes, and tempo is quarter notes
-				});
-		});
-	});
 };
 
 padOn = MIDIFunc.noteOn(a, nil, nil, quneo.uid);
