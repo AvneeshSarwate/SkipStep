@@ -702,16 +702,16 @@ class MultiLoop:
     
     ##is used to start the threading in the SkipStep initialization     
     def playStart(self):
-        # self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
+        self.audioThread = threading.Thread(target=self.oscServSelf.serve_forever)
         # #self.chuckThread.start()
-        # self.audioThread.start()
-        self.oscServSelf.serve_forever()
+        self.audioThread.start()
+        # self.oscServSelf.serve_forever()
     
     ##is used to start the threading in the SkipStep initialization 
     def uiStart(self):
-        # self.uiThread = threading.Thread(target=self.oscServUI.serve_forever)
-        # self.uiThread.start()
-        self.oscServUI.serve_forever()
+        self.uiThread = threading.Thread(target=self.oscServUI.serve_forever)
+        self.uiThread.start()
+        # self.oscServUI.serve_forever()
     
     
     ## converts a grid into a phrase.prog object 
@@ -1505,7 +1505,7 @@ try:
     #loop.check()
     loop.uiStart()
     loop.playStart()
-    #loop.loopStart()
+    "started"
 except KeyboardInterrupt:
     print "stopped"
     loop.oscServUI.close()
