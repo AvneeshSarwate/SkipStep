@@ -97,10 +97,9 @@ launchpadOut = MIDIOut.newByName("Launchpad Pro", "Standalone Port");
 launchpadOut.latency = 0;
 launchPad = MIDIClient.sources.select({|elem| (elem.name == "Standalone Port")
 	&& (elem.device == "Launchpad Pro")})[0];
-lastColoredIndPad = [11,31,51,71];
+lastColoredIndPad = [71, 51, 31, 11];
 color1 = [39, 112, 4, 83];
 color2 = [25, 45, 72, 13];
-channelAndStartIndToPad = {|chan, ind| 10+(20*chan) + if(ind < 8, ind+1, 11+(ind-8))};
 launchpadBankButtonGroupings = [[80,70,89,79],[60,50,69,59],[40,30,49,39],[20,10,29,19]];
 indToBank = [80, 60, 40, 20, 70, 50, 30, 10, 89, 69, 49, 29, 79, 59, 39, 19];
 loop_BUTTON = 96;
@@ -121,11 +120,15 @@ launchpadBankButtonToChanInd = Dictionary.new;
 
 //maps step sequencer pad midi numbers to (instrumentIndex, sequenceIndex)
 launchPadToChanelAndStartInd = Dictionary.new;
+
 (1..8).do{|i|
     (1..8).do{|j|
-        launchPadToChanelAndStartInd.put((i*10+j), [3-((i-1)/2).floor, ((i-1)%2)*8 + (j-1)]);
+        launchPadToChanelAndStartInd.put((i*10+j), [3-((i-1)/2).floor, (i%2)*8+j-1]);
     }
 };
+//inverse mapping
+channelAndStartIndToPad = {|chan, ind| 70-(20*chan) + if(ind < 8, ind+11, ind-7)};
+
 noteToInd = {|x| (noteToXY.(x)[1]*4) + noteToXY.(x)[0]}; //convert note to pad index
 noteToXY = {|x|
     var xVal = 3-((x-10)/20).floor;
@@ -240,7 +243,8 @@ lightIndex = if(~lightIndexes.size == 0,
 
 (1..8).do{|i|
     (1..8).do{|j|
-        setLight.((i*10+j), color1[((i-1)/2).floor]);
+        var chan = launchPadToChanelAndStartInd[i*10+j][0];
+        setLight.((i*10+j), color1[chan]);
     }
 };
 
@@ -434,7 +438,7 @@ playHandler = {|msg, time, addr, recvPort|
 					chordDur = beats[msg[1]] - (SystemClock.beats-lastHits[msg[1]]) - 0.005;
 					("stepjump duration is" + chordDur).postln;
 				},
-				{chordDur = 0.25*beats[msg[1]]-0.005}
+				{chordDur = 0.25*beats[msg[1]]-0.05}
 			);
 			Task({
 				//TODO: add onNotes tracking
@@ -451,7 +455,7 @@ playHandler = {|msg, time, addr, recvPort|
                         notesOn[msg[1]].remove(i);
                     });
 				}); /*hit noteOff messages*/
-				0.005.wait; //articulation
+				0.05.wait; //articulation
 			}).play;
 
 		},
@@ -695,6 +699,15 @@ var num = 4;
 		{("no"+i).postln;}
 )});
 )
+
+(
+var channelAndStartIndToPad = {|chan, ind| 70-(20*chan) + if(ind < 8, ind+11, ind-7)};
+i = 4;
+j = 1;
+(i%2)*8+j-1;
+channelAndStartIndToPad.(3, 15)
+)
+
 
 (
 var fu, gu;
