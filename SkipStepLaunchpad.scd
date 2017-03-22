@@ -279,7 +279,7 @@ clockFuncGenerator = {|i|
 			{
 				lastHits[i] = SystemClock.beats;
 				pythonOSCport.sendMsg("/played-"++i, i, j);
-				("beat" + i + " " + beats[i]).postln;
+				//("beat" + i + " " + beats[i]).postln;
 				returnVal = beats[i] * (1/ beatMods[i]) * 0.25;
 		});
 
@@ -342,8 +342,6 @@ a = {|vel, note, chan, port|
 
 				//TODO: lighting stuff - turn on red if normal, green if loop, orange if holdDown
 	});
-	["SHOULD BE TAP TEMPO", note, tapTempo_BUTTON].postln;
-	[note >= tapTempo_BUTTON, note <= tapTempo_BUTTON, note == tapTempo_BUTTON].postln;
     if((note == tapTempo_BUTTON) && (vel !=0), {
 		var thisHit = TempoClock.default.beats;
 		var beatDif = thisHit - lastTimeTapped;
@@ -399,6 +397,12 @@ lastBeatsHandler = {|msg, time, addr, recvPort|
 OSCFunc(lastBeatsHandler, "/lastBeats");
 
 //msg[1] is the new BEAT DURATION (not tempo)
+OSCFunc({|msg, time, addr, recvPort|
+    (0..3).do({|i| metronomeClocks[i] = TempoClock.new(1/msg[1].asFloat, 0)});
+	"SKIPSTEP ONESHOT".postln;
+}, "/masterClockBeat").oneShot;
+
+//msg[1] is the new BEAT DURATION (not tempo)
 masterClockBeat = {|msg, time, addr, recvPort|
 	(0..3).do({|i|
 		if(loopStartFunctions[i] != nil, {
@@ -432,14 +436,6 @@ playHandler = {|msg, time, addr, recvPort|
             setLight.(lastColoredIndPad[msg[1]], color1[msg[1]]);
             setLight.(channelAndStartIndToPad.(msg[1], msg[4]), color2[msg[1]]);
             lastColoredIndPad[msg[1]] = channelAndStartIndToPad.(msg[1], msg[4]);
-			//TODO: set lastHits[i] flag if needed
-			if (msg[3] == 1,
-				{
-					chordDur = beats[msg[1]] - (SystemClock.beats-lastHits[msg[1]]) - 0.005;
-					("stepjump duration is" + chordDur).postln;
-				},
-				{chordDur = 0.25*beats[msg[1]]-0.05}
-			);
 			Task({
 				//TODO: add onNotes tracking
 				msg[playChordParamNum..].do({|i|
@@ -448,15 +444,17 @@ playHandler = {|msg, time, addr, recvPort|
                         notesOn[msg[1]].add(i);
                     });
 				});/*hit noteOn messages*/
-				chordDur.wait; /*wait for beat*/
+                ["ON", msg[1], msg[4], SystemClock.beats].postln;
+				0.245.wait; /*wait for beat*/
 				msg[playChordParamNum..].do({|i|
                     if(i > 0, {
                         midiOut.noteOff(msg[1], i);
                         notesOn[msg[1]].remove(i);
                     });
 				}); /*hit noteOff messages*/
-				0.05.wait; //articulation
-			}).play;
+                ["OFF", msg[1], msg[4], SystemClock.beats].postln;
+				0.005.wait; //articulation
+            }, metronomeClocks[msg[1]]).play;
 
 		},
 		{
