@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, padIndToGreen, padIndToRed, loopingBanks, singlePlayPads, heldDownBanks, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, instrumentIsHolding, launchpadBankButtonGroupings, launchpadButtonToChanInd, launchpadBankButtonToChanInd, isBankNote, green_COLOR, red_COLOR, orange_COLOR, indToBank;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, padIndToGreen, padIndToRed, loopingBanks, singlePlayPads, heldDownBanks, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, instrumentIsHolding, launchpadBankButtonGroupings, launchpadButtonToChanInd, launchpadBankButtonToChanInd, isBankNote, green_COLOR, red_COLOR, orange_COLOR, indToBank, buttonOnWrapper, buttonOffWrapper, ccWrapper;
 
 //light switching variables
 var setLight, ccLights, padColorState, cycleLight, lightIndex;
@@ -162,7 +162,14 @@ launchPadButtonOn = {|vel, note, chan, port|
         });
     });
 };
-launchPadOnFunc = MIDIFunc.noteOn(launchPadButtonOn, nil, nil, launchPad.uid);
+
+buttonOnWrapper = {|vel, note, chan, port|
+    if(~lightIndex == lightIndex, {
+        ["LIGHT INDEX SKIPSTEP", ~lightIndex, lightIndex].postln;
+        launchPadButtonOn.(vel, note, chan, port)
+    })
+};
+launchPadOnFunc = MIDIFunc.noteOn(buttonOnWrapper, nil, nil, launchPad.uid);
 
 launchPadButtonOff = {|vel, note, chan, port|
     var chanAndStartInd = launchPadToChanelAndStartInd[note];
@@ -181,7 +188,13 @@ launchPadButtonOff = {|vel, note, chan, port|
         });
     })
 };
-launchpadOffFunc = MIDIFunc.noteOff(launchPadButtonOff, nil, nil, launchPad.uid);
+buttonOffWrapper = {|vel, note, chan, port|
+    if(~lightIndex == lightIndex, {
+        ["LIGHT INDEX SKIPSTEP", ~lightIndex, lightIndex].postln;
+        launchPadButtonOff.(vel, note, chan, port)
+    })
+};
+launchpadOffFunc = MIDIFunc.noteOff(buttonOffWrapper, nil, nil, launchPad.uid);
 //------------------end code to handle launchpad triggering ---------------------
 
 
@@ -229,15 +242,16 @@ OSCFunc({|msg, time, addr, recvPort|
 }, "/lightsChange");
 lightIndex = if(~lightIndexes.size == 0,
     {
-        lightIndex.add(0);
+        ~lightIndexes.add(0);
         0
     },
     {
-        lightIndex.add(lightIndex.maxItem+1);
-        lightIndex.maxItem+1
+        ~lightIndexes.add(~lightIndexes.maxItem+1);
+        ~lightIndexes.maxItem
     }
 );
 ~lightIndex = lightIndex;
+["LIGHT INDEX SKIPSTEP", ~lightIndex, lightIndex].postln;
 //TODO - add ~lightIndex == lightIndex condition to all launchpad note/cc hanlders
 //----------------------------------------------
 
@@ -288,7 +302,7 @@ clockFuncGenerator = {|i|
 };
 
 //Launchpad circle button push
-a = {|vel, note, chan, port|
+ccHandler = {|vel, note, chan, port|
 	if(isBankNote.(note) && (vel !=0), {
 		var xVal = noteToXY.(note)[0];
 		var yVal = noteToXY.(note)[1];
@@ -376,8 +390,13 @@ a = {|vel, note, chan, port|
 		//toggle lighting
 	});
 };
-
-padOn = MIDIFunc.cc(a, nil, nil, launchPad.uid);
+ccWrapper = {|vel, note, chan, port|
+    if(~lightIndex == lightIndex, {
+        ["LIGHT INDEX SKIPSTEP", ~lightIndex, lightIndex].postln;
+        ccHandler.(vel, note, chan, port)
+    })
+};
+padOn = MIDIFunc.cc(ccWrapper, nil, nil, launchPad.uid);
 
 
 //msg[1] is the instrument index for which to start the metronome
@@ -444,7 +463,7 @@ playHandler = {|msg, time, addr, recvPort|
                         notesOn[msg[1]].add(i);
                     });
 				});/*hit noteOn messages*/
-                ["ON", msg[1], msg[4], SystemClock.beats].postln;
+                //["ON", msg[1], msg[4], SystemClock.beats].postln;
 				0.245.wait; /*wait for beat*/
 				msg[playChordParamNum..].do({|i|
                     if(i > 0, {
@@ -452,7 +471,7 @@ playHandler = {|msg, time, addr, recvPort|
                         notesOn[msg[1]].remove(i);
                     });
 				}); /*hit noteOff messages*/
-                ["OFF", msg[1], msg[4], SystemClock.beats].postln;
+                //["OFF", msg[1], msg[4], SystemClock.beats].postln;
 				0.005.wait; //articulation
             }, metronomeClocks[msg[1]]).play;
 
