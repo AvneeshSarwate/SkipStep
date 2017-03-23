@@ -2,7 +2,7 @@
 var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, padIndToGreen, padIndToRed, loopingBanks, singlePlayPads, heldDownBanks, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, instrumentIsHolding, launchpadBankButtonGroupings, launchpadButtonToChanInd, launchpadBankButtonToChanInd, isBankNote, green_COLOR, red_COLOR, orange_COLOR, indToBank, buttonOnWrapper, buttonOffWrapper, ccWrapper;
 
 //light switching variables
-var setLight, ccLights, padColorState, cycleLight, lightIndex;
+var setLight, ccLights, padColorState, cycleLight, lightIndex, cycleLight_BUTTON;
 
 n = 4; //set n - number of instruments
 //MIDIClient.init;
@@ -202,6 +202,7 @@ launchpadOffFunc = MIDIFunc.noteOff(buttonOffWrapper, nil, nil, launchPad.uid);
 
 //----------------------------------------------
 //light switching variables
+cycleLight_BUTTON = 95;
 padColorState = Dictionary.new;
 ccLights = List.new;
 (1..8).do({|i|
@@ -211,8 +212,8 @@ ccLights = List.new;
     ccLights.add((i*10)+9);
 });
 
-setLight = {|note, color|
-    if(~lightIndex == lightIndex, {
+setLight = {|note, color, lightIndexOverride=false|
+    if((~lightIndex == lightIndex) || lightIndexOverride, {
         if(ccLights.includes(note),
             {launchpadOut.control(0, note, color)},
             {launchpadOut.noteOn(0, note, color)}
@@ -220,7 +221,7 @@ setLight = {|note, color|
     });
     padColorState[note] = color;
 };
-(1..100).do({|note|
+(1..98).do({|note|
     if(ccLights.includes(note),
         {launchpadOut.control(0, note, 0)},
         {launchpadOut.noteOn(0, note, 0)}
@@ -229,14 +230,21 @@ setLight = {|note, color|
 });
 cycleLight = {
     //TODO: change name of this port to something like SCOSCport
-    masterClockOSCport.sendMsg("/lightsChange", (lightIndex+1)%~lightIndexes.size);
-    ~lightIndex = (lightIndex+1)%~lightIndexes.size;
+    Task({
+        masterClockOSCport.sendMsg("/lightsChange", (~lightIndex+1)%~lightIndexes.size);
+        0.01.wait;
+        ~lightIndex = (~lightIndex+1)%~lightIndexes.size;
+    }).play;
 };
 
 //msg[1] is lightIndex
 OSCFunc({|msg, time, addr, recvPort|
     if(msg[1].asInt == lightIndex, {
-        padColorState.keys.do({|key| setLight.(key, padColorState[key])});å
+        var colorStateLog = List.new(100);
+        (0..99).do({|i| colorStateLog.add(0)});
+        padColorState.keys.do({|key| setLight.(key, padColorState[key], true);
+            colorStateLog[key]=padColorState[key]});
+        ["CHANGING SKIPSTEP LIGHTS", msg[1], colorStateLog].postln;
     });
 
 }, "/lightsChange");
@@ -375,6 +383,7 @@ ccHandler = {|vel, note, chan, port|
 			},
             {setLight.(loop_BUTTON, 0)}
 		);
+        ["SKIP STEP 96", ~lightIndex].postln;
 		//toggle lighting
 	});
 	if((note == hold_BUTTON) && (vel !=0), {
@@ -389,12 +398,18 @@ ccHandler = {|vel, note, chan, port|
 		);
 		//toggle lighting
 	});
+    if((note == cycleLight_BUTTON) && (vel !=0), {
+        // ["SKIPSTEP BUTTON CYCLE HIT", ~lightIndex, lightIndex].postln;
+        if(~cycling, {cycleLight.()})
+    });
 };
 ccWrapper = {|vel, note, chan, port|
-    if(~lightIndex == lightIndex, {
-        ["LIGHT INDEX SKIPSTEP", ~lightIndex, lightIndex].postln;
+    ~lock.wait;
+    if((~lightIndex == lightIndex) && (vel != 0), {
+        ["LIGHT INDEX SKIPSTEP", ~lightIndex, lightIndex, SystemClock.beats].postln;
         ccHandler.(vel, note, chan, port)
-    })
+    });
+    ~lock.signal;
 };
 padOn = MIDIFunc.cc(ccWrapper, nil, nil, launchPad.uid);
 
