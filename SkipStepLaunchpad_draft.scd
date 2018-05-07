@@ -708,95 +708,45 @@ OSCFunc(cf, "/playChord");
 OSCFunc.trace(true);
 )
 
-(
-//template for tap tempo hanlder
-var oldTap, newTap, tapLim, tapFunc, beat;
 
-beat = .5;
-tapLim = 2;
 
-//make sure time is in seconds
-tapFunc = {|msg, time, addr, recvPort|
-	//msg[1] is a boolean vector indicating which instruments the tap occured for
-	oldTap = newTap;
-	newTap = time; //should it be SystemClock.beat instead?
-	("time"+time).postln;
-	if(newTap - oldTap < tapLim,
-		{
-			("duration"+(newTap-oldTap)).postln;
-			(0..n-1).do({|i|
-				if(msg[1].asString[i] == $1,
-					//directly set .tempo of TempoClocks here, recalculate duration to "beat"
-					{beats[i] = newTap - oldTap};
-				)}
-			)
-		}; //generalized version
-	)
-};
-)
+c.queue
 
 (
-/*start array of tempo clocks like this - beat change by tap tempo should
-give the proper behavior */
-var temp = TempoClock.new(2.0);
-/*assign to each tempoClock as {f1.value(chanVal_i)}*/
-var f1 = {|chan| /*repalce with an oscSend*/; .25};
-//if using beats array instead of TempoClock tempo, this function would return beats[i]
-temp.sched(0, f1);
-)
+c = TempoClock.new(1);
 
+~ts = Routine({
+    var i = 10;
+    var j = 0;
+    while({j < i}, {
+        ["yo", j, c.beats].postln;
+        3.wait;
+        j = j+1;
+    });
+});
 
-(
-var num = 4;
-(0..(num-1)).do({|i|
-	if('1101'.asString[i] == $1,
-		{("yes"+i).postln;"dork".post},
-		{("no"+i).postln;}
-)});
-)
-
-(
-var channelAndStartIndToPad = {|chan, ind| 70-(20*chan) + if(ind < 8, ind+11, ind-7)};
-i = 4;
-j = 1;
-(i%2)*8+j-1;
-channelAndStartIndToPad.(3, 15)
-)
-
-
-(
-var fu, gu;
-fu = {|a1| a1*2;};
-gu = {fu.value(5);};
-gu.class.postln;
-)
-~lps
-(
-var ar = Array.newClear(4);
-ar[1] = 12;
-ar[2] = "yp";
-ar.postln;
-)
-a = [1]
-(
 Task({
-	SystemClock.beats.postln;
-	1.wait;
-	SystemClock.beats.postln;
-}).play;
-)
+    (0..10).do({
+        ~ts.play;
+        0.5.wait;
+        ~ts.stop;
+        ~ts.reset;
+    });
+    ~ts.stop;
+    "trigger done".postln;
+}, c).play
 
-MIDIClient.init;
-MIDIClient.destinations.postln
+)
+~ts.reset
+~ts.play
+~ts.stop
 (
-var mid;
-MIDIClient.init;
-mid = MIDIOut.newByName("IAC Driver", "Bus 1");
-mid.postln;
-mid.noteOff(0);
+~ts.stop;
+~ts.reset;
+~ts.play;
 )
 
-a = [1, 2, 5, 3, 4, 5];
-a[2..].do({|i| i.postln});
-
+~ts.start
+~ts.free
+~ts.reset
 
