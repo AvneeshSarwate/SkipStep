@@ -1,5 +1,5 @@
 (
-var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, padIndToGreen, padIndToRed, loopingBanks, singlePlayPads, heldDownBanks, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, instrumentIsHolding, launchpadBankButtonGroupings, launchpadButtonToChanInd, launchpadBankButtonToChanInd, isBankNote, green_COLOR, red_COLOR, orange_COLOR, indToBank, buttonOnWrapper, buttonOffWrapper, ccWrapper;
+var n, beats, oldTap, newTap, tapLim, tempoClocks, oscMetronomeHit, midiOut, playHandler, tapTempoHandler, tempoChangeHandler, tempoSyncHandler, lastHits, indTest, playChordParamNum, chordDur, skipHitCalc, pythonOSCport, loopingOn, lastBeats, metronomeClocks, notesOn, clockFuncGenerator, lastBeatsHandler, holdDownPlay, loop_BUTTON, hold_BUTTON, masterLoopingOn, startMetronomeResponse, padOn, padOff, noteToXY, noteToInd, isPadNote, padIndToGreen, padIndToRed, loopingBanks, singlePlayPads, heldDownBanks, loop_LIGHT, hold_LIGHT, tampTempo_BUTTON, lastTimeTapped, beatMods, tapTempo_BUTTON, ccHandler, transposeMap, transposePositions, startPositionMap, startPosition, replayList, recordList, replayRecording, replayLoopState, replayedInstrument, record_BUTTON, replay_BUTTON, replayingLoop, replayInd, replayClock, loopStartFunctions, masterClockBeat, masterClockTempoHandler, masterClockOSCport, launchpadOut, launchPad, lastColoredIndPad, color1, color2, channelAndStartIndToPad, launchPadToChanelAndStartInd, selectedPadPerInst, launchPadButtonOn, launchPadOnFunc, launchPadButtonOff, launchpadOffFunc, instrumentIsHolding, launchpadBankButtonGroupings, launchpadButtonToChanInd, launchpadBankButtonToChanInd, isBankNote, green_COLOR, red_COLOR, orange_COLOR, indToBank, buttonOnWrapper, buttonOffWrapper, ccWrapper, playerTasks;
 
 //light switching variables
 var setLight, ccLights, padColorState, cycleLight, lightIndex, cycleLight_BUTTON, launchpadIndex = 1;
@@ -137,7 +137,8 @@ launchPadButtonOn = {|vel, note, chan, port|
         var padSlot = selectedPadPerInst[channel];
         var bankInd = (padSlot*4) + channel; //this gives the bankInd
         ["START LOOP", channel, padSlot, startInd, loopingOn[channel], instrumentIsHolding[channel]].postln;
-        metronomeClocks[channel].clear;
+        playerTasks[channel].stop;
+        "PLAYER TASKS".postln;
         midiOut.allNotesOff(channel);
         if(loopingOn[channel],{
             loopStartFunctions[channel] = {pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd)};
@@ -171,7 +172,7 @@ launchPadButtonOff = {|vel, note, chan, port|
         var bankInd = (padSlot*4) + channel; //this gives the bankInd
         ["off hanlder", note, heldDownBanks].postln;
         if(heldDownBanks.includes(bankInd), {
-            metronomeClocks[channel].clear;
+            playerTasks[channel].stop;
             notesOn[channel].do({|i| midiOut.noteOff(channel, i)});
             notesOn[channel].clear;
             heldDownBanks.remove(bankInd);
@@ -224,7 +225,7 @@ setLight = {|note, color, lightIndexOverride=false|
 cycleLight = {
     //TODO: change name of this port to something like SCOSCport
     Task({
-        ["NEW LIGHT INDEX TRIGGER FROM SKIPSTEP", ~lightIndex[launchpadIndex]].postln;
+        ["NEW LIGHT INDEX TRIGGER FROM ALGKEYS", ~lightIndex[launchpadIndex]].postln;
         masterClockOSCport.sendMsg("/lightsChange", (~lightIndex[launchpadIndex]+1)%~lightIndexes[launchpadIndex].size);
         0.01.wait;
         ~lightIndex[launchpadIndex] = (~lightIndex[launchpadIndex]+1)%~lightIndexes[launchpadIndex].size;
@@ -238,7 +239,7 @@ OSCFunc({|msg, time, addr, recvPort|
         (0..99).do({|i| colorStateLog.add(0)});
         padColorState.keys.do({|key| setLight.(key, padColorState[key], true);
             colorStateLog[key]=padColorState[key]});
-        ["CHANGING TO SKIPSTEP LIGHTS", msg[1], colorStateLog].postln;
+        ["CHANGING TO ALGOKEYS LIGHTS", msg[1], colorStateLog].postln;
     });
 
 }, "/lightsChange");
@@ -253,7 +254,7 @@ lightIndex = if(~lightIndexes[launchpadIndex].size == 0,
     }
 );
 ~lightIndex[launchpadIndex] = lightIndex;
-["LIGHT INDEX SKIPSTEP", ~lightIndex[launchpadIndex], lightIndex].postln;
+["LIGHT INDEX ALGOKEYS", ~lightIndex[launchpadIndex], lightIndex].postln;
 //----------------------------------------------
 
 (1..8).do{|i|
@@ -302,6 +303,19 @@ clockFuncGenerator = {|i|
 	}
 };
 
+playerTasks = List.fill(n, {0});
+(0..3).do({|i|
+    playerTasks[i] = Task({
+        var running = true;
+        var clockFunc = clockFuncGenerator.(i);
+        while({running}, {
+            var waitVal = clockFunc.();
+            if(waitVal.isNil.not, {waitVal.wait}, {running = false});
+        });
+        ["TASK FINISHED", i].postln;
+    }, metronomeClocks[i])
+});
+
 //Launchpad circle button push
 ccHandler = {|vel, note, chan, port|
 	if(isBankNote.(note) && (vel !=0), {
@@ -322,7 +336,7 @@ ccHandler = {|vel, note, chan, port|
 
         if(loopingBanks.includes(bankInd), {
             "STOP LOOP".postln;
-            metronomeClocks[xVal].clear;
+            playerTasks[xVal].stop;
             setLight.(note, green_COLOR);
         });
         selectedPadPerInst[xVal] = yVal;
@@ -406,7 +420,9 @@ padOn = MIDIFunc.cc(ccWrapper, nil, nil, launchPad.uid);
 //msg[2] is the miniState index that is being played on the metronome
 startMetronomeResponse = {|msg, time, addr, recvPort|
 	("metronome started for" + msg[1]).postln;
-	metronomeClocks[msg[1]].sched(0, clockFuncGenerator.(msg[1], msg[2]));
+    // metronomeClocks[msg[1]].sched(0, clockFuncGenerator.(msg[1], msg[2]));
+    playerTasks[msg[1]].reset;
+    playerTasks[msg[1]].play;
 };
 OSCFunc(startMetronomeResponse, "/startMetronome");
 
@@ -422,21 +438,38 @@ OSCFunc(lastBeatsHandler, "/lastBeats");
 ~lps = loopStartFunctions;
 ~lps;
 OSCFunc({|msg, time, addr, recvPort|
-    (0..3).do({|i| metronomeClocks[i] = TempoClock.new(1/msg[1].asFloat, 0)});
+    (0..3).do({|i|
+        var task;
+        metronomeClocks[i] = TempoClock.new(1/msg[1].asFloat, 0);
+        task = Task({
+            {
+                // ["loop", i, loopStartFunctions[i].isNil.not].postln;
+                /*if(loopStartFunctions[i].isNil.not, {
+                    loopStartFunctions[i].();
+                    loopStartFunctions[i] = nil;
+                    ["start", i].postln;
+                });*/
+                0.25.wait;
+            }.loop;
+            ["task loop end", i].postln;
+
+        }, metronomeClocks[i]);
+        task.play;
+    });
 	"SKIPSTEP ONESHOT".postln;
 }, "/masterClockBeat").oneShot;
 
-//msg[1] is the new BEAT DURATION (not tempo)
-masterClockBeat = {|msg, time, addr, recvPort|
-	(0..3).do({|i|
-		if(loopStartFunctions[i] != nil, {
-			loopStartFunctions[i].();
-			loopStartFunctions[i] = nil;
-		})
-	});
-	//"SKIPSTEP BEAT".postln;
-};
-OSCFunc(masterClockBeat, "/masterClockBeat");
+// //msg[1] is the new BEAT DURATION (not tempo)
+// masterClockBeat = {|msg, time, addr, recvPort|
+//     (0..3).do({|i|
+//         if(loopStartFunctions[i] != nil, {
+//             loopStartFunctions[i].();
+//             loopStartFunctions[i] = nil;
+//         })
+//     });
+//     //"SKIPSTEP BEAT".postln;
+// };
+// OSCFunc(masterClockBeat, "/masterClockBeat");
 
 //msg[1] is the new BEAT DURATION (not tempo)
 masterClockTempoHandler = {|msg, time, addr, recvPort|
