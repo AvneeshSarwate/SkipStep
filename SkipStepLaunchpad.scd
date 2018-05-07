@@ -149,6 +149,7 @@ launchPadButtonOn = {|vel, note, chan, port|
         var bankInd = (padSlot*4) + channel; //this gives the bankInd
         ["START LOOP", channel, padSlot, startInd, loopingOn[channel], instrumentIsHolding[channel]].postln;
         metronomeClocks[channel].clear;
+        midiOut.allNotesOff(channel);
         if(loopingOn[channel],{
             loopStartFunctions[channel] = {pythonOSCport.sendMsg("/padHit", channel, padSlot, startInd)};
         });
@@ -368,7 +369,7 @@ ccHandler = {|vel, note, chan, port|
 		var thisHit = TempoClock.default.beats;
 		var beatDif = thisHit - lastTimeTapped;
 		lastTimeTapped = thisHit;
-		["tapTempo", 60*(1/beatDif)].postln;
+		["tapTempo", 60*(1/beatDif), beatDif].postln;
 		//TODO - send tap info to master clock
 		if(TempoClock.default.beats2secs(beatDif) < 2, {masterClockOSCport.sendMsg("/uploadTempo", beatDif)});
 	});
@@ -450,6 +451,7 @@ OSCFunc(masterClockBeat, "/masterClockBeat");
 
 //msg[1] is the new BEAT DURATION (not tempo)
 masterClockTempoHandler = {|msg, time, addr, recvPort|
+    ["GOT TEMPO", msg[1]].postln;
 	(0..3).do({|i| metronomeClocks[i].tempo = 1/msg[1].asFloat})
 };
 OSCFunc(masterClockTempoHandler, "/masterClockTempo");

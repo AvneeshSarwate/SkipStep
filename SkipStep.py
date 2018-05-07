@@ -1503,11 +1503,15 @@ try:
     loop = MultiLoop(4, port)
     #loop2 = Looper(p, trans)
     #loop.check()
+    "UI server starting"   
     loop.uiStart()
-    loop.playStart()
+    # loop.playStart()
+    "SC server starting"
+    loop.oscServSelf.serve_forever()
     "started"
 except KeyboardInterrupt:
     print "stopped"
     loop.oscServUI.close()
+    loop.uiThread.join()
     loop.oscServSelf.close()
 
